@@ -124,8 +124,6 @@ class _DailyCollectionFormPageState
                       ),
                       maxLines: 3,
                       textCapitalization: TextCapitalization.sentences,
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Note is required' : null,
                     ),
                     const SizedBox(height: 16),
                     InkWell(

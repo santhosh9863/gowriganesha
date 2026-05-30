@@ -30,7 +30,11 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
     _expectedController = TextEditingController();
     _givenController = TextEditingController();
     _notesController = TextEditingController();
-    if (widget.targetId != null) _loadTarget();
+    if (widget.targetId != null) {
+      _loadTarget();
+    } else {
+      _isLoading = false;
+    }
   }
 
   Future<void> _loadTarget() async {

@@ -15,6 +15,7 @@ const _navItems = [
   _NavItem(icon: Icons.handshake_rounded, label: 'Sponsors'),
   _NavItem(icon: Icons.account_balance_wallet_rounded, label: 'Daily'),
   _NavItem(icon: Icons.receipt_long_rounded, label: 'Expenses'),
+  _NavItem(icon: Icons.follow_the_signs_rounded, label: 'Follow-ups'),
 ];
 
 class AnimatedBottomNav extends StatelessWidget {
@@ -87,7 +88,7 @@ class _NavBarItemState extends State<_NavBarItem>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 250),
+      duration: const Duration(milliseconds: 200),
       vsync: this,
     );
     _scale = Tween<double>(begin: 1.0, end: 1.15).animate(

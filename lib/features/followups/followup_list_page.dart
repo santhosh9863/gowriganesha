@@ -78,8 +78,7 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage>
   ) {
     final items = allItems.where((f) {
       if (_filter == 'active') return f.status == 'active';
-      if (_filter == 'completed') return f.status == 'completed';
-      return true;
+      return f.status == 'completed';
     }).toList();
 
     return Column(
@@ -103,12 +102,6 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage>
                 label: const Text('Completed'),
                 selected: _filter == 'completed',
                 onSelected: (_) => setState(() => _filter = 'completed'),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              FilterChip(
-                label: const Text('All'),
-                selected: _filter == 'all',
-                onSelected: (_) => setState(() => _filter = 'all'),
               ),
             ],
           ),
@@ -338,11 +331,56 @@ class _FollowUpCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        item.sponsorName,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              item.sponsorName,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (isActive && isOverdue) ...[
+                            const SizedBox(width: AppSpacing.sm),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEF4444).withAlpha(25),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'OVERDUE',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: const Color(0xFFEF4444),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 9,
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (isActive && isDueToday) ...[
+                            const SizedBox(width: AppSpacing.sm),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF59E0B).withAlpha(25),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'DUE TODAY',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: const Color(0xFFF59E0B),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 9,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       Row(
@@ -369,6 +407,40 @@ class _FollowUpCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (isActive && onCollected != null)
+                  GestureDetector(
+                    onTap: onCollected,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: statusColor.withAlpha(20),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: statusColor.withAlpha(60),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.check_circle_rounded,
+                            size: 14,
+                            color: statusColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Collect',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: statusColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 4),
                 PopupMenuButton<String>(
                   onSelected: (value) {
                     if (value == 'edit') onEdit();
@@ -418,17 +490,6 @@ class _FollowUpCard extends StatelessWidget {
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-              ),
-            ],
-            if (isActive) ...[
-              const SizedBox(height: AppSpacing.md),
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton.tonalIcon(
-                  onPressed: onCollected,
-                  icon: const Icon(Icons.check_circle_rounded, size: 18),
-                  label: const Text('Collected'),
-                ),
               ),
             ],
           ],

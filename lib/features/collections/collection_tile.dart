@@ -43,16 +43,6 @@ _StatusData _statusData(_CollectionStatus s) => switch (s) {
         ),
     };
 
-String _relativeTime(DateTime updated) {
-  final now = DateTime.now();
-  final diff = now.difference(updated);
-  if (diff.inMinutes < 1) return 'Updated just now';
-  if (diff.inMinutes < 60) return 'Updated ${diff.inMinutes} min ago';
-  if (diff.inHours < 24) return 'Updated ${diff.inHours}h ago';
-  if (diff.inDays == 1) return 'Updated Yesterday';
-  return 'Updated ${diff.inDays} days ago';
-}
-
 class CollectionTile extends StatelessWidget {
   final Target target;
   final VoidCallback onDelete;
@@ -71,7 +61,9 @@ class CollectionTile extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final status = _status(target);
     final sd = _statusData(status);
-    final hasLocation = target.building.isNotEmpty || target.area.isNotEmpty;
+    final ratio = target.expectedAmount > 0
+        ? (target.givenAmount / target.expectedAmount).clamp(0.0, 1.0)
+        : 0.0;
 
     return Padding(
       padding: const EdgeInsets.symmetric(
@@ -108,13 +100,28 @@ class CollectionTile extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Icon(sd.icon, size: 14, color: sd.color),
-                            const SizedBox(width: AppSpacing.xs),
-                            Text(
-                              sd.label,
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                color: sd.color,
-                                fontWeight: FontWeight.w600,
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: sd.color.withAlpha(20),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(sd.icon, size: 12, color: sd.color),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    sd.label,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: sd.color,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             const Spacer(),
@@ -152,56 +159,95 @@ class CollectionTile extends StatelessWidget {
                             ),
                           ],
                         ),
-                        const SizedBox(height: AppSpacing.xs),
+                        const SizedBox(height: AppSpacing.sm),
                         Text(
                           target.name,
-                          style: theme.textTheme.titleLarge?.copyWith(
+                          style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        if (hasLocation) ...[
-                          const SizedBox(height: AppSpacing.xs),
-                          Text(
-                            [
-                              if (target.building.isNotEmpty) target.building,
-                              if (target.area.isNotEmpty) target.area,
-                            ].join(', '),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
                         const SizedBox(height: AppSpacing.sm),
                         Row(
                           children: [
                             Expanded(
-                              child: _AmountLabel(
-                                label: 'Expected',
-                                amount: target.expectedAmount,
-                                color: colorScheme.primary,
-                                theme: theme,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: LinearProgressIndicator(
+                                      value: ratio,
+                                      minHeight: 6,
+                                      backgroundColor:
+                                          colorScheme.primaryContainer
+                                              .withAlpha(120),
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppSpacing.xs),
+                                  Row(
+                                    children: [
+                                      AmountText(
+                                        amount: target.givenAmount,
+                                        style:
+                                            theme.textTheme.bodySmall?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                          color: colorScheme.tertiary,
+                                        ),
+                                      ),
+                                      Text(
+                                        ' of ',
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                          color:
+                                              colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                      AmountText(
+                                        amount: target.expectedAmount,
+                                        style:
+                                            theme.textTheme.bodySmall?.copyWith(
+                                          color:
+                                              colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(width: AppSpacing.xs),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: onQuickUpdate,
+                            const SizedBox(width: AppSpacing.sm),
+                            GestureDetector(
+                              onTap: onQuickUpdate,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.tertiary.withAlpha(20),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color:
+                                        colorScheme.tertiary.withAlpha(60),
+                                  ),
+                                ),
                                 child: Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Expanded(
-                                      child: _AmountLabel(
-                                        label: 'Received',
-                                        amount: target.givenAmount,
+                                    Text(
+                                      'Update',
+                                      style:
+                                          theme.textTheme.labelSmall?.copyWith(
                                         color: colorScheme.tertiary,
-                                        theme: theme,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
-                                    const SizedBox(width: AppSpacing.xs),
+                                    const SizedBox(width: 4),
                                     Icon(
                                       Icons.edit_rounded,
-                                      size: 14,
+                                      size: 12,
                                       color: colorScheme.tertiary,
                                     ),
                                   ],
@@ -209,13 +255,6 @@ class CollectionTile extends StatelessWidget {
                               ),
                             ),
                           ],
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          _relativeTime(target.updatedAt.toDate()),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurface.withAlpha(100),
-                          ),
                         ),
                       ],
                     ),
@@ -226,43 +265,6 @@ class CollectionTile extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _AmountLabel extends StatelessWidget {
-  final String label;
-  final int amount;
-  final Color color;
-  final ThemeData theme;
-
-  const _AmountLabel({
-    required this.label,
-    required this.amount,
-    required this.color,
-    required this.theme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.labelLarge?.copyWith(
-            color: color,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        AmountText(
-          amount: amount,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
     );
   }
 }

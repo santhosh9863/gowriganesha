@@ -1,0 +1,1026 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:ganesha_2026/core/constants.dart';
+import 'package:ganesha_2026/core/design/app_spacing.dart';
+import 'package:ganesha_2026/core/design/app_radius.dart';
+import 'package:ganesha_2026/core/providers/dashboard_provider.dart';
+import 'package:ganesha_2026/core/providers/activity_provider.dart';
+import 'package:ganesha_2026/core/providers/chart_provider.dart';
+import 'package:ganesha_2026/core/models/activity.dart';
+import 'dart:math' as math;
+import 'package:ganesha_2026/core/providers/followup_provider.dart';
+
+class DashboardPage extends ConsumerStatefulWidget {
+  const DashboardPage({super.key});
+
+  @override
+  ConsumerState<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends ConsumerState<DashboardPage> {
+  static bool _hasPlayedIntro = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!_hasPlayedIntro) {
+      _hasPlayedIntro = true;
+    }
+  }
+
+  String _fmt(int n) => NumberFormat('#,##,###', 'en_IN').format(n);
+
+  @override
+  Widget build(BuildContext context) {
+    final dashboard = ref.watch(dashboardProvider);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Dashboard'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_rounded),
+            tooltip: 'Settings',
+            onPressed: () => context.push('/settings'),
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(dashboardProvider);
+          ref.invalidate(activitiesStreamProvider);
+          ref.invalidate(activeFollowUpsProvider);
+          ref.invalidate(dailyChartProvider);
+        },
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            final isWide = width > 900;
+            final isMedium = width > 600;
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.sm,
+                AppSpacing.lg,
+                AppSpacing.xxxl,
+              ),
+              child: isWide
+                  ? _WideLayout(dashboard: dashboard, fmt: _fmt)
+                  : isMedium
+                      ? _MediumLayout(dashboard: dashboard, fmt: _fmt)
+                      : _NarrowLayout(dashboard: dashboard, fmt: _fmt),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _WideLayout extends StatelessWidget {
+  final DashboardData dashboard;
+  final String Function(int) fmt;
+  const _WideLayout({required this.dashboard, required this.fmt});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 2, child: _GoalProgress(dashboard: dashboard, fmt: fmt)),
+            const SizedBox(width: AppSpacing.lg),
+            Expanded(flex: 1, child: _BalanceCard(dashboard: dashboard, fmt: fmt)),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 2, child: _CollectionTrend(dashboard: dashboard, fmt: fmt)),
+            const SizedBox(width: AppSpacing.lg),
+            Expanded(flex: 1, child: _QuickStats(dashboard: dashboard, fmt: fmt)),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xxl),
+        _RecentActivityCard(),
+      ],
+    );
+  }
+}
+
+class _MediumLayout extends StatelessWidget {
+  final DashboardData dashboard;
+  final String Function(int) fmt;
+  const _MediumLayout({required this.dashboard, required this.fmt});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _GoalProgress(dashboard: dashboard, fmt: fmt),
+        const SizedBox(height: AppSpacing.lg),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: _BalanceCard(dashboard: dashboard, fmt: fmt)),
+            const SizedBox(width: AppSpacing.lg),
+            Expanded(child: _QuickStats(dashboard: dashboard, fmt: fmt)),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        _CollectionTrend(dashboard: dashboard, fmt: fmt),
+        const SizedBox(height: AppSpacing.xxl),
+        _RecentActivityCard(),
+      ],
+    );
+  }
+}
+
+class _NarrowLayout extends StatelessWidget {
+  final DashboardData dashboard;
+  final String Function(int) fmt;
+  const _NarrowLayout({required this.dashboard, required this.fmt});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _GoalProgress(dashboard: dashboard, fmt: fmt),
+        const SizedBox(height: AppSpacing.md),
+        _BalanceCard(dashboard: dashboard, fmt: fmt),
+        const SizedBox(height: AppSpacing.md),
+        _CollectionTrend(dashboard: dashboard, fmt: fmt),
+        const SizedBox(height: AppSpacing.md),
+        _QuickStats(dashboard: dashboard, fmt: fmt),
+        const SizedBox(height: AppSpacing.xxl),
+        _RecentActivityCard(),
+      ],
+    );
+  }
+}
+
+class _GoalProgress extends StatelessWidget {
+  final DashboardData dashboard;
+  final String Function(int) fmt;
+  const _GoalProgress({required this.dashboard, required this.fmt});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final progress = dashboard.progressPercent / 100;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: AppRadius.cardBorder,
+        border: Border.all(color: cs.outlineVariant.withAlpha(80)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: cs.primary.withAlpha(20),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.trending_up_rounded, size: 20, color: cs.primary),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                'Goal Progress',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          Text(
+            '${AppConstants.currencySymbol}${fmt(dashboard.expectedTotal)}',
+            style: theme.textTheme.displayLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: cs.primary,
+              letterSpacing: -1.5,
+              height: 1.0,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Expected Sponsorship',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: cs.onSurface.withAlpha(120),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xxl),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: (progress).clamp(0.0, 1.0),
+              minHeight: 14,
+              backgroundColor: cs.primaryContainer.withAlpha(120),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Text(
+                '${AppConstants.currencySymbol}${fmt(dashboard.collectedTotal)} collected',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: cs.tertiary,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${dashboard.progressPercent.toStringAsFixed(0)}%',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: cs.tertiary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest.withAlpha(80),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                _MiniStat(
+                  label: 'Collected',
+                  value: '${AppConstants.currencySymbol}${fmt(dashboard.collectedTotal)}',
+                  color: cs.tertiary,
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Container(width: 1, height: 36, color: cs.outlineVariant),
+                const SizedBox(width: AppSpacing.md),
+                _MiniStat(
+                  label: 'Remaining',
+                  value: '${AppConstants.currencySymbol}${fmt(dashboard.remainingCollection)}',
+                  color: dashboard.remainingCollection > 0 ? cs.error : cs.tertiary,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const _MiniStat({required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BalanceCard extends StatelessWidget {
+  final DashboardData dashboard;
+  final String Function(int) fmt;
+  const _BalanceCard({required this.dashboard, required this.fmt});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isPositive = dashboard.balance >= 0;
+    final balColor = isPositive ? cs.tertiary : cs.error;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: AppRadius.cardBorder,
+        border: Border.all(color: cs.outlineVariant.withAlpha(80)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: balColor.withAlpha(20),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.account_balance_rounded,
+                  size: 20,
+                  color: balColor,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  'Balance',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: balColor.withAlpha(15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isPositive ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                      size: 12,
+                      color: balColor,
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      isPositive ? 'Surplus' : 'Deficit',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: balColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            '${AppConstants.currencySymbol}${fmt(dashboard.balance)}',
+            style: theme.textTheme.displayMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: balColor,
+              letterSpacing: -1.0,
+              height: 1.0,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Icon(Icons.receipt_long_rounded, size: 13, color: cs.error),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  'Expenses: ${AppConstants.currencySymbol}${fmt(dashboard.totalExpenses)}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            '${((dashboard.collectedTotal > 0 ? (dashboard.balance / dashboard.collectedTotal) * 100 : 0)).toStringAsFixed(0)}% retention',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: cs.onSurface.withAlpha(120),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CollectionTrend extends ConsumerWidget {
+  final DashboardData dashboard;
+  final String Function(int) fmt;
+  const _CollectionTrend({required this.dashboard, required this.fmt});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final chartData = ref.watch(dailyChartProvider);
+
+    final totalInPeriod = chartData.fold<int>(0, (v, p) => v + p.amount);
+    final spots = chartData.asMap().entries.map((e) {
+      return FlSpot(e.key.toDouble(), e.value.amount.toDouble());
+    }).toList();
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: AppRadius.cardBorder,
+        border: Border.all(color: cs.outlineVariant.withAlpha(80)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: cs.tertiary.withAlpha(20),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.bar_chart_rounded,
+                  size: 20,
+                  color: cs.tertiary,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                'Collection Trend',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '14 days',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: cs.onSurface.withAlpha(120),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          SizedBox(
+            height: 180,
+            child: spots.isEmpty || spots.every((s) => s.y == 0)
+                ? Center(
+                    child: Text(
+                      'No collection data yet',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  )
+                : LineChart(
+                    LineChartData(
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        horizontalInterval: _roundInterval(
+                          chartData.map((e) => e.amount).reduce((a, b) => a > b ? a : b).toDouble(),
+                        ),
+                        getDrawingHorizontalLine: (value) => FlLine(
+                          color: cs.outlineVariant.withAlpha(60),
+                          strokeWidth: 1,
+                        ),
+                      ),
+                      titlesData: FlTitlesData(
+                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 40,
+                            getTitlesWidget: (value, meta) {
+                              if (value == 0) return const SizedBox.shrink();
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 4),
+                                child: Text(
+                                  _shortFmt(value.toInt()),
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: cs.onSurface.withAlpha(100),
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 20,
+                            interval: chartData.length > 10 ? 2 : 1,
+                            getTitlesWidget: (value, meta) {
+                              final idx = value.toInt();
+                              if (idx < 0 || idx >= chartData.length) return const SizedBox.shrink();
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  chartData[idx].label,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: cs.onSurface.withAlpha(100),
+                                    fontSize: 9,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: spots,
+                          isCurved: true,
+                          preventCurveOverShooting: true,
+                          color: cs.tertiary,
+                          barWidth: 3,
+                          isStrokeCapRound: true,
+                          dotData: const FlDotData(show: false),
+                          belowBarData: BarAreaData(
+                            show: true,
+                            color: cs.tertiary.withAlpha(25),
+                          ),
+                        ),
+                      ],
+                      lineTouchData: LineTouchData(
+                        enabled: true,
+                        touchTooltipData: LineTouchTooltipData(
+                          getTooltipItems: (touchedSpots) {
+                            return touchedSpots.map((spot) {
+                              final idx = spot.spotIndex;
+                              final label = idx < chartData.length ? chartData[idx].label : '';
+                              return LineTooltipItem(
+                                '$label\n${AppConstants.currencySymbol}${_shortFmt(spot.y.toInt())}',
+                                TextStyle(
+                                  color: cs.surface,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                ),
+                              );
+                            }).toList();
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              Text(
+                '${AppConstants.currencySymbol}${fmt(totalInPeriod)}',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: cs.tertiary,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                'total in 14 days',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: cs.onSurface.withAlpha(120),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+double _roundInterval(double maxVal) {
+  if (maxVal <= 0) return 1000;
+  final order = _orderOfMagnitude(maxVal);
+  final normalized = maxVal / order;
+  if (normalized <= 2) return 0.5 * order;
+  if (normalized <= 5) return 1 * order;
+  return 2 * order;
+}
+
+double _orderOfMagnitude(double val) {
+  if (val <= 0) return 1;
+  final exp = (math.log(val.abs()) / math.log(10) - 1).ceil();
+  if (exp < 0) return 1;
+  return double.parse('1e$exp');
+}
+
+String _shortFmt(int n) {
+  if (n >= 100000) return '${(n / 100000).toStringAsFixed(1)}L';
+  if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
+  return n.toString();
+}
+
+class _QuickStats extends StatelessWidget {
+  final DashboardData dashboard;
+  final String Function(int) fmt;
+  const _QuickStats({required this.dashboard, required this.fmt});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: AppRadius.cardBorder,
+        border: Border.all(color: cs.outlineVariant.withAlpha(80)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: cs.primary.withAlpha(20),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.grid_view_rounded, size: 20, color: cs.primary),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                'Quick Stats',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          _StatItem(
+            icon: Icons.today_rounded,
+            iconColor: cs.tertiary,
+            value: '${AppConstants.currencySymbol}${fmt(dashboard.todayCollection)}',
+            label: "Today's Collection",
+            sublabel: '${dashboard.todayEntryCount} entries',
+            theme: theme,
+            onTap: () => context.push('/daily-collections'),
+          ),
+          const Divider(height: AppSpacing.xxl),
+          _StatItem(
+            icon: Icons.people_rounded,
+            iconColor: cs.primary,
+            value: '${dashboard.pendingSponsorCount}',
+            label: 'Pending Sponsors',
+            sublabel: '${AppConstants.currencySymbol}${fmt(dashboard.pendingRemainingTotal)} remaining',
+            theme: theme,
+            onTap: () => context.push('/collections?filter=pending'),
+          ),
+          const Divider(height: AppSpacing.xxl),
+          _StatItem(
+            icon: Icons.notifications_rounded,
+            iconColor: cs.error,
+            value: dashboard.pendingSponsorCount > 0 ? 'Active' : 'None',
+            label: 'Pending Visits',
+            sublabel: 'Follow-ups requiring action',
+            theme: theme,
+            onTap: () => context.push('/followups'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatItem extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String value;
+  final String label;
+  final String sublabel;
+  final ThemeData theme;
+  final VoidCallback? onTap;
+
+  const _StatItem({
+    required this.icon,
+    required this.iconColor,
+    required this.value,
+    required this.label,
+    required this.sublabel,
+    required this.theme,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: iconColor.withAlpha(15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 16, color: iconColor),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    value,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 16,
+              color: theme.colorScheme.onSurface.withAlpha(80),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _activityRelativeTime(DateTime dt) {
+  final now = DateTime.now();
+  final diff = now.difference(dt);
+  if (diff.inMinutes < 1) return 'just now';
+  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+  if (diff.inHours < 24) return '${diff.inHours}h ago';
+  if (diff.inDays == 1) return 'Yesterday';
+  if (diff.inDays < 30) return '${diff.inDays}d ago';
+  return DateFormat('d MMM').format(dt);
+}
+
+IconData _activityIcon(String type) {
+  switch (type) {
+    case 'collection_recorded':
+      return Icons.account_balance_wallet_rounded;
+    case 'expense_added':
+      return Icons.receipt_long_rounded;
+    case 'followup_added':
+      return Icons.notifications_rounded;
+    case 'followup_completed':
+      return Icons.check_circle_rounded;
+    default:
+      return Icons.circle_rounded;
+  }
+}
+
+Color _activityColor(String type) {
+  switch (type) {
+    case 'collection_recorded':
+      return const Color(0xFF22C55E);
+    case 'expense_added':
+      return const Color(0xFFEF4444);
+    case 'followup_added':
+      return const Color(0xFF3B82F6);
+    case 'followup_completed':
+      return const Color(0xFF22C55E);
+    default:
+      return const Color(0xFF9CA3AF);
+  }
+}
+
+class _ActivityGroup {
+  final String label;
+  final List<Activity> activities;
+  _ActivityGroup({required this.label, required this.activities});
+}
+
+List<_ActivityGroup> _groupActivities(List<Activity> activities) {
+  final sorted = List<Activity>.from(activities)
+    ..sort((a, b) => b.createdAt.toDate().compareTo(a.createdAt.toDate()));
+
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final yesterday = today.subtract(const Duration(days: 1));
+
+  final groups = <_ActivityGroup>[];
+  _ActivityGroup? current;
+
+  for (final a in sorted) {
+    final date = a.createdAt.toDate();
+    final day = DateTime(date.year, date.month, date.day);
+    String label;
+    if (day == today) {
+      label = 'Today';
+    } else if (day == yesterday) {
+      label = 'Yesterday';
+    } else {
+      label = DateFormat('d MMM').format(date);
+    }
+
+    if (current == null || current.label != label) {
+      current = _ActivityGroup(label: label, activities: []);
+      groups.add(current);
+    }
+    current.activities.add(a);
+  }
+
+  return groups;
+}
+
+class _RecentActivityCard extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final activitiesAsync = ref.watch(activitiesStreamProvider);
+    final items = activitiesAsync.valueOrNull ?? [];
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: AppRadius.cardBorder,
+        border: Border.all(color: cs.outlineVariant.withAlpha(80)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: cs.primary.withAlpha(20),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.history_rounded,
+                  size: 20,
+                  color: cs.primary,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                'Recent Activity',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          if (items.isEmpty) ...[
+            const SizedBox(height: AppSpacing.xxl),
+            Center(
+              child: Column(
+                children: [
+                  Icon(Icons.inbox_rounded, size: 40, color: cs.onSurface.withAlpha(40)),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'No recent activity',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    'Activity will appear here once you start recording',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: cs.onSurface.withAlpha(80),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: AppSpacing.lg),
+            ..._groupActivities(items).take(4).expand((group) {
+              final maxItems = group.activities.take(5).toList();
+              return [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: Text(
+                    group.label,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                ...maxItems.map((a) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(AppSpacing.sm),
+                            decoration: BoxDecoration(
+                              color: _activityColor(a.type).withAlpha(20),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              _activityIcon(a.type),
+                              size: 16,
+                              color: _activityColor(a.type),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  a.title,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  a.description,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Text(
+                            _activityRelativeTime(a.createdAt.toDate()),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: cs.onSurface.withAlpha(150),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )),
+                if (group.activities.length > 5)
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.xs),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () {},
+                        icon: const Icon(Icons.expand_more_rounded, size: 16),
+                        label: Text(
+                          '${group.activities.length - 5} more',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: cs.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: AppSpacing.sm),
+              ];
+            }),
+          ],
+        ],
+      ),
+    );
+  }
+}

@@ -25,84 +25,111 @@ GoRoute _buildRoute(String path, Widget page) {
 final _router = GoRouter(
   initialLocation: '/',
   routes: [
-    ShellRoute(
-      builder: (context, state, child) => AppScaffold(child: child),
-      routes: [
-        _buildRoute('/', const DashboardPage()),
-        GoRoute(
-          path: '/collections',
-          pageBuilder: (context, state) =>
-              PageTransition.fadeSlide(const CollectionListPage()),
+    StatefulShellRoute.indexedStack(
+      builder: (context, state, navigationShell) =>
+          AppScaffold(navigationShell: navigationShell),
+      branches: [
+        StatefulShellBranch(
           routes: [
-            _buildRoute('add', const CollectionFormPage()),
+            _buildRoute('/', const DashboardPage()),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
             GoRoute(
-              path: ':targetId',
-              pageBuilder: (context, state) {
-                final targetId = state.pathParameters['targetId']!;
-                return PageTransition.fadeSlide(
-                  CollectionDetailPage(targetId: targetId),
-                );
-              },
-            ),
-            GoRoute(
-              path: ':targetId/edit',
-              pageBuilder: (context, state) {
-                final targetId = state.pathParameters['targetId']!;
-                return PageTransition.fadeSlide(
-                  CollectionFormPage(targetId: targetId),
-                );
-              },
+              path: '/collections',
+              pageBuilder: (context, state) =>
+                  PageTransition.fadeSlide(const CollectionListPage()),
+              routes: [
+                _buildRoute('add', const CollectionFormPage()),
+                GoRoute(
+                  path: ':targetId',
+                  pageBuilder: (context, state) {
+                    final targetId = state.pathParameters['targetId']!;
+                    return PageTransition.fadeSlide(
+                      CollectionDetailPage(targetId: targetId),
+                    );
+                  },
+                ),
+                GoRoute(
+                  path: ':targetId/edit',
+                  pageBuilder: (context, state) {
+                    final targetId = state.pathParameters['targetId']!;
+                    return PageTransition.fadeSlide(
+                      CollectionFormPage(targetId: targetId),
+                    );
+                  },
+                ),
+              ],
             ),
           ],
         ),
-        GoRoute(
-          path: '/expenses',
-          pageBuilder: (context, state) =>
-              PageTransition.fadeSlide(const ExpenseListPage()),
+        StatefulShellBranch(
           routes: [
-            _buildRoute('add', const ExpenseFormPage()),
             GoRoute(
-              path: ':expenseId/edit',
-              pageBuilder: (context, state) {
-                final expenseId = state.pathParameters['expenseId']!;
-                return PageTransition.fadeSlide(
-                  ExpenseFormPage(expenseId: expenseId),
-                );
-              },
+              path: '/daily-collections',
+              pageBuilder: (context, state) =>
+                  PageTransition.fadeSlide(const DailyCollectionListPage()),
+              routes: [
+                _buildRoute('add', const DailyCollectionFormPage()),
+                GoRoute(
+                  path: ':dailyCollectionId/edit',
+                  pageBuilder: (context, state) {
+                    final id = state.pathParameters['dailyCollectionId']!;
+                    return PageTransition.fadeSlide(
+                      DailyCollectionFormPage(dailyCollectionId: id),
+                    );
+                  },
+                ),
+              ],
             ),
           ],
         ),
-        GoRoute(
-          path: '/daily-collections',
-          pageBuilder: (context, state) =>
-              PageTransition.fadeSlide(const DailyCollectionListPage()),
+        StatefulShellBranch(
           routes: [
-            _buildRoute('add', const DailyCollectionFormPage()),
             GoRoute(
-              path: ':dailyCollectionId/edit',
-              pageBuilder: (context, state) {
-                final id = state.pathParameters['dailyCollectionId']!;
-                return PageTransition.fadeSlide(
-                  DailyCollectionFormPage(dailyCollectionId: id),
-                );
-              },
+              path: '/expenses',
+              pageBuilder: (context, state) =>
+                  PageTransition.fadeSlide(const ExpenseListPage()),
+              routes: [
+                _buildRoute('add', const ExpenseFormPage()),
+                GoRoute(
+                  path: ':expenseId/edit',
+                  pageBuilder: (context, state) {
+                    final expenseId = state.pathParameters['expenseId']!;
+                    return PageTransition.fadeSlide(
+                      ExpenseFormPage(expenseId: expenseId),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/followups',
+              pageBuilder: (context, state) =>
+                  PageTransition.fadeSlide(const FollowUpListPage()),
+              routes: [
+                _buildRoute('add', const FollowUpFormPage()),
+                GoRoute(
+                  path: ':followUpId/edit',
+                  pageBuilder: (context, state) {
+                    final id = state.pathParameters['followUpId']!;
+                    return PageTransition.fadeSlide(
+                      FollowUpFormPage(followUpId: id),
+                    );
+                  },
+                ),
+              ],
             ),
           ],
         ),
       ],
     ),
     _buildRoute('/settings', const SettingsPage()),
-    _buildRoute('/followups', const FollowUpListPage()),
-    _buildRoute('/followups/add', const FollowUpFormPage()),
-    GoRoute(
-      path: '/followups/:followUpId/edit',
-      pageBuilder: (context, state) {
-        final id = state.pathParameters['followUpId']!;
-        return PageTransition.fadeSlide(
-          FollowUpFormPage(followUpId: id),
-        );
-      },
-    ),
   ],
 );
 

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ganesha_2026/core/providers/target_provider.dart';
 import 'package:ganesha_2026/core/providers/expense_provider.dart';
 import 'package:ganesha_2026/core/providers/daily_collection_provider.dart';
+import 'package:ganesha_2026/core/providers/budget_provider.dart';
 
 class DashboardData {
   final int expectedTotal;
@@ -35,13 +36,16 @@ final dashboardProvider = Provider<DashboardData>((ref) {
   final targetsAsync = ref.watch(targetsStreamProvider);
   final expensesAsync = ref.watch(expensesStreamProvider);
   final dailyCollectionsAsync = ref.watch(dailyCollectionsStreamProvider);
+  final budgetAsync = ref.watch(budgetProvider);
 
   final targets = targetsAsync.valueOrNull ?? [];
   final expenses = expensesAsync.valueOrNull ?? [];
   final dailyCollections = dailyCollectionsAsync.valueOrNull ?? [];
 
-  final expectedTotal =
+  final expectedFromTargets =
       targets.fold<int>(0, (v, t) => v + t.expectedAmount);
+  final budget = budgetAsync.valueOrNull ?? expectedFromTargets;
+  final expectedTotal = budget > 0 ? budget : expectedFromTargets;
   final sponsorCollected =
       targets.fold<int>(0, (v, t) => v + t.givenAmount);
   final totalDaily =

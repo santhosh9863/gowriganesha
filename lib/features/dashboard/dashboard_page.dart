@@ -1,41 +1,848 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:ganesha_2026/core/constants.dart';
-import 'package:ganesha_2026/core/design/app_spacing.dart';
-import 'package:ganesha_2026/core/design/app_radius.dart';
+import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/providers/dashboard_provider.dart';
 import 'package:ganesha_2026/core/providers/activity_provider.dart';
-import 'package:ganesha_2026/core/models/sponsor_followup.dart';
+import 'package:ganesha_2026/core/providers/chart_provider.dart';
 import 'package:ganesha_2026/core/providers/followup_provider.dart';
-import 'package:ganesha_2026/shared/widgets/app_card.dart';
-import 'package:ganesha_2026/shared/widgets/app_empty_state.dart';
+
+const _s8 = 8.0;
+const _s12 = 12.0;
+const _s16 = 16.0;
+const _s20 = 20.0;
+const _s24 = 24.0;
+const _s32 = 32.0;
+
+const _green = Color(0xFF0F6B3C);
+const _greenLight = Color(0xFFE8F5E9);
+const _success = Color(0xFF22C55E);
+const _amber = Color(0xFFF59E0B);
+const _red = Color(0xFFEF4444);
+const _surface = Color(0xFFF4F6F8);
+const _card = Color(0xFFFFFFFF);
+const _textPri = Color(0xFF1A1A2E);
+const _textSec = Color(0xFF6B7280);
+const _textTer = Color(0xFF9CA3AF);
+const _border = Color(0xFFE2E4E9);
+const _shadow = Color(0x0A000000);
+
+final _fmt = NumberFormat('#,##,###', 'en_IN');
+
+String _shortFmt(int n) {
+  if (n >= 100000) return '${(n / 100000).toStringAsFixed(1)}L';
+  if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
+  return n.toString();
+}
+
+String _greeting() {
+  final h = DateTime.now().hour;
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+String _todayDate() => DateFormat('d MMMM yyyy').format(DateTime.now());
+
+double _roundInterval(double maxVal) {
+  if (maxVal <= 0) return 1000;
+  final exp = (math.log(maxVal.abs()) / math.ln10 - 1).ceil();
+  final order = math.pow(10, exp < 0 ? 0 : exp).toDouble();
+  if (order <= 0) return 1000;
+  final n = maxVal / order;
+  if (n <= 2) return 0.5 * order;
+  if (n <= 5) return 1 * order;
+  return 2 * order;
+}
 
 class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
-
   @override
   ConsumerState<DashboardPage> createState() => _DashboardPageState();
 }
 
 class _DashboardPageState extends ConsumerState<DashboardPage>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _heroFade;
+  late final AnimationController _fadeCtrl;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
+    _fadeCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 500),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _fadeCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _surface,
+      body: SafeArea(
+        child: FadeTransition(
+          opacity: _fadeCtrl,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final w = constraints.maxWidth;
+              final isWide = w > 900;
+              return RefreshIndicator(
+                onRefresh: () async {
+                  ref.invalidate(dashboardProvider);
+                  ref.invalidate(activitiesStreamProvider);
+                  ref.invalidate(activeFollowUpsProvider);
+                  ref.invalidate(dailyChartProvider);
+                },
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(
+                    isWide ? _s32 : _s16, _s20, isWide ? _s32 : _s16, _s32,
+                  ),
+                  child: isWide ? const _WideLayout() : const _NarrowLayout(),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
     );
-    _heroFade = CurvedAnimation(
-      parent: _ctrl,
-      curve: const Interval(0.0, 0.45, curve: Curves.easeOut),
+  }
+}
+
+class _WideLayout extends StatelessWidget {
+  const _WideLayout();
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _FestivalHeader(),
+        const SizedBox(height: _s24),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Expanded(flex: 5, child: _HeroCard()),
+            const SizedBox(width: _s24),
+            const Expanded(flex: 2, child: _QuickActions()),
+          ],
+        ),
+        const SizedBox(height: _s24),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Expanded(flex: 2, child: _KpiGrid()),
+            const SizedBox(width: _s24),
+            const Expanded(flex: 3, child: _CollectionTrend()),
+          ],
+        ),
+        const SizedBox(height: _s24),
+        const _ActivityTimeline(),
+      ],
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) => _ctrl.forward());
+  }
+}
+
+class _NarrowLayout extends StatelessWidget {
+  const _NarrowLayout();
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _FestivalHeader(),
+        SizedBox(height: _s20),
+        _HeroCard(),
+        SizedBox(height: _s16),
+        _KpiGrid(),
+        SizedBox(height: _s16),
+        _QuickActions(),
+        SizedBox(height: _s16),
+        _CollectionTrend(),
+        SizedBox(height: _s24),
+        _ActivityTimeline(),
+      ],
+    );
+  }
+}
+
+class _FestivalHeader extends StatelessWidget {
+  const _FestivalHeader();
+  @override
+  Widget build(BuildContext context) {
+    final greeting = '${_greeting()},';
+    final date = _todayDate();
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              greeting,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: _textSec),
+            ),
+            const SizedBox(height: 2),
+            const Text(
+              'Sri Gowri Ganesha Festival',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: _textPri, letterSpacing: -0.3),
+            ),
+            const SizedBox(height: 1),
+            Text(
+              date,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w400, color: _textTer),
+            ),
+          ],
+        ),
+        _SettingsIcon(),
+      ],
+    );
+  }
+}
+
+class _SettingsIcon extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 38, height: 38,
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _border),
+      ),
+      child: IconButton(
+        icon: const Icon(Icons.settings_rounded, size: 18, color: _textSec),
+        onPressed: () => context.push('/settings'),
+        padding: EdgeInsets.zero,
+        tooltip: 'Settings',
+      ),
+    );
+  }
+}
+
+class _CountUp extends StatelessWidget {
+  final int target;
+  final TextStyle? style;
+  final String Function(int) format;
+  const _CountUp({required this.target, this.style, required this.format});
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: target.toDouble()),
+      duration: const Duration(milliseconds: 700),
+      curve: Curves.easeOut,
+      builder: (context, value, _) => Text(format(value.round()), style: style),
+    );
+  }
+}
+
+class _HeroCard extends StatelessWidget {
+  const _HeroCard();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(_s24),
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(
+                  color: _greenLight,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.trending_up_rounded, size: 18, color: _green),
+              ),
+              const SizedBox(width: _s12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Festival Goal',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textTer, letterSpacing: 0.3),
+                  ),
+                  Consumer(builder: (context, ref, _) {
+                    final db = ref.watch(dashboardProvider);
+                    return Text(
+                      '${db.progressPercent.toStringAsFixed(1)}% complete',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: _success),
+                    );
+                  }),
+                ],
+              ),
+              const Spacer(),
+              const Icon(Icons.trending_up_rounded, size: 16, color: _textTer),
+            ],
+          ),
+          const SizedBox(height: _s24),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Collected',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: _textSec),
+                    ),
+                    const SizedBox(height: 4),
+                    Consumer(builder: (context, ref, _) {
+                      final db = ref.watch(dashboardProvider);
+                      return _CountUp(
+                        target: db.collectedTotal,
+                        style: const TextStyle(
+                          fontSize: 38, fontWeight: FontWeight.w700, color: _textPri,
+                          letterSpacing: -1.5, height: 1.0,
+                        ),
+                        format: (v) => '${AppConstants.currencySymbol}${_fmt.format(v)}',
+                      );
+                    }),
+                    const SizedBox(height: 4),
+                    Consumer(builder: (context, ref, _) {
+                      final db = ref.watch(dashboardProvider);
+                      return Text(
+                        'Target: ${AppConstants.currencySymbol}${_fmt.format(db.expectedTotal)}',
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: _textTer),
+                      );
+                    }),
+                    const SizedBox(height: _s20),
+                    Consumer(builder: (context, ref, _) {
+                      final db = ref.watch(dashboardProvider);
+                      final pct = db.progressPercent / 100;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(3),
+                            child: TweenAnimationBuilder<double>(
+                              tween: Tween(begin: 0, end: pct.clamp(0.0, 1.0)),
+                              duration: const Duration(milliseconds: 700),
+                              curve: Curves.easeOut,
+                              builder: (context, value, _) => LinearProgressIndicator(
+                                value: value,
+                                minHeight: 6,
+                                backgroundColor: const Color(0xFFE5E7EB),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: _s8),
+                          Row(
+                            children: [
+                              Text(
+                                '${AppConstants.currencySymbol}${_shortFmt(db.remainingCollection)} remaining',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _textTer),
+                              ),
+                            ],
+                          ),
+                        ],
+                      );
+                    }),
+                  ],
+                ),
+              ),
+              const SizedBox(width: _s24),
+              Consumer(builder: (context, ref, _) {
+                final db = ref.watch(dashboardProvider);
+                return _HeroRing(
+                  progress: (db.progressPercent / 100).clamp(0.0, 1.0),
+                  size: 96,
+                  stroke: 7,
+                );
+              }),
+            ],
+          ),
+          const SizedBox(height: _s20),
+          Consumer(builder: (context, ref, _) {
+            final db = ref.watch(dashboardProvider);
+            final sponsorCount = db.pendingSponsorCount +
+                (db.collectedTotal > 0 ? 1 : 0);
+            return Row(
+              children: [
+                _Metric(label: 'Sponsors', value: sponsorCount),
+                _Divider(),
+                _Metric(label: 'Collections', value: '${AppConstants.currencySymbol}${_shortFmt(db.collectedTotal)}'),
+                _Divider(),
+                _Metric(label: 'Pending', value: db.pendingSponsorCount),
+                _Divider(),
+                _Metric(label: 'Visits', value: db.pendingSponsorCount),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class _Metric extends StatelessWidget {
+  final String label;
+  final dynamic value;
+  const _Metric({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$value',
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: _textPri),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w400, color: _textTer),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Divider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1, height: 28, color: _border,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+    );
+  }
+}
+
+class _HeroRing extends StatelessWidget {
+  final double progress;
+  final double size;
+  final double stroke;
+  const _HeroRing({required this.progress, required this.size, required this.stroke});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size + 8,
+      height: size + 8,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          CustomPaint(
+            painter: _RingPainter(
+              progress: 1, stroke: stroke,
+              color: const Color(0xFFE5E7EB),
+              trackColor: const Color(0x00000000),
+            ),
+            size: Size(size, size),
+          ),
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: progress),
+            duration: const Duration(milliseconds: 1000),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, _) => CustomPaint(
+              painter: _RingPainter(
+                progress: value, stroke: stroke,
+                color: _green, trackColor: const Color(0x00000000),
+              ),
+              size: Size(size, size),
+            ),
+          ),
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: progress),
+            duration: const Duration(milliseconds: 1000),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, _) => Text(
+              '${(value * 100).toStringAsFixed(0)}%',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _green),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RingPainter extends CustomPainter {
+  final double progress;
+  final double stroke;
+  final Color color;
+  final Color trackColor;
+  _RingPainter({required this.progress, required this.stroke, required this.color, required this.trackColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width / 2, size.height / 2);
+    final r = size.width / 2 - stroke / 2;
+    if (trackColor.a > 0) {
+      canvas.drawCircle(c, r, Paint()
+        ..color = trackColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = stroke
+        ..strokeCap = StrokeCap.round);
+    }
+    if (progress > 0) {
+      canvas.drawArc(
+        Rect.fromCircle(center: c, radius: r),
+        -math.pi / 2,
+        2 * math.pi * progress,
+        false,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = stroke
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RingPainter old) => old.progress != progress;
+}
+
+class _KpiGrid extends ConsumerWidget {
+  const _KpiGrid();
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final db = ref.watch(dashboardProvider);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = (constraints.maxWidth - _s16) / 2;
+        return Wrap(
+          spacing: _s16, runSpacing: _s16,
+          children: [
+            SizedBox(width: w, child: _KpiCard(
+              icon: Icons.today_rounded, label: "Today's Collection",
+              value: db.todayCollection, trend: '${db.todayEntryCount} entries',
+              color: _success, fmtCurrency: true,
+            )),
+            SizedBox(width: w, child: _KpiCard(
+              icon: Icons.people_rounded, label: 'Pending Sponsors',
+              value: db.pendingSponsorCount,
+              trend: '${AppConstants.currencySymbol}${_shortFmt(db.pendingRemainingTotal)} remaining',
+              color: _amber, fmtCurrency: false,
+            )),
+            SizedBox(width: w, child: _KpiCard(
+              icon: Icons.notifications_rounded, label: 'Pending Visits',
+              value: db.pendingSponsorCount, trend: 'Requires action',
+              color: _green, fmtCurrency: false,
+            )),
+            SizedBox(width: w, child: _KpiCard(
+              icon: Icons.receipt_long_rounded, label: 'Expenses',
+              value: db.totalExpenses,
+              trend: db.totalExpenses > 0
+                  ? '${((db.totalExpenses / (db.collectedTotal > 0 ? db.collectedTotal : 1)) * 100).toStringAsFixed(0)}% of collected'
+                  : 'No expenses',
+              color: _red, fmtCurrency: true,
+            )),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _KpiCard extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final int value;
+  final String trend;
+  final Color color;
+  final bool fmtCurrency;
+  const _KpiCard({required this.icon, required this.label, required this.value, required this.trend, required this.color, required this.fmtCurrency});
+
+  @override
+  State<_KpiCard> createState() => _KpiCardState();
+}
+
+class _KpiCardState extends State<_KpiCard> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.all(_s16),
+        decoration: BoxDecoration(
+          color: _card,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _border),
+          boxShadow: [
+            BoxShadow(
+              color: _shadow,
+              blurRadius: _hover ? 8 : 4,
+              offset: Offset(0, _hover ? 4 : 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  width: 32, height: 32,
+                  decoration: BoxDecoration(
+                    color: widget.color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(widget.icon, size: 16, color: widget.color),
+                ),
+              ],
+            ),
+            const SizedBox(height: _s12),
+            _CountUp(
+              target: widget.value,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: _textPri, height: 1.0),
+              format: widget.fmtCurrency
+                  ? (v) => '${AppConstants.currencySymbol}${_shortFmt(v)}'
+                  : (v) => '$v',
+            ),
+            const SizedBox(height: 4),
+            Text(widget.label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _textSec)),
+            const SizedBox(height: 4),
+            Text(widget.trend, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w400, color: _textTer)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickActions extends StatelessWidget {
+  const _QuickActions();
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(bottom: _s12),
+          child: Text('Quick Actions', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textSec)),
+        ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final w = (constraints.maxWidth - _s12) / 2;
+            return Wrap(
+              spacing: _s12, runSpacing: _s12,
+              children: [
+                SizedBox(width: w, child: _ActionTile(icon: Icons.person_add_rounded, label: 'Sponsor', color: _green, route: '/collections/add')),
+                SizedBox(width: w, child: _ActionTile(icon: Icons.account_balance_wallet_rounded, label: 'Collection', color: _success, route: '/daily-collections/add')),
+                SizedBox(width: w, child: _ActionTile(icon: Icons.notifications_active_rounded, label: 'Follow Up', color: _amber, route: '/followups/add')),
+                SizedBox(width: w, child: _ActionTile(icon: Icons.receipt_rounded, label: 'Expense', color: _red, route: '/expenses/add')),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _ActionTile extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final String route;
+  const _ActionTile({required this.icon, required this.label, required this.color, required this.route});
+
+  @override
+  State<_ActionTile> createState() => _ActionTileState();
+}
+
+class _ActionTileState extends State<_ActionTile> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        height: 100,
+        decoration: BoxDecoration(
+          color: _card,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: widget.color.withValues(alpha: _hover ? 0.2 : 0.08)),
+          boxShadow: [
+            BoxShadow(
+              color: Color.lerp(_shadow, widget.color.withValues(alpha: 0.06), _hover ? 1 : 0)!,
+              blurRadius: _hover ? 8 : 4,
+              offset: Offset(0, _hover ? 4 : 2),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => context.push(widget.route),
+            borderRadius: BorderRadius.circular(14),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(
+                    color: widget.color.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(widget.icon, size: 20, color: widget.color),
+                ),
+                const SizedBox(height: _s8),
+                Text(widget.label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textPri)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CollectionTrend extends ConsumerWidget {
+  const _CollectionTrend();
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final chartData = ref.watch(dailyChartProvider);
+    final total = chartData.fold<int>(0, (v, p) => v + p.amount);
+    final spots = chartData.asMap().entries
+        .map((e) => FlSpot(e.key.toDouble(), e.value.amount.toDouble())).toList();
+    final hasData = spots.isNotEmpty && spots.any((s) => s.y > 0);
+
+    return Container(
+      padding: const EdgeInsets.all(_s20),
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Collection Trend', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textSec)),
+              Text('14 days', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w400, color: _textTer)),
+            ],
+          ),
+          const SizedBox(height: _s20),
+          SizedBox(
+            height: 160,
+            child: hasData
+                ? LineChart(
+                    LineChartData(
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        horizontalInterval: _roundInterval(
+                          chartData.map((e) => e.amount).reduce((a, b) => a > b ? a : b).toDouble(),
+                        ),
+                        getDrawingHorizontalLine: (v) => FlLine(color: _border, strokeWidth: 1),
+                      ),
+                      titlesData: const FlTitlesData(
+                        topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: spots,
+                          isCurved: true,
+                          preventCurveOverShooting: true,
+                          color: _green,
+                          barWidth: 2,
+                          isStrokeCapRound: true,
+                          dotData: const FlDotData(show: false),
+                          belowBarData: BarAreaData(
+                            show: true,
+                            gradient: LinearGradient(
+                              colors: [
+                                _green.withValues(alpha: 0.12),
+                                _green.withValues(alpha: 0.0),
+                              ],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ),
+                          ),
+                        ),
+                      ],
+                      lineTouchData: LineTouchData(
+                        enabled: true,
+                        touchTooltipData: LineTouchTooltipData(
+                          getTooltipItems: (touchedSpots) {
+                            return touchedSpots.map((spot) {
+                              final idx = spot.spotIndex;
+                              final label = idx < chartData.length ? chartData[idx].label : '';
+                              return LineTooltipItem(
+                                '$label\n${AppConstants.currencySymbol}${_shortFmt(spot.y.toInt())}',
+                                const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 11),
+                              );
+                            }).toList();
+                          },
+                        ),
+                      ),
+                    ),
+                  )
+                : const _ChartSkeleton(),
+          ),
+          if (hasData) ...[
+            const SizedBox(height: _s12),
+            Row(
+              children: [
+                Text(
+                  '${AppConstants.currencySymbol}${_fmt.format(total)}',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _textPri),
+                ),
+                const SizedBox(width: 6),
+                const Text('total in 14 days', style: TextStyle(fontSize: 12, color: _textTer)),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ChartSkeleton extends StatefulWidget {
+  const _ChartSkeleton();
+  @override
+  State<_ChartSkeleton> createState() => _ChartSkeletonState();
+}
+
+class _ChartSkeletonState extends State<_ChartSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(seconds: 2))
+      ..repeat(reverse: true);
   }
 
   @override
@@ -44,773 +851,157 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
     super.dispose();
   }
 
-  String _fmt(int n) {
-    return NumberFormat('#,##,###', 'en_IN').format(n);
-  }
-
   @override
   Widget build(BuildContext context) {
-    final dashboard = ref.watch(dashboardProvider);
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final progress = dashboard.progressPercent / 100;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Dashboard'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_rounded),
-            tooltip: 'Settings',
-            onPressed: () => context.push('/settings'),
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(dashboardProvider);
-          ref.invalidate(activitiesStreamProvider);
-          ref.invalidate(activeFollowUpsProvider);
-        },
-        child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.sm,
-              AppSpacing.lg,
-              AppSpacing.xxxl,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _HeroSection(
-                  fade: _heroFade,
-                  controller: _ctrl,
-                  target: dashboard.expectedTotal,
-                  collected: dashboard.collectedTotal,
-                  progress: progress,
-                  theme: theme,
-                  colorScheme: colorScheme,
-                  fmt: _fmt,
-                ),
-                const SizedBox(height: AppSpacing.xxl),
-                _PendingVisits(theme: theme, colorScheme: colorScheme),
-                const SizedBox(height: AppSpacing.lg),
-                _PendingSponsors(theme: theme, colorScheme: colorScheme),
-                const SizedBox(height: AppSpacing.lg),
-                _TodayCollection(theme: theme, colorScheme: colorScheme),
-                const SizedBox(height: AppSpacing.lg),
-                _BalanceSection(
-                  controller: _ctrl,
-                  balance: dashboard.balance,
-                  expenses: dashboard.totalExpenses,
-                  theme: theme,
-                  colorScheme: colorScheme,
-                  fmt: _fmt,
-                ),
-                const SizedBox(height: AppSpacing.xxl),
-                _RecentActivity(theme: theme, colorScheme: colorScheme),
-              ],
-            ),
-          ),
-        ),
-    );
-  }
-}
-
-class _HeroSection extends StatelessWidget {
-  final Animation<double> fade;
-  final Animation<double> controller;
-  final int target;
-  final int collected;
-  final double progress;
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-  final String Function(int) fmt;
-
-  const _HeroSection({
-    required this.fade,
-    required this.controller,
-    required this.target,
-    required this.collected,
-    required this.progress,
-    required this.theme,
-    required this.colorScheme,
-    required this.fmt,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: fade,
-      child: AppCard(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: AnimatedBuilder(
-          animation: controller,
-          builder: (context, _) {
-            final t = controller.value;
-            final displayTarget = (target * t).round();
-            final displayCollected = (collected * t).round();
-            final displayProgress = progress * t;
-
-            return Column(
-              children: [
-                Text(
-                  'Expected Sponsorship',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  '${AppConstants.currencySymbol}${fmt(displayTarget)}',
-                  style: theme.textTheme.displayLarge?.copyWith(
-                    color: colorScheme.primary,
-                    letterSpacing: -0.5,
-                    height: 1.1,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  'festival goal',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurface.withAlpha(100),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xxl),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.account_balance_wallet_rounded,
-                      size: 20,
-                      color: colorScheme.tertiary,
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Text(
-                      'Collected',
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      '${(displayProgress * 100).toStringAsFixed(1)}%',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.tertiary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  '${AppConstants.currencySymbol}${fmt(displayCollected)}',
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                ClipRRect(
-                  borderRadius: AppRadius.cardBorder,
-                  child: LinearProgressIndicator(
-                    value: displayProgress,
-                    minHeight: 10,
-                    backgroundColor: colorScheme.primaryContainer.withAlpha(80),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _BalanceSection extends StatelessWidget {
-  final Animation<double> controller;
-  final int balance;
-  final int expenses;
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-  final String Function(int) fmt;
-
-  const _BalanceSection({
-    required this.controller,
-    required this.balance,
-    required this.expenses,
-    required this.theme,
-    required this.colorScheme,
-    required this.fmt,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-          child: Text(
-            'Balance',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        AppCard(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: AnimatedBuilder(
-            animation: controller,
-            builder: (context, _) {
-              final displayBalance = (balance * controller.value).round();
-              final displayExpenses = (expenses * controller.value).round();
-              return Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(AppSpacing.sm),
-                              decoration: BoxDecoration(
-                                color: displayBalance >= 0
-                                    ? colorScheme.tertiary.withAlpha(30)
-                                    : colorScheme.error.withAlpha(30),
-                                borderRadius: AppRadius.cardBorder,
-                              ),
-                              child: Icon(
-                                Icons.balance_rounded,
-                                size: 20,
-                                color: displayBalance >= 0
-                                    ? colorScheme.tertiary
-                                    : colorScheme.error,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Text(
-                              'Current Balance',
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          '${AppConstants.currencySymbol}${fmt(displayBalance)}',
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: displayBalance >= 0
-                                ? colorScheme.tertiary
-                                : colorScheme.error,
-                          ),
-                        ),
-                      ],
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, _) {
+        final o = 0.04 + _ctrl.value * 0.06;
+        return SizedBox(
+          height: 160,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: List.generate(10, (i) {
+              final h = 0.2 + (i.isEven ? 0.3 : 0.5) + (i % 3 == 0 ? 0.2 : 0.0);
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  child: Container(
+                    height: 140 * h,
+                    decoration: BoxDecoration(
+                      color: _textPri.withValues(alpha: o),
+                      borderRadius: BorderRadius.circular(3),
                     ),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        'Expenses',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: colorScheme.error,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        '${AppConstants.currencySymbol}${fmt(displayExpenses)}',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.error,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                ),
               );
-            },
+            }),
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 }
 
-class _PendingSponsors extends ConsumerWidget {
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-
-  const _PendingSponsors({
-    required this.theme,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final dashboard = ref.watch(dashboardProvider);
-
-    return AppCard(
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      onTap: () => context.push('/collections?filter=pending'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.people_rounded,
-                size: 20,
-                color: colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                'Pending Sponsors',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const Spacer(),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 20,
-                color: colorScheme.onSurface.withAlpha(80),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            '${dashboard.pendingSponsorCount} Sponsors',
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            '₹${NumberFormat('#,##,###', 'en_IN').format(dashboard.pendingRemainingTotal)} Remaining',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: colorScheme.error,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          if (dashboard.pendingSponsorCount == 0) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              'All sponsorships collected',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _TodayCollection extends ConsumerWidget {
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-
-  const _TodayCollection({
-    required this.theme,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final dashboard = ref.watch(dashboardProvider);
-
-    return AppCard(
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      onTap: () => context.push('/daily-collections'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.today_rounded,
-                size: 20,
-                color: colorScheme.tertiary,
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                "Today's Collection",
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const Spacer(),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 20,
-                color: colorScheme.onSurface.withAlpha(80),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            '${AppConstants.currencySymbol}${NumberFormat('#,##,###', 'en_IN').format(dashboard.todayCollection)}',
-            style: theme.textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: colorScheme.tertiary,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            '${dashboard.todayEntryCount} Entries Today',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PendingVisits extends ConsumerWidget {
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-
-  const _PendingVisits({
-    required this.theme,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final allActive = ref.watch(activeFollowUpsProvider);
-    final count = allActive.length;
-    final visits = allActive.take(5).toList();
-
-    return AppCard(
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InkWell(
-            onTap: () => context.push('/followups'),
-            borderRadius: AppRadius.cardBorder,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.md),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.notifications_rounded,
-                    size: 20,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Text(
-                    'Pending Visits ($count)',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (count > 0)
-                    Text(
-                      'View All',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                  if (count > 0) ...[
-                    const SizedBox(width: AppSpacing.xs),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      size: 16,
-                      color: colorScheme.primary,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          if (count == 0)
-            AppEmptyState(
-              icon: Icons.check_circle_rounded,
-              title: 'No pending follow-ups',
-              subtitle: 'All sponsor visits are completed.',
-            )
-          else
-            ...visits.map((fu) => _VisitRow(
-                  followup: fu,
-                  theme: theme,
-                  colorScheme: colorScheme,
-                )),
-        ],
-      ),
-    );
-  }
-}
-
-class _VisitRow extends StatelessWidget {
-  final SponsorFollowup followup;
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-
-  const _VisitRow({
-    required this.followup,
-    required this.theme,
-    required this.colorScheme,
-  });
-
-  String _formatDate(DateTime d) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final date = DateTime(d.year, d.month, d.day);
-    if (date == today) return 'Today';
-    if (date == today.add(const Duration(days: 1))) return 'Tomorrow';
-    final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    final diff = date.difference(today).inDays;
-    if (diff > 0 && diff <= 7) return dayNames[date.weekday - 1];
-    return DateFormat('d MMM').format(d);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isOverdue =
-        followup.followUpDate.toDate().isBefore(DateTime.now());
-    return InkWell(
-      onTap: () => context.push('/followups/${followup.id}/edit'),
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: isOverdue
-                    ? colorScheme.errorContainer.withAlpha(80)
-                    : colorScheme.primaryContainer.withAlpha(80),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                isOverdue ? Icons.warning_amber_rounded : Icons.person_rounded,
-                size: 20,
-                color: isOverdue ? colorScheme.error : colorScheme.primary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    followup.sponsorName,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.calendar_today_rounded,
-                        size: 13,
-                        color: isOverdue ? colorScheme.error : colorScheme.primary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _formatDate(followup.followUpDate.toDate()),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color:
-                              isOverdue ? colorScheme.error : colorScheme.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (followup.amount != null) ...[
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: colorScheme.secondaryContainer.withAlpha(120),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        '₹${NumberFormat('#,##,###', 'en_IN').format(followup.amount)}',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: colorScheme.secondary,
-                        ),
-                      ),
-                    ),
-                  ],
-                  if (followup.note.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      followup.note,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 20,
-              color: colorScheme.onSurface.withAlpha(80),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-String _activityRelativeTime(DateTime dt) {
-  final now = DateTime.now();
-  final diff = now.difference(dt);
-  if (diff.inMinutes < 1) return 'just now';
-  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-  if (diff.inHours < 24) return '${diff.inHours}h ago';
-  if (diff.inDays == 1) return 'Yesterday';
-  if (diff.inDays < 30) return '${diff.inDays}d ago';
+String _relTime(DateTime dt) {
+  final d = DateTime.now().difference(dt);
+  if (d.inMinutes < 1) return 'now';
+  if (d.inMinutes < 60) return '${d.inMinutes}m';
+  if (d.inHours < 24) return '${d.inHours}h';
+  if (d.inDays == 1) return 'yesterday';
+  if (d.inDays < 30) return '${d.inDays}d';
   return DateFormat('d MMM').format(dt);
 }
 
-IconData _activityIcon(String type) {
+Color _actColor(String type) {
   switch (type) {
-    case 'collection_recorded':
-      return Icons.account_balance_wallet_rounded;
-    case 'expense_added':
-      return Icons.receipt_long_rounded;
-    case 'followup_added':
-      return Icons.notifications_rounded;
-    case 'followup_completed':
-      return Icons.check_circle_rounded;
-    default:
-      return Icons.circle_rounded;
+    case 'collection_recorded': return _success;
+    case 'expense_added': return _red;
+    case 'followup_added': return _amber;
+    case 'followup_completed': return _success;
+    default: return _textTer;
   }
 }
 
-Color _activityColor(String type, ColorScheme cs) {
-  switch (type) {
-    case 'collection_recorded':
-      return const Color(0xFF22C55E);
-    case 'expense_added':
-      return const Color(0xFFEF4444);
-    case 'followup_added':
-      return const Color(0xFF3B82F6);
-    case 'followup_completed':
-      return const Color(0xFF22C55E);
-    default:
-      return cs.onSurface;
-  }
+class _ActivityGroup {
+  final String label;
+  final List<Activity> activities;
+  _ActivityGroup({required this.label, required this.activities});
 }
 
-class _RecentActivity extends ConsumerWidget {
-  final ThemeData theme;
-  final ColorScheme colorScheme;
+List<_ActivityGroup> _groupActivities(List<Activity> activities) {
+  final sorted = List<Activity>.from(activities)
+    ..sort((a, b) => b.createdAt.toDate().compareTo(a.createdAt.toDate()));
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final yesterday = today.subtract(const Duration(days: 1));
+  final groups = <_ActivityGroup>[];
+  _ActivityGroup? current;
+  for (final a in sorted) {
+    final date = a.createdAt.toDate();
+    final day = DateTime(date.year, date.month, date.day);
+    final label = day == today
+        ? 'Today'
+        : day == yesterday
+            ? 'Yesterday'
+            : DateFormat('d MMM').format(date);
+    if (current == null || current.label != label) {
+      current = _ActivityGroup(label: label, activities: []);
+      groups.add(current);
+    }
+    current.activities.add(a);
+  }
+  return groups;
+}
 
-  const _RecentActivity({
-    required this.theme,
-    required this.colorScheme,
-  });
-
+class _ActivityTimeline extends ConsumerWidget {
+  const _ActivityTimeline();
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final activitiesAsync = ref.watch(activitiesStreamProvider);
-    final items = activitiesAsync.valueOrNull ?? [];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-          child: Text(
-            'Recent Activity',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+    final items = ref.watch(activitiesStreamProvider).valueOrNull ?? [];
+    return Container(
+      padding: const EdgeInsets.all(_s20),
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Text('Recent Activity', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textSec)),
+              Spacer(),
+              Text('Timeline', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w400, color: _textTer)),
+            ],
           ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        AppCard(
-          padding: items.isEmpty
-              ? const EdgeInsets.all(AppSpacing.xxl)
-              : const EdgeInsets.all(AppSpacing.lg),
-          child: items.isEmpty
-              ? AppEmptyState(
-                  icon: Icons.inbox_rounded,
-                  title: 'No recent activity',
-                  subtitle:
-                      'Activity will appear here once you start recording',
-                )
-              : Column(
-                  children: items.take(20).map((a) => Padding(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: AppSpacing.sm),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(AppSpacing.sm),
-                              decoration: BoxDecoration(
-                                color: _activityColor(a.type, colorScheme)
-                                    .withAlpha(30),
-                                borderRadius: AppRadius.cardBorder,
-                              ),
-                              child: Icon(
-                                _activityIcon(a.type),
-                                size: 18,
-                                color: _activityColor(a.type, colorScheme),
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.md),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    a.title,
-                                    style:
-                                        theme.textTheme.bodyMedium?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.xs),
-                                  Text(
-                                    a.description,
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Text(
-                              _activityRelativeTime(a.createdAt.toDate()),
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )).toList(),
-                ),
-        ),
-      ],
+          const SizedBox(height: _s16),
+          if (items.isEmpty)
+            const SizedBox(
+              height: 80,
+              child: Center(
+                child: Text('No activity yet', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: _textSec)),
+              ),
+            )
+          else
+            _buildList(items),
+        ],
+      ),
     );
+  }
+
+  Widget _buildList(List<Activity> items) {
+    final groups = _groupActivities(items);
+    final widgets = <Widget>[];
+    var count = 0;
+    for (final g in groups) {
+      if (count >= 5) break;
+      widgets.add(Padding(
+        padding: const EdgeInsets.only(bottom: _s8),
+        child: Text(g.label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _textTer, letterSpacing: 0.5)),
+      ));
+      for (final a in g.activities) {
+        if (count >= 5) break;
+        count++;
+        final c = _actColor(a.type);
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(width: 8, height: 8, decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(a.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: _textPri),
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+              ),
+              Text(_relTime(a.createdAt.toDate()), style: const TextStyle(fontSize: 11, color: _textTer)),
+            ],
+          ),
+        ));
+      }
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: widgets);
   }
 }

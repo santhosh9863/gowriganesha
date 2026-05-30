@@ -36,10 +36,34 @@ class FirestoreService {
   CollectionReference<Map<String, dynamic>> get _followUps =>
       _firestore.collection('sponsor_followups');
 
+  CollectionReference<Map<String, dynamic>> get _settings =>
+      _firestore.collection('settings');
+
   CollectionReference<Map<String, dynamic>> get _activities =>
       _firestore.collection('activities');
 
   String generateId() => _firestore.collection('_').doc().id;
+
+  Future<int> getBudget(String settingsId) async {
+    try {
+      final doc = await _settings.doc(settingsId).get();
+      if (!doc.exists || doc.data() == null) return 0;
+      return doc.data()!['festivalBudget'] as int? ?? 0;
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error fetching budget: $e');
+      throw FirestoreException('Failed to load budget', originalError: e);
+    }
+  }
+
+  Future<void> setBudget(String settingsId, int amount) async {
+    try {
+      await _settings.doc(settingsId).set({'festivalBudget': amount});
+      debugPrint('[FIRESTORE] Budget updated: $settingsId → $amount');
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error setting budget: $e');
+      throw FirestoreException('Failed to save budget', originalError: e);
+    }
+  }
 
   Future<Festival?> getFestival(String festivalId) async {
     try {
