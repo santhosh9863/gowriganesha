@@ -12,6 +12,8 @@ class DashboardData {
   final double progressPercent;
   final int todayCollection;
   final int totalDailyCollections;
+  final int pendingSponsorCount;
+  final int pendingRemainingTotal;
 
   const DashboardData({
     required this.expectedTotal,
@@ -22,6 +24,8 @@ class DashboardData {
     required this.progressPercent,
     required this.todayCollection,
     required this.totalDailyCollections,
+    required this.pendingSponsorCount,
+    required this.pendingRemainingTotal,
   });
 }
 
@@ -60,6 +64,10 @@ final dashboardProvider = Provider<DashboardData>((ref) {
 
   final totalDailyCollections = totalDaily;
 
+  final pending = targets.where((t) => t.givenAmount < t.expectedAmount).toList();
+  final pendingSponsorCount = pending.length;
+  final pendingRemainingTotal = pending.fold<int>(0, (v, t) => v + (t.expectedAmount - t.givenAmount));
+
   return DashboardData(
     expectedTotal: expectedTotal,
     collectedTotal: collectedTotal,
@@ -69,5 +77,7 @@ final dashboardProvider = Provider<DashboardData>((ref) {
     progressPercent: progressPercent,
     todayCollection: todayCollection,
     totalDailyCollections: totalDailyCollections,
+    pendingSponsorCount: pendingSponsorCount,
+    pendingRemainingTotal: pendingRemainingTotal,
   );
 });

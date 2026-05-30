@@ -20,6 +20,14 @@ class CollectionListPage extends ConsumerStatefulWidget {
 class _CollectionListPageState extends ConsumerState<CollectionListPage> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  String _filter = 'all';
+
+  @override
+  void initState() {
+    super.initState();
+    final filter = GoRouterState.of(context).uri.queryParameters['filter'];
+    if (filter == 'pending') _filter = 'pending';
+  }
 
   @override
   void dispose() {
@@ -51,13 +59,29 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage> {
   }
 
   List<Target> _filterTargets(List<Target> targets) {
-    if (_searchQuery.isEmpty) return targets;
-    final q = _searchQuery.toLowerCase();
-    return targets.where((t) {
-      return t.name.toLowerCase().contains(q) ||
-          t.building.toLowerCase().contains(q) ||
-          t.area.toLowerCase().contains(q);
-    }).toList();
+    var result = targets;
+    if (_searchQuery.isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      result = result.where((t) {
+        return t.name.toLowerCase().contains(q) ||
+            t.building.toLowerCase().contains(q) ||
+            t.area.toLowerCase().contains(q);
+      }).toList();
+    }
+    if (_filter == 'pending') {
+      result = result.where((t) => t.givenAmount < t.expectedAmount).toList();
+    }
+    return result;
+  }
+
+  Widget _buildFilterChip(String label, String value) {
+    final selected = _filter == value;
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => setState(() => _filter = value),
+      visualDensity: VisualDensity.compact,
+    );
   }
 
   Widget _buildList(
@@ -108,6 +132,16 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage> {
               filled: true,
               fillColor: colorScheme.surfaceContainerHighest.withAlpha(100),
             ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+          child: Row(
+            children: [
+              _buildFilterChip('All', 'all'),
+              const SizedBox(width: 8),
+              _buildFilterChip('Pending', 'pending'),
+            ],
           ),
         ),
         if (filtered.isEmpty)

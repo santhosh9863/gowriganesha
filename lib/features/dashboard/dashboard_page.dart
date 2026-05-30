@@ -111,6 +111,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                   fmt: _fmt,
                 ),
                 const SizedBox(height: 24),
+                _PendingSponsors(theme: theme, colorScheme: colorScheme),
+                const SizedBox(height: 24),
                 _PendingVisits(theme: theme, colorScheme: colorScheme),
                 const SizedBox(height: 24),
                 _RecentActivity(theme: theme, colorScheme: colorScheme),
@@ -507,6 +509,83 @@ class _SecondaryCard extends StatelessWidget {
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _PendingSponsors extends ConsumerWidget {
+  final ThemeData theme;
+  final ColorScheme colorScheme;
+
+  const _PendingSponsors({
+    required this.theme,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dashboard = ref.watch(dashboardProvider);
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: InkWell(
+        onTap: () => context.push('/collections?filter=pending'),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.people_rounded,
+                    size: 20,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Pending Sponsors',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: colorScheme.onSurface.withAlpha(80),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '${dashboard.pendingSponsorCount} Sponsors',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '₹${NumberFormat('#,##,###', 'en_IN').format(dashboard.pendingRemainingTotal)} Remaining',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.error,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (dashboard.pendingSponsorCount == 0) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'All sponsorships collected',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
