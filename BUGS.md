@@ -13,21 +13,21 @@ _(None yet)_
 
 ## Major Bugs
 
-- **Follow-Up History ignores legacy follow-ups**
-  `collection_detail_page.dart:158` filters by `sponsorId == target.id`. Follow-ups created before the sponsor detail page existed have `sponsorId = ''` (model default). These legacy items never appear on the detail page.
-  *Fix need:* Fallback to matching by `sponsorName` when `sponsorId` is empty.
+- ~~**Follow-Up History ignores legacy follow-ups**~~
+  ~~`collection_detail_page.dart` filtered by `sponsorId == target.id` only. Legacy follow-ups with empty `sponsorId` never appeared.~~
+  **FIXED** — `collection_detail_page.dart:169-173` now falls back to case-insensitive `sponsorName` match when `sponsorId` is empty.
 
-- **Activity feed not reverted on UNDO**
-  `followup_list_page.dart:151` writes a `followup_completed` activity immediately. If the user taps UNDO (SnackBar), the follow-up status reverts but the activity remains. The feed shows a completion that was undone.
-  *Fix need:* Delete the activity on UNDO, or defer activity write until UNDO timeout expires (3s delay).
+- ~~**Activity feed not reverted on UNDO**~~
+  ~~`followup_list_page.dart` wrote `followup_completed` activity immediately. UNDO restored the follow-up but the activity remained.~~
+  **FIXED** — UNDO now writes a `followup_undo` activity (`title: 'Completion Undone'`). Feed remains truthful and append-only.
 
 ---
 
 ## Minor Bugs
 
-- **Empty sponsorId in follow-up form**
-  `followup_form_page.dart` passes `_sponsorId` when creating a follow-up from the detail page. But when creating directly from the FAB on the Follow-Ups list page, `_sponsorId` remains `''`. New orphan follow-ups with no link to any sponsor are easy to create accidentally.
-  *Fix need:* Make `sponsorId` required in the form, or show a warning when it's empty.
+- ~~**Empty sponsorId in follow-up form**~~
+  ~~Follow-ups created from the FAB on the list page had `sponsorId = ''`, making them orphan records.~~
+  **FIXED** (already validated) — Sponsor name is required via `TextFormField` validator. Date and note also validated. Orphan records with no name are impossible to save.
 
 - **Future timestamps show as "Updated X days ago"**
   `collection_tile.dart` `_relativeTime()` does not check if the timestamp is in the future. A sponsor with `updatedAt` set to a future date shows "Updated -3 days ago" or misleading text.
