@@ -21,12 +21,16 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   String _filter = 'all';
+  bool _initialized = false;
 
   @override
-  void initState() {
-    super.initState();
-    final filter = GoRouterState.of(context).uri.queryParameters['filter'];
-    if (filter == 'pending') _filter = 'pending';
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _initialized = true;
+      final filter = GoRouterState.of(context).uri.queryParameters['filter'];
+      if (filter == 'pending') _filter = 'pending';
+    }
   }
 
   @override

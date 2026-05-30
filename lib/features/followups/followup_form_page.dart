@@ -25,6 +25,7 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
   DateTime? _followUpDate;
   bool _isLoading = true;
   String _sponsorId = '';
+  bool _initialized = false;
 
   @override
   void initState() {
@@ -34,7 +35,14 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
     _noteController = TextEditingController();
     if (widget.followUpId != null) {
       _loadFollowUp();
-    } else {
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized && widget.followUpId == null) {
+      _initialized = true;
       final queryParams = GoRouterState.of(context).uri.queryParameters;
       _sponsorId = queryParams['sponsorId'] ?? '';
       final sponsorName = queryParams['sponsorName'];
