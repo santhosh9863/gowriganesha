@@ -11,6 +11,7 @@ class DashboardData {
   final int remainingCollection;
   final double progressPercent;
   final int todayCollection;
+  final int todayEntryCount;
   final int totalDailyCollections;
   final int pendingSponsorCount;
   final int pendingRemainingTotal;
@@ -23,6 +24,7 @@ class DashboardData {
     required this.remainingCollection,
     required this.progressPercent,
     required this.todayCollection,
+    required this.todayEntryCount,
     required this.totalDailyCollections,
     required this.pendingSponsorCount,
     required this.pendingRemainingTotal,
@@ -56,11 +58,13 @@ final dashboardProvider = Provider<DashboardData>((ref) {
   final now = DateTime.now();
   final todayStart = DateTime(now.year, now.month, now.day);
   final todayEnd = todayStart.add(const Duration(days: 1));
-  final todayCollection = dailyCollections
+  final todayItems = dailyCollections
       .where((dc) =>
           dc.date.toDate().isAfter(todayStart) &&
           dc.date.toDate().isBefore(todayEnd))
-      .fold<int>(0, (v, dc) => v + dc.amount);
+      .toList();
+  final todayCollection = todayItems.fold<int>(0, (v, dc) => v + dc.amount);
+  final todayEntryCount = todayItems.length;
 
   final totalDailyCollections = totalDaily;
 
@@ -76,6 +80,7 @@ final dashboardProvider = Provider<DashboardData>((ref) {
     remainingCollection: remainingCollection,
     progressPercent: progressPercent,
     todayCollection: todayCollection,
+    todayEntryCount: todayEntryCount,
     totalDailyCollections: totalDailyCollections,
     pendingSponsorCount: pendingSponsorCount,
     pendingRemainingTotal: pendingRemainingTotal,

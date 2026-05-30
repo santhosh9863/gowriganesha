@@ -113,6 +113,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                 const SizedBox(height: 24),
                 _PendingSponsors(theme: theme, colorScheme: colorScheme),
                 const SizedBox(height: 24),
+                _TodayCollection(theme: theme, colorScheme: colorScheme),
+                const SizedBox(height: 24),
                 _PendingVisits(theme: theme, colorScheme: colorScheme),
                 const SizedBox(height: 24),
                 _RecentActivity(theme: theme, colorScheme: colorScheme),
@@ -584,6 +586,75 @@ class _PendingSponsors extends ConsumerWidget {
                   ),
                 ),
               ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TodayCollection extends ConsumerWidget {
+  final ThemeData theme;
+  final ColorScheme colorScheme;
+
+  const _TodayCollection({
+    required this.theme,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dashboard = ref.watch(dashboardProvider);
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: InkWell(
+        onTap: () => context.push('/daily-collections'),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.today_rounded,
+                    size: 20,
+                    color: colorScheme.tertiary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    "Today's Collection",
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: colorScheme.onSurface.withAlpha(80),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '${AppConstants.currencySymbol}${NumberFormat('#,##,###', 'en_IN').format(dashboard.todayCollection)}',
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.tertiary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${dashboard.todayEntryCount} Entries Today',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ],
           ),
         ),
