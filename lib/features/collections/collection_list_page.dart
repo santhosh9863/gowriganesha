@@ -3,15 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:ganesha_2026/core/design/app_spacing.dart';
+import 'package:ganesha_2026/core/constants.dart';
+import 'package:ganesha_2026/core/design/app_colors.dart';
 import 'package:ganesha_2026/core/design/app_radius.dart';
+import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/target.dart';
 import 'package:ganesha_2026/core/providers/target_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/features/collections/collection_tile.dart';
-import 'package:ganesha_2026/shared/widgets/amount_text.dart';
-import 'package:ganesha_2026/shared/widgets/app_card.dart';
 import 'package:ganesha_2026/shared/widgets/app_empty_state.dart';
+import 'package:ganesha_2026/shared/widgets/app_metric_card.dart';
 import 'package:ganesha_2026/shared/widgets/app_page_scaffold.dart';
 import 'package:ganesha_2026/shared/widgets/app_skeleton.dart';
 import 'package:ganesha_2026/shared/widgets/app_stagger.dart';
@@ -63,7 +64,6 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
   Widget build(BuildContext context) {
     final targetsAsync = ref.watch(targetsStreamProvider);
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
     return AppPageScaffold(
       festivalName: 'Sponsors',
@@ -79,7 +79,7 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
           onRefresh: () async {
             ref.invalidate(targetsStreamProvider);
           },
-          child: _buildList(context, ref, targets, theme, colorScheme),
+          child: _buildList(context, ref, targets, theme),
         ),
         loading: () => const AppSkeletonList(),
         error: (e, _) => Center(child: Text('Error: $e')),
@@ -105,88 +105,157 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
     return result;
   }
 
-  Widget _buildFilterChip(String label, String value) {
-    final selected = _filter == value;
-    return FilterChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => setState(() => _filter = value),
-      visualDensity: VisualDensity.compact,
-    );
-  }
-
   Widget _buildList(
     BuildContext context,
     WidgetRef ref,
     List<Target> targets,
     ThemeData theme,
-    ColorScheme colorScheme,
   ) {
-    final expectedTotal =
-        targets.fold<int>(0, (v, t) => v + t.expectedAmount);
-    final collectedTotal =
-        targets.fold<int>(0, (v, t) => v + t.givenAmount);
+    final totalSponsors = targets.length;
+    final collectedSponsors = targets.where((t) => t.givenAmount >= t.expectedAmount).length;
+    final pendingSponsors = targets.where((t) => t.givenAmount < t.expectedAmount).length;
+    final expectedTotal = targets.fold<int>(0, (v, t) => v + t.expectedAmount);
+    final collectedTotal = targets.fold<int>(0, (v, t) => v + t.givenAmount);
     final remainingTotal = expectedTotal - collectedTotal;
 
     final filtered = _filterTargets(targets);
 
     return Column(
       children: [
+        // Summary metrics 2x2
         Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.lg,
-            AppSpacing.sm,
+            0,
+            AppSpacing.lg,
+            AppSpacing.md,
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final w = (constraints.maxWidth - AppSpacing.sm) / 2;
+              return Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: [
+                  SizedBox(
+                    width: w,
+                    child: AppMetricCard(
+                      label: 'Total Sponsors',
+                      value: '$totalSponsors',
+                      icon: Icons.people_rounded,
+                      iconColor: AppColors.primary,
+                      iconBgColor: AppColors.primaryBg,
+                    ),
+                  ),
+                  SizedBox(
+                    width: w,
+                    child: AppMetricCard(
+                      label: 'Collected',
+                      value: '$collectedSponsors',
+                      icon: Icons.check_circle_rounded,
+                      iconColor: AppColors.success,
+                      iconBgColor: AppColors.successBg,
+                    ),
+                  ),
+                  SizedBox(
+                    width: w,
+                    child: AppMetricCard(
+                      label: 'Pending',
+                      value: '$pendingSponsors',
+                      icon: Icons.schedule_rounded,
+                      iconColor: AppColors.warning,
+                      iconBgColor: AppColors.warningBg,
+                    ),
+                  ),
+                  SizedBox(
+                    width: w,
+                    child: AppMetricCard(
+                      label: 'Remaining',
+                      value: '${AppConstants.currencySymbol}${_fmt(remainingTotal)}',
+                      icon: Icons.trending_down_rounded,
+                      iconColor: AppColors.error,
+                      iconBgColor: AppColors.errorBg,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+        // Search
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
             AppSpacing.lg,
             0,
+            AppSpacing.lg,
+            AppSpacing.sm,
           ),
           child: TextField(
             controller: _searchController,
             onChanged: (v) => setState(() => _searchQuery = v),
             decoration: InputDecoration(
-              hintText: 'Search by name, building or area...',
-              prefixIcon: const Icon(Icons.search_rounded),
+              hintText: 'Search sponsors...',
+              prefixIcon: const Icon(Icons.search_rounded, size: 20),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.clear_rounded),
+                      icon: const Icon(Icons.clear_rounded, size: 18),
                       onPressed: () {
                         _searchController.clear();
                         setState(() => _searchQuery = '');
                       },
                     )
                   : null,
-              border: OutlineInputBorder(
-                borderRadius: AppRadius.buttonBorder,
-              ),
-              contentPadding: const EdgeInsets.symmetric(vertical: 0),
               filled: true,
-              fillColor: colorScheme.surfaceContainerHighest.withAlpha(100),
+              fillColor: AppColors.warmGray50,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.md,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppRadius.medium),
+                borderSide: BorderSide(color: AppColors.outline),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppRadius.medium),
+                borderSide: BorderSide(color: AppColors.outline),
+              ),
             ),
           ),
         ),
+        // Filter chips
         Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.lg,
-            AppSpacing.sm,
+            0,
             AppSpacing.lg,
-            AppSpacing.sm,
+            AppSpacing.md,
           ),
           child: Row(
             children: [
-              _buildFilterChip('All', 'all'),
+              _FilterChip(
+                label: 'All',
+                selected: _filter == 'all',
+                onTap: () => setState(() => _filter = 'all'),
+                color: AppColors.warmGray500,
+              ),
               const SizedBox(width: AppSpacing.sm),
-              _buildFilterChip('Pending', 'pending'),
+              _FilterChip(
+                label: 'Pending',
+                selected: _filter == 'pending',
+                onTap: () => setState(() => _filter = 'pending'),
+                color: AppColors.warning,
+              ),
               const SizedBox(width: AppSpacing.sm),
-              _buildFilterChip('Collected', 'collected'),
+              _FilterChip(
+                label: 'Collected',
+                selected: _filter == 'collected',
+                onTap: () => setState(() => _filter = 'collected'),
+                color: AppColors.success,
+              ),
             ],
           ),
         ),
-        _SummaryBar(
-          expectedTotal: expectedTotal,
-          collectedTotal: collectedTotal,
-          remainingTotal: remainingTotal,
-          theme: theme,
-          colorScheme: colorScheme,
-        ),
+        // List or empty state
         if (filtered.isEmpty)
           Expanded(
             child: AppEmptyState(
@@ -196,7 +265,9 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
               title: targets.isEmpty
                   ? 'No sponsors yet'
                   : 'No sponsors match "$_searchQuery"',
-              subtitle: targets.isEmpty ? 'Tap + to add your first sponsor' : null,
+              subtitle: targets.isEmpty
+                  ? 'Tap + to add your first sponsor'
+                  : null,
               action: targets.isEmpty
                   ? FilledButton.icon(
                       onPressed: () => context.push('/collections/add'),
@@ -209,17 +280,14 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
         else
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.only(
-                top: AppSpacing.xs,
-                bottom: 80,
-              ),
+              padding: const EdgeInsets.only(bottom: 80),
               itemCount: filtered.length,
               itemBuilder: (context, index) {
                 final target = filtered[index];
                 return AppStagger(
                   index: index,
                   controller: _staggerCtrl,
-                  child: CollectionTile(
+                  child: SponsorCard(
                     target: target,
                     onDelete: () => _handleDelete(context, ref, target),
                     onQuickUpdate: () =>
@@ -339,116 +407,43 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
   }
 }
 
-class _SummaryBar extends StatelessWidget {
-  final int expectedTotal;
-  final int collectedTotal;
-  final int remainingTotal;
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-
-  const _SummaryBar({
-    required this.expectedTotal,
-    required this.collectedTotal,
-    required this.remainingTotal,
-    required this.theme,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        0,
-        AppSpacing.lg,
-        AppSpacing.sm,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _SummaryChip(
-              label: 'Expected',
-              amount: expectedTotal,
-              color: colorScheme.primary,
-              theme: theme,
-              onTap: () => _filterBy(context, 'all'),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: _SummaryChip(
-              label: 'Collected',
-              amount: collectedTotal,
-              color: colorScheme.tertiary,
-              theme: theme,
-              onTap: () => _filterBy(context, 'collected'),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: _SummaryChip(
-              label: 'Remaining',
-              amount: remainingTotal,
-              color: remainingTotal > 0
-                  ? colorScheme.error
-                  : Colors.green.shade700,
-              theme: theme,
-              onTap: () => _filterBy(context, 'pending'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _filterBy(BuildContext context, String filter) {
-    context.push('/collections?filter=$filter');
-  }
-}
-
-class _SummaryChip extends StatelessWidget {
+class _FilterChip extends StatelessWidget {
   final String label;
-  final int amount;
-  final Color color;
-  final ThemeData theme;
+  final bool selected;
   final VoidCallback onTap;
+  final Color color;
 
-  const _SummaryChip({
+  const _FilterChip({
     required this.label,
-    required this.amount,
-    required this.color,
-    required this.theme,
+    required this.selected,
     required this.onTap,
+    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return GestureDetector(
       onTap: onTap,
-      child: AppCard(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
+          vertical: AppSpacing.xs + 2,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: color,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            AmountText(
-              amount: amount,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-          ],
+        decoration: BoxDecoration(
+          color: selected ? color.withValues(alpha: 0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.full),
+          border: Border.all(
+            color: selected ? color.withValues(alpha: 0.3) : AppColors.outline,
+          ),
+        ),
+        child: Text(
+          label,
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: selected ? color : AppColors.warmGray500,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );
