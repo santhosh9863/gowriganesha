@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:ganesha_2026/core/design/app_spacing.dart';
+import 'package:ganesha_2026/core/design/app_radius.dart';
+import 'package:ganesha_2026/core/design/app_colors.dart';
 import 'package:ganesha_2026/core/models/target.dart';
 import 'package:ganesha_2026/shared/widgets/amount_text.dart';
 
@@ -15,24 +18,28 @@ class _StatusData {
   final String label;
   final IconData icon;
   final Color color;
-  const _StatusData(this.label, this.icon, this.color);
+  final Color border;
+  const _StatusData(this.label, this.icon, this.color, this.border);
 }
 
-_StatusData _statusData(_CollectionStatus s, ColorScheme cs) => switch (s) {
+_StatusData _statusData(_CollectionStatus s) => switch (s) {
       _CollectionStatus.notStarted => _StatusData(
           'Not Started',
           Icons.circle_outlined,
-          cs.outline,
+          const Color(0xFF9CA3AF),
+          const Color(0xFF9CA3AF),
         ),
       _CollectionStatus.pending => _StatusData(
           'Pending',
           Icons.schedule_rounded,
-          Colors.orange.shade700,
+          const Color(0xFFF59E0B),
+          const Color(0xFFF59E0B),
         ),
       _CollectionStatus.complete => _StatusData(
           'Complete',
           Icons.check_circle_rounded,
-          Colors.green.shade700,
+          const Color(0xFF22C55E),
+          const Color(0xFF22C55E),
         ),
     };
 
@@ -63,131 +70,159 @@ class CollectionTile extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final status = _status(target);
-    final sd = _statusData(status, colorScheme);
+    final sd = _statusData(status);
     final hasLocation = target.building.isNotEmpty || target.area.isNotEmpty;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.xs,
+      ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
         onTap: () => context.push('/collections/${target.id}'),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(sd.icon, size: 16, color: sd.color),
-                  const SizedBox(width: 6),
-                  Text(
-                    sd.label,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: sd.color,
-                      fontWeight: FontWeight.w600,
+        borderRadius: AppRadius.cardBorder,
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: AppRadius.cardBorder,
+            border: Border.all(color: AppColors.outline),
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              children: [
+                Container(
+                  width: 4,
+                  decoration: BoxDecoration(
+                    color: sd.border,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(AppRadius.card),
+                      bottomLeft: Radius.circular(AppRadius.card),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      target.name,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  PopupMenuButton<String>(
-                    onSelected: (value) {
-                      if (value == 'edit') {
-                        context.push('/collections/${target.id}/edit');
-                      } else if (value == 'delete') {
-                        onDelete();
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit_rounded, size: 20),
-                            SizedBox(width: 8),
-                            Text('Edit'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete_rounded, size: 20),
-                            SizedBox(width: 8),
-                            Text('Delete'),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              if (hasLocation) ...[
-                const SizedBox(height: 2),
-                Text(
-                  [
-                    if (target.building.isNotEmpty) target.building,
-                    if (target.area.isNotEmpty) target.area,
-                  ].join(', '),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ],
-              const SizedBox(height: 2),
-              Text(
-                _relativeTime(target.updatedAt.toDate()),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: _AmountLabel(
-                      label: 'Expected',
-                      amount: target.expectedAmount,
-                      color: colorScheme.primary,
-                      theme: theme,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: onQuickUpdate,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _AmountLabel(
-                              label: 'Received',
-                              amount: target.givenAmount,
-                              color: colorScheme.tertiary,
-                              theme: theme,
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(sd.icon, size: 14, color: sd.color),
+                            const SizedBox(width: AppSpacing.xs),
+                            Text(
+                              sd.label,
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: sd.color,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
+                            const Spacer(),
+                            PopupMenuButton<String>(
+                              onSelected: (value) {
+                                if (value == 'edit') {
+                                  context.push(
+                                      '/collections/${target.id}/edit');
+                                } else if (value == 'delete') {
+                                  onDelete();
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                const PopupMenuItem(
+                                  value: 'edit',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.edit_rounded, size: 20),
+                                      SizedBox(width: 8),
+                                      Text('Edit'),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.delete_rounded, size: 20),
+                                      SizedBox(width: 8),
+                                      Text('Delete'),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          target.name,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
                           ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.edit_rounded,
-                            size: 16,
-                            color: colorScheme.tertiary,
+                        ),
+                        if (hasLocation) ...[
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            [
+                              if (target.building.isNotEmpty) target.building,
+                              if (target.area.isNotEmpty) target.area,
+                            ].join(', '),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
-                      ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _AmountLabel(
+                                label: 'Expected',
+                                amount: target.expectedAmount,
+                                color: colorScheme.primary,
+                                theme: theme,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.xs),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: onQuickUpdate,
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: _AmountLabel(
+                                        label: 'Received',
+                                        amount: target.givenAmount,
+                                        color: colorScheme.tertiary,
+                                        theme: theme,
+                                      ),
+                                    ),
+                                    const SizedBox(width: AppSpacing.xs),
+                                    Icon(
+                                      Icons.edit_rounded,
+                                      size: 14,
+                                      color: colorScheme.tertiary,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          _relativeTime(target.updatedAt.toDate()),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurface.withAlpha(100),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -215,12 +250,12 @@ class _AmountLabel extends StatelessWidget {
       children: [
         Text(
           label,
-          style: theme.textTheme.labelSmall?.copyWith(
+          style: theme.textTheme.labelLarge?.copyWith(
             color: color,
             fontWeight: FontWeight.w500,
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: AppSpacing.xs),
         AmountText(
           amount: amount,
           style: theme.textTheme.bodyMedium?.copyWith(

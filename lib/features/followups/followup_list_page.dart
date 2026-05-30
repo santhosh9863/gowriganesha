@@ -4,10 +4,15 @@ import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
+import 'package:ganesha_2026/core/design/app_spacing.dart';
+import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/models/sponsor_followup.dart';
 import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/providers/followup_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
+import 'package:ganesha_2026/shared/widgets/amount_text.dart';
+import 'package:ganesha_2026/shared/widgets/app_card.dart';
+import 'package:ganesha_2026/shared/widgets/app_empty_state.dart';
 import 'package:ganesha_2026/shared/widgets/confirm_dialog.dart';
 
 class FollowUpListPage extends ConsumerStatefulWidget {
@@ -54,47 +59,49 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
 
     return Column(
       children: [
-        _FilterBar(
-          filter: _filter,
-          onChanged: (v) => setState(() => _filter = v),
-          theme: theme,
-          colorScheme: colorScheme,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.sm,
+            AppSpacing.lg,
+            AppSpacing.sm,
+          ),
+          child: Row(
+            children: [
+              FilterChip(
+                label: const Text('Active'),
+                selected: _filter == 'active',
+                onSelected: (_) => setState(() => _filter = 'active'),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              FilterChip(
+                label: const Text('Completed'),
+                selected: _filter == 'completed',
+                onSelected: (_) => setState(() => _filter = 'completed'),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              FilterChip(
+                label: const Text('All'),
+                selected: _filter == 'all',
+                onSelected: (_) => setState(() => _filter = 'all'),
+              ),
+            ],
+          ),
         ),
         if (items.isEmpty)
           Expanded(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.follow_the_signs_rounded,
-                    size: 64,
-                    color: colorScheme.onSurface.withAlpha(60),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _filter == 'completed'
-                        ? 'No completed follow-ups'
-                        : 'No pending follow-ups',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Tap + to add a follow-up',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurface.withAlpha(128),
-                    ),
-                  ),
-                ],
-              ),
+            child: AppEmptyState(
+              icon: Icons.follow_the_signs_rounded,
+              title: _filter == 'completed'
+                  ? 'No completed follow-ups'
+                  : 'No pending follow-ups',
+              subtitle: 'Tap + to add a follow-up',
             ),
           )
         else
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.only(top: 8, bottom: 80),
+              padding: const EdgeInsets.only(top: 0, bottom: 80),
               itemCount: items.length,
               itemBuilder: (context, index) {
                 final item = items[index];
@@ -225,95 +232,6 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
   }
 }
 
-class _FilterBar extends StatelessWidget {
-  final String filter;
-  final ValueChanged<String> onChanged;
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-
-  const _FilterBar({
-    required this.filter,
-    required this.onChanged,
-    required this.theme,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-      child: Row(
-        children: [
-          _FilterChip(
-            label: 'Pending',
-            selected: filter == 'active',
-            onTap: () => onChanged('active'),
-            color: colorScheme.primary,
-            theme: theme,
-          ),
-          const SizedBox(width: 8),
-          _FilterChip(
-            label: 'Completed',
-            selected: filter == 'completed',
-            onTap: () => onChanged('completed'),
-            color: Colors.green.shade700,
-            theme: theme,
-          ),
-          const SizedBox(width: 8),
-          _FilterChip(
-            label: 'All',
-            selected: filter == 'all',
-            onTap: () => onChanged('all'),
-            color: colorScheme.onSurfaceVariant,
-            theme: theme,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  final Color color;
-  final ThemeData theme;
-
-  const _FilterChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    required this.color,
-    required this.theme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? color.withAlpha(30) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? color : cs.outlineVariant,
-          ),
-        ),
-        child: Text(
-          label,
-          style: theme.textTheme.labelMedium?.copyWith(
-            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-            color: selected ? color : cs.onSurfaceVariant,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _FollowUpCard extends StatelessWidget {
   final SponsorFollowup item;
   final VoidCallback onEdit;
@@ -342,43 +260,51 @@ class _FollowUpCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isOverdue = item.followUpDate.toDate().isBefore(DateTime.now());
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dueDate = item.followUpDate.toDate();
+    final dueDay = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    final isOverdue = dueDay.isBefore(today);
+    final isDueToday = dueDay == today;
     final isActive = item.status == 'active';
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+    Color statusColor;
+    IconData statusIcon;
+    if (!isActive) {
+      statusColor = const Color(0xFF22C55E);
+      statusIcon = Icons.check_circle_rounded;
+    } else if (isOverdue) {
+      statusColor = const Color(0xFFEF4444);
+      statusIcon = Icons.warning_amber_rounded;
+    } else if (isDueToday) {
+      statusColor = const Color(0xFFF59E0B);
+      statusIcon = Icons.notifications_active_rounded;
+    } else {
+      statusColor = const Color(0xFF3B82F6);
+      statusIcon = Icons.follow_the_signs_rounded;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.xs,
+      ),
+      child: AppCard(
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(AppSpacing.sm),
                   decoration: BoxDecoration(
-                    color: isActive
-                        ? (isOverdue
-                            ? colorScheme.errorContainer.withAlpha(80)
-                            : colorScheme.primaryContainer.withAlpha(80))
-                        : colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(10),
+                    color: statusColor.withAlpha(30),
+                    borderRadius: AppRadius.cardBorder,
                   ),
-                  child: Icon(
-                    isActive
-                        ? (isOverdue
-                            ? Icons.warning_amber_rounded
-                            : Icons.follow_the_signs_rounded)
-                        : Icons.check_circle_rounded,
-                    size: 22,
-                    color: isActive
-                        ? (isOverdue
-                            ? colorScheme.error
-                            : colorScheme.primary)
-                        : Colors.green.shade700,
-                  ),
+                  child: Icon(statusIcon, size: 22, color: statusColor),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -389,7 +315,7 @@ class _FollowUpCard extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: AppSpacing.xs),
                       Row(
                         children: [
                           Icon(
@@ -397,23 +323,15 @@ class _FollowUpCard extends StatelessWidget {
                                 ? Icons.calendar_today_rounded
                                 : Icons.check_circle_rounded,
                             size: 14,
-                            color: isActive
-                                ? (isOverdue
-                                    ? colorScheme.error
-                                    : colorScheme.primary)
-                                : Colors.green.shade700,
+                            color: statusColor,
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: AppSpacing.xs),
                           Text(
                             isActive
-                                ? _formatDate(item.followUpDate.toDate())
+                                ? _formatDate(dueDate)
                                 : 'Completed',
                             style: theme.textTheme.labelSmall?.copyWith(
-                              color: isActive
-                                  ? (isOverdue
-                                      ? colorScheme.error
-                                      : colorScheme.onSurfaceVariant)
-                                  : Colors.green.shade700,
+                              color: statusColor,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -453,26 +371,28 @@ class _FollowUpCard extends StatelessWidget {
               ],
             ),
             if (item.amount != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                '₹${NumberFormat('#,##,###', 'en_IN').format(item.amount)}',
+              const SizedBox(height: AppSpacing.sm),
+              AmountText(
+                amount: item.amount!,
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: colorScheme.secondary,
                 ),
               ),
             ],
-            const SizedBox(height: 4),
-            Text(
-              item.note,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+            if (item.note.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                item.note,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
+            ],
             if (isActive) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               Align(
                 alignment: Alignment.centerRight,
                 child: FilledButton.tonalIcon(

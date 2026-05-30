@@ -8,6 +8,7 @@ import 'package:ganesha_2026/core/providers/expense_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/features/expenses/expense_tile.dart';
 import 'package:ganesha_2026/shared/widgets/amount_text.dart';
+import 'package:ganesha_2026/shared/widgets/app_empty_state.dart';
 import 'package:ganesha_2026/shared/widgets/confirm_dialog.dart';
 
 class ExpenseListPage extends ConsumerWidget {
@@ -41,32 +42,10 @@ class ExpenseListPage extends ConsumerWidget {
     ColorScheme colorScheme,
   ) {
     if (expenses.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.receipt_long_rounded,
-              size: 64,
-              color: colorScheme.primary,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No expenses recorded',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Tap + to add your first expense',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurface.withAlpha(128),
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+      return AppEmptyState(
+        icon: Icons.receipt_long_rounded,
+        title: 'No expenses recorded',
+        subtitle: 'Tap + to add your first expense',
       );
     }
 

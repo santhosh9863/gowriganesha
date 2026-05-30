@@ -3,11 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:ganesha_2026/core/design/app_spacing.dart';
+import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/models/target.dart';
 import 'package:ganesha_2026/core/providers/target_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/features/collections/collection_tile.dart';
 import 'package:ganesha_2026/shared/widgets/amount_text.dart';
+import 'package:ganesha_2026/shared/widgets/app_card.dart';
+import 'package:ganesha_2026/shared/widgets/app_empty_state.dart';
 import 'package:ganesha_2026/shared/widgets/confirm_dialog.dart';
 
 class CollectionListPage extends ConsumerStatefulWidget {
@@ -107,15 +111,13 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage> {
 
     return Column(
       children: [
-        _SummaryBar(
-          expectedTotal: expectedTotal,
-          collectedTotal: collectedTotal,
-          remainingTotal: remainingTotal,
-          theme: theme,
-          colorScheme: colorScheme,
-        ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.sm,
+            AppSpacing.lg,
+            0,
+          ),
           child: TextField(
             controller: _searchController,
             onChanged: (v) => setState(() => _searchQuery = v),
@@ -132,7 +134,7 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage> {
                     )
                   : null,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: AppRadius.buttonBorder,
               ),
               contentPadding: const EdgeInsets.symmetric(vertical: 0),
               filled: true,
@@ -141,34 +143,55 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.sm,
+            AppSpacing.lg,
+            AppSpacing.sm,
+          ),
           child: Row(
             children: [
               _buildFilterChip('All', 'all'),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.sm),
               _buildFilterChip('Pending', 'pending'),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.sm),
               _buildFilterChip('Collected', 'collected'),
             ],
           ),
         ),
+        _SummaryBar(
+          expectedTotal: expectedTotal,
+          collectedTotal: collectedTotal,
+          remainingTotal: remainingTotal,
+          theme: theme,
+          colorScheme: colorScheme,
+        ),
         if (filtered.isEmpty)
           Expanded(
-            child: Center(
-              child: Text(
-                targets.isEmpty
-                    ? 'No sponsors yet'
-                    : 'No sponsors match "$_searchQuery"',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
+            child: AppEmptyState(
+              icon: targets.isEmpty
+                  ? Icons.people_outline_rounded
+                  : Icons.search_off_rounded,
+              title: targets.isEmpty
+                  ? 'No sponsors yet'
+                  : 'No sponsors match "$_searchQuery"',
+              subtitle: targets.isEmpty ? 'Tap + to add your first sponsor' : null,
+              action: targets.isEmpty
+                  ? FilledButton.icon(
+                      onPressed: () => context.push('/collections/add'),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('Add Sponsor'),
+                    )
+                  : null,
             ),
           )
         else
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.only(top: 4, bottom: 80),
+              padding: const EdgeInsets.only(
+                top: AppSpacing.xs,
+                bottom: 80,
+              ),
               itemCount: filtered.length,
               itemBuilder: (context, index) {
                 final target = filtered[index];
@@ -308,63 +331,80 @@ class _SummaryBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        0,
+        AppSpacing.lg,
+        AppSpacing.sm,
+      ),
       child: Row(
         children: [
           Expanded(
-            child: _SummaryCard(
+            child: _SummaryChip(
               label: 'Expected',
               amount: expectedTotal,
               color: colorScheme.primary,
               theme: theme,
+              onTap: () => _filterBy(context, 'all'),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
-            child: _SummaryCard(
+            child: _SummaryChip(
               label: 'Collected',
               amount: collectedTotal,
               color: colorScheme.tertiary,
               theme: theme,
+              onTap: () => _filterBy(context, 'collected'),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
-            child: _SummaryCard(
+            child: _SummaryChip(
               label: 'Remaining',
               amount: remainingTotal,
               color: remainingTotal > 0
                   ? colorScheme.error
                   : Colors.green.shade700,
               theme: theme,
+              onTap: () => _filterBy(context, 'pending'),
             ),
           ),
         ],
       ),
     );
   }
+
+  void _filterBy(BuildContext context, String filter) {
+    context.push('/collections?filter=$filter');
+  }
 }
 
-class _SummaryCard extends StatelessWidget {
+class _SummaryChip extends StatelessWidget {
   final String label;
   final int amount;
   final Color color;
   final ThemeData theme;
+  final VoidCallback onTap;
 
-  const _SummaryCard({
+  const _SummaryChip({
     required this.label,
     required this.amount,
     required this.color,
     required this.theme,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    return GestureDetector(
+      onTap: onTap,
+      child: AppCard(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -375,7 +415,7 @@ class _SummaryCard extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpacing.xs),
             AmountText(
               amount: amount,
               style: theme.textTheme.titleMedium?.copyWith(

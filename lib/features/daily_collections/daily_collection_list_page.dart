@@ -3,10 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
+import 'package:ganesha_2026/core/design/app_spacing.dart';
+import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/models/daily_collection.dart';
 import 'package:ganesha_2026/core/providers/daily_collection_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/features/daily_collections/daily_collection_tile.dart';
+import 'package:ganesha_2026/shared/widgets/app_card.dart';
+import 'package:ganesha_2026/shared/widgets/app_empty_state.dart';
 import 'package:ganesha_2026/shared/widgets/confirm_dialog.dart';
 
 class DailyCollectionListPage extends ConsumerStatefulWidget {
@@ -122,26 +126,9 @@ class _DailyCollectionListPageState
               )),
         ],
         if (collections.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 32),
-            child: Center(
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.account_balance_wallet_rounded,
-                    size: 48,
-                    color: colorScheme.onSurface.withAlpha(60),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'No collections recorded yet',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          AppEmptyState(
+            icon: Icons.account_balance_wallet_rounded,
+            title: 'No collections recorded yet',
           ),
       ],
     );
@@ -255,48 +242,48 @@ class _TodayTotalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: colorScheme.secondaryContainer.withAlpha(80),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.today_rounded,
-                color: colorScheme.secondary,
-                size: 28,
-              ),
+    return AppCard(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xl,
+        vertical: AppSpacing.lg,
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: colorScheme.secondaryContainer.withAlpha(80),
+              borderRadius: AppRadius.cardBorder,
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Today's Collection",
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${AppConstants.currencySymbol}${fmt(total)}',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
+            child: Icon(
+              Icons.today_rounded,
+              color: colorScheme.secondary,
+              size: 28,
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Today's Collection",
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  '${AppConstants.currencySymbol}${fmt(total)}',
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
