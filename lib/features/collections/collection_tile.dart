@@ -36,6 +36,16 @@ _StatusData _statusData(_CollectionStatus s, ColorScheme cs) => switch (s) {
         ),
     };
 
+String _relativeTime(DateTime updated) {
+  final now = DateTime.now();
+  final diff = now.difference(updated);
+  if (diff.inMinutes < 1) return 'Updated just now';
+  if (diff.inMinutes < 60) return 'Updated ${diff.inMinutes} min ago';
+  if (diff.inHours < 24) return 'Updated ${diff.inHours}h ago';
+  if (diff.inDays == 1) return 'Updated Yesterday';
+  return 'Updated ${diff.inDays} days ago';
+}
+
 class CollectionTile extends StatelessWidget {
   final Target target;
   final VoidCallback onDelete;
@@ -133,6 +143,13 @@ class CollectionTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
+              const SizedBox(height: 2),
+              Text(
+                _relativeTime(target.updatedAt.toDate()),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
               const SizedBox(height: 10),
               Row(
                 children: [
