@@ -13,6 +13,8 @@ import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/shared/widgets/amount_text.dart';
 import 'package:ganesha_2026/shared/widgets/app_card.dart';
 import 'package:ganesha_2026/shared/widgets/app_empty_state.dart';
+import 'package:ganesha_2026/shared/widgets/app_skeleton.dart';
+import 'package:ganesha_2026/shared/widgets/app_stagger.dart';
 import 'package:ganesha_2026/shared/widgets/confirm_dialog.dart';
 
 class FollowUpListPage extends ConsumerStatefulWidget {
@@ -22,8 +24,26 @@ class FollowUpListPage extends ConsumerStatefulWidget {
   ConsumerState<FollowUpListPage> createState() => _FollowUpListPageState();
 }
 
-class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
+class _FollowUpListPageState extends ConsumerState<FollowUpListPage>
+    with SingleTickerProviderStateMixin {
   String _filter = 'active';
+  late final AnimationController _staggerCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _staggerCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _staggerCtrl.forward());
+  }
+
+  @override
+  void dispose() {
+    _staggerCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,8 +54,13 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Follow-Ups')),
       body: allAsync.when(
-        data: (allItems) => _buildContent(context, allItems, theme, colorScheme),
-        loading: () => const Center(child: CircularProgressIndicator()),
+        data: (allItems) => RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(allFollowUpsStreamProvider);
+          },
+          child: _buildContent(context, allItems, theme, colorScheme),
+        ),
+        loading: () => const AppSkeletonList(),
         error: (e, _) => Center(child: Text('Error: $e')),
       ),
       floatingActionButton: FloatingActionButton(
@@ -105,16 +130,20 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
               itemCount: items.length,
               itemBuilder: (context, index) {
                 final item = items[index];
-                return _FollowUpCard(
-                  item: item,
-                  onEdit: () =>
-                      context.push('/followups/${item.id}/edit'),
-                  onDelete: () => _handleDelete(context, ref, item),
-                  onCollected: item.status == 'active'
-                      ? () => _handleCollected(context, ref, item)
-                      : null,
-                  theme: theme,
-                  colorScheme: colorScheme,
+                return AppStagger(
+                  index: index,
+                  controller: _staggerCtrl,
+                  child: _FollowUpCard(
+                    item: item,
+                    onEdit: () =>
+                        context.push('/followups/${item.id}/edit'),
+                    onDelete: () => _handleDelete(context, ref, item),
+                    onCollected: item.status == 'active'
+                        ? () => _handleCollected(context, ref, item)
+                        : null,
+                    theme: theme,
+                    colorScheme: colorScheme,
+                  ),
                 );
               },
             ),

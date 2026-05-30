@@ -66,7 +66,13 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(dashboardProvider);
+          ref.invalidate(activitiesStreamProvider);
+          ref.invalidate(activeFollowUpsProvider);
+        },
+        child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.lg,
               AppSpacing.sm,
@@ -106,6 +112,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
               ],
             ),
           ),
+        ),
     );
   }
 }

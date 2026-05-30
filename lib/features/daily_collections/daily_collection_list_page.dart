@@ -11,6 +11,7 @@ import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/features/daily_collections/daily_collection_tile.dart';
 import 'package:ganesha_2026/shared/widgets/app_card.dart';
 import 'package:ganesha_2026/shared/widgets/app_empty_state.dart';
+import 'package:ganesha_2026/shared/widgets/app_skeleton.dart';
 import 'package:ganesha_2026/shared/widgets/confirm_dialog.dart';
 
 class DailyCollectionListPage extends ConsumerStatefulWidget {
@@ -22,15 +23,28 @@ class DailyCollectionListPage extends ConsumerStatefulWidget {
 }
 
 class _DailyCollectionListPageState
-    extends ConsumerState<DailyCollectionListPage> {
+    extends ConsumerState<DailyCollectionListPage>
+    with SingleTickerProviderStateMixin {
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
   bool _isSaving = false;
+  late final AnimationController _staggerCtrl;
 
   static const _amountChips = [1000, 2000, 5000, 10000];
 
   @override
+  void initState() {
+    super.initState();
+    _staggerCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _staggerCtrl.forward());
+  }
+
+  @override
   void dispose() {
+    _staggerCtrl.dispose();
     _amountController.dispose();
     _noteController.dispose();
     super.dispose();
@@ -45,9 +59,13 @@ class _DailyCollectionListPageState
     return Scaffold(
       appBar: AppBar(title: const Text('Daily Collections')),
       body: dailyCollectionAsync.when(
-        data: (collections) =>
-            _buildContent(context, ref, collections, theme, colorScheme),
-        loading: () => const Center(child: CircularProgressIndicator()),
+        data: (collections) => RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(dailyCollectionsStreamProvider);
+          },
+          child: _buildContent(context, ref, collections, theme, colorScheme),
+        ),
+        loading: () => const AppSkeletonList(),
         error: (e, _) => Center(child: Text('Error: $e')),
       ),
     );

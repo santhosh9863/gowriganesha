@@ -12,6 +12,8 @@ import 'package:ganesha_2026/features/collections/collection_tile.dart';
 import 'package:ganesha_2026/shared/widgets/amount_text.dart';
 import 'package:ganesha_2026/shared/widgets/app_card.dart';
 import 'package:ganesha_2026/shared/widgets/app_empty_state.dart';
+import 'package:ganesha_2026/shared/widgets/app_skeleton.dart';
+import 'package:ganesha_2026/shared/widgets/app_stagger.dart';
 import 'package:ganesha_2026/shared/widgets/confirm_dialog.dart';
 
 class CollectionListPage extends ConsumerStatefulWidget {
@@ -21,11 +23,23 @@ class CollectionListPage extends ConsumerStatefulWidget {
   ConsumerState<CollectionListPage> createState() => _CollectionListPageState();
 }
 
-class _CollectionListPageState extends ConsumerState<CollectionListPage> {
+class _CollectionListPageState extends ConsumerState<CollectionListPage>
+    with SingleTickerProviderStateMixin {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   String _filter = 'all';
   bool _initialized = false;
+  late final AnimationController _staggerCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _staggerCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _staggerCtrl.forward());
+  }
 
   @override
   void didChangeDependencies() {
@@ -39,6 +53,7 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage> {
 
   @override
   void dispose() {
+    _staggerCtrl.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -54,9 +69,13 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage> {
         title: const Text('Collections'),
       ),
       body: targetsAsync.when(
-        data: (targets) =>
-            _buildList(context, ref, targets, theme, colorScheme),
-        loading: () => const Center(child: CircularProgressIndicator()),
+        data: (targets) => RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(targetsStreamProvider);
+          },
+          child: _buildList(context, ref, targets, theme, colorScheme),
+        ),
+        loading: () => const AppSkeletonList(),
         error: (e, _) => Center(child: Text('Error: $e')),
       ),
       floatingActionButton: FloatingActionButton(
@@ -195,11 +214,15 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage> {
               itemCount: filtered.length,
               itemBuilder: (context, index) {
                 final target = filtered[index];
-                return CollectionTile(
-                  target: target,
-                  onDelete: () => _handleDelete(context, ref, target),
-                  onQuickUpdate: () =>
-                      _handleQuickUpdate(context, ref, target),
+                return AppStagger(
+                  index: index,
+                  controller: _staggerCtrl,
+                  child: CollectionTile(
+                    target: target,
+                    onDelete: () => _handleDelete(context, ref, target),
+                    onQuickUpdate: () =>
+                        _handleQuickUpdate(context, ref, target),
+                  ),
                 );
               },
             ),
