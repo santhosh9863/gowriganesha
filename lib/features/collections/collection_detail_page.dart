@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
+import 'package:ganesha_2026/core/design/app_spacing.dart';
+import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/models/target.dart';
 import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/models/sponsor_followup.dart';
@@ -11,6 +13,7 @@ import 'package:ganesha_2026/core/providers/target_provider.dart';
 import 'package:ganesha_2026/core/providers/followup_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/shared/widgets/amount_text.dart';
+import 'package:ganesha_2026/shared/widgets/app_card.dart';
 
 class CollectionDetailPage extends ConsumerStatefulWidget {
   final String targetId;
@@ -39,30 +42,48 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
   Future<void> _handleReceiveAmount(Target target) async {
     final amountCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
-    final result = await showDialog<Map<String, dynamic>>(
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppRadius.bottomSheet),
+        ),
+      ),
       builder: (ctx) {
         final theme = Theme.of(ctx);
-        return AlertDialog(
-          title: const Text('Receive Amount'),
-          content: Column(
+        return Padding(
+          padding: EdgeInsets.only(
+            left: AppSpacing.xxl,
+            right: AppSpacing.xxl,
+            top: AppSpacing.xxl,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + AppSpacing.xxl,
+          ),
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text(
+                'Receive Amount',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
               Text(
                 target.name,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: AppSpacing.xs),
               Text(
                 'Expected: ₹${_fmt(target.expectedAmount)}',
-                style: theme.textTheme.labelMedium?.copyWith(
+                style: theme.textTheme.labelLarge?.copyWith(
                   color: theme.colorScheme.primary,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.lg),
               TextField(
                 controller: amountCtrl,
                 keyboardType: TextInputType.number,
@@ -73,7 +94,7 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
                 ),
                 autofocus: true,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               TextField(
                 controller: noteCtrl,
                 decoration: const InputDecoration(
@@ -82,26 +103,35 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
                   border: OutlineInputBorder(),
                 ),
               ),
+              const SizedBox(height: AppSpacing.xxl),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton(
+                      onPressed: () {
+                        final v = int.tryParse(amountCtrl.text.trim());
+                        if (v != null && v > 0) {
+                          Navigator.pop(ctx, {
+                            'amount': v,
+                            'note': noteCtrl.text.trim(),
+                          });
+                        }
+                      },
+                      child: const Text('Save'),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final v = int.tryParse(amountCtrl.text.trim());
-                if (v != null && v > 0) {
-                  Navigator.pop(ctx, {
-                    'amount': v,
-                    'note': noteCtrl.text.trim(),
-                  });
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
         );
       },
     );
@@ -188,77 +218,68 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
     return Scaffold(
       appBar: AppBar(title: Text(target.name)),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Card(
-              margin: EdgeInsets.zero,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    _AmountRow(
-                      label: 'Expected Sponsorship',
-                      amount: target.expectedAmount,
-                      color: colorScheme.primary,
-                      theme: theme,
+            AppCard(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                children: [
+                  _AmountRow(
+                    label: 'Expected Sponsorship',
+                    amount: target.expectedAmount,
+                    color: colorScheme.primary,
+                    theme: theme,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _AmountRow(
+                    label: 'Received Amount',
+                    amount: target.givenAmount,
+                    color: colorScheme.tertiary,
+                    theme: theme,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _AmountRow(
+                    label: 'Remaining Amount',
+                    amount: remaining,
+                    color: remaining > 0 ? colorScheme.error : Colors.green.shade700,
+                    theme: theme,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  ClipRRect(
+                    borderRadius: AppRadius.cardBorder,
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 8,
+                      backgroundColor: colorScheme.primaryContainer.withAlpha(80),
                     ),
-                    const SizedBox(height: 12),
-                    _AmountRow(
-                      label: 'Received Amount',
-                      amount: target.givenAmount,
-                      color: colorScheme.tertiary,
-                      theme: theme,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    '${(progress * 100).toStringAsFixed(0)}%',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
                     ),
-                    const SizedBox(height: 12),
-                    _AmountRow(
-                      label: 'Remaining Amount',
-                      amount: remaining,
-                      color: remaining > 0 ? colorScheme.error : Colors.green.shade700,
-                      theme: theme,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'Updated ${_relativeTime(target.updatedAt)}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
-                    const SizedBox(height: 16),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        minHeight: 8,
-                        backgroundColor: colorScheme.primaryContainer.withAlpha(80),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${(progress * 100).toStringAsFixed(0)}%',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Updated ${_relativeTime(target.updatedAt)}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () => _handleReceiveAmount(target),
-                    icon: const Icon(Icons.payments_rounded, size: 18),
-                    label: const Text('Receive Amount'),
-                  ),
-                ),
-              ],
+            const SizedBox(height: AppSpacing.xl),
+            FilledButton.icon(
+              onPressed: () => _handleReceiveAmount(target),
+              icon: const Icon(Icons.payments_rounded, size: 18),
+              label: const Text('Receive Amount'),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             Row(
               children: [
                 Expanded(
@@ -270,7 +291,7 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
                     label: const Text('Add Follow-Up'),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () =>
@@ -282,14 +303,14 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
               ],
             ),
             if (sponsorFollowUps.isNotEmpty) ...[
-              const SizedBox(height: 24),
+              const SizedBox(height: AppSpacing.xxl),
               Text(
                 'Follow-Up History',
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.sm),
               ...active.map((fu) => _FollowUpRow(
                     followup: fu,
                     theme: theme,
@@ -297,7 +318,7 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
                     isActive: true,
                   )),
               if (completed.isNotEmpty) ...[
-                const Divider(height: 24),
+                const Divider(height: AppSpacing.xxl),
                 ...completed.map((fu) => _FollowUpRow(
                       followup: fu,
                       theme: theme,
