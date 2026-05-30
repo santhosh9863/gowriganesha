@@ -10,6 +10,7 @@ import 'package:ganesha_2026/core/providers/dashboard_provider.dart';
 import 'package:ganesha_2026/core/providers/activity_provider.dart';
 import 'package:ganesha_2026/core/providers/chart_provider.dart';
 import 'package:ganesha_2026/core/providers/followup_provider.dart';
+import 'package:ganesha_2026/shared/widgets/app_page_header.dart';
 
 const _s8 = 8.0;
 const _s12 = 12.0;
@@ -38,15 +39,6 @@ String _shortFmt(int n) {
   if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
   return n.toString();
 }
-
-String _greeting() {
-  final h = DateTime.now().hour;
-  if (h < 12) return 'Good morning';
-  if (h < 17) return 'Good afternoon';
-  return 'Good evening';
-}
-
-String _todayDate() => DateFormat('d MMMM yyyy').format(DateTime.now());
 
 double _roundInterval(double maxVal) {
   if (maxVal <= 0) return 1000;
@@ -107,7 +99,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                   padding: EdgeInsets.fromLTRB(
                     isWide ? _s32 : _s16, _s20, isWide ? _s32 : _s16, _s32,
                   ),
-                  child: isWide ? const _WideLayout() : const _NarrowLayout(),
+                  child: isWide
+                      ? _WideLayout(onSettings: () => context.push('/settings'))
+                      : _NarrowLayout(onSettings: () => context.push('/settings')),
                 ),
               );
             },
@@ -119,13 +113,14 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
 }
 
 class _WideLayout extends StatelessWidget {
-  const _WideLayout();
+  final VoidCallback? onSettings;
+  const _WideLayout({this.onSettings});
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _FestivalHeader(),
+        AppPageHeader(onSettings: onSettings),
         const SizedBox(height: _s24),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -152,13 +147,14 @@ class _WideLayout extends StatelessWidget {
 }
 
 class _NarrowLayout extends StatelessWidget {
-  const _NarrowLayout();
+  final VoidCallback? onSettings;
+  const _NarrowLayout({this.onSettings});
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _FestivalHeader(),
+        AppPageHeader(onSettings: onSettings),
         SizedBox(height: _s20),
         _HeroCard(),
         SizedBox(height: _s16),
@@ -170,61 +166,6 @@ class _NarrowLayout extends StatelessWidget {
         SizedBox(height: _s24),
         _ActivityTimeline(),
       ],
-    );
-  }
-}
-
-class _FestivalHeader extends StatelessWidget {
-  const _FestivalHeader();
-  @override
-  Widget build(BuildContext context) {
-    final greeting = '${_greeting()},';
-    final date = _todayDate();
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              greeting,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: _textSec),
-            ),
-            const SizedBox(height: 2),
-            const Text(
-              'Sri Gowri Ganesha Festival',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: _textPri, letterSpacing: -0.3),
-            ),
-            const SizedBox(height: 1),
-            Text(
-              date,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w400, color: _textTer),
-            ),
-          ],
-        ),
-        _SettingsIcon(),
-      ],
-    );
-  }
-}
-
-class _SettingsIcon extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 38, height: 38,
-      decoration: BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _border),
-      ),
-      child: IconButton(
-        icon: const Icon(Icons.settings_rounded, size: 18, color: _textSec),
-        onPressed: () => context.push('/settings'),
-        padding: EdgeInsets.zero,
-        tooltip: 'Settings',
-      ),
     );
   }
 }

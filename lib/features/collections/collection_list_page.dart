@@ -12,6 +12,7 @@ import 'package:ganesha_2026/features/collections/collection_tile.dart';
 import 'package:ganesha_2026/shared/widgets/amount_text.dart';
 import 'package:ganesha_2026/shared/widgets/app_card.dart';
 import 'package:ganesha_2026/shared/widgets/app_empty_state.dart';
+import 'package:ganesha_2026/shared/widgets/app_page_scaffold.dart';
 import 'package:ganesha_2026/shared/widgets/app_skeleton.dart';
 import 'package:ganesha_2026/shared/widgets/app_stagger.dart';
 import 'package:ganesha_2026/shared/widgets/confirm_dialog.dart';
@@ -64,11 +65,16 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Collections'),
+    return AppPageScaffold(
+      festivalName: 'Sponsors',
+      onSettings: () => context.push('/settings'),
+      onAdd: () => context.push('/collections/add'),
+      showAdd: true,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => context.push('/collections/add'),
+        child: const Icon(Icons.add_rounded),
       ),
-      body: targetsAsync.when(
+      child: targetsAsync.when(
         data: (targets) => RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(targetsStreamProvider);
@@ -77,10 +83,6 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
         ),
         loading: () => const AppSkeletonList(),
         error: (e, _) => Center(child: Text('Error: $e')),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/collections/add'),
-        child: const Icon(Icons.add_rounded),
       ),
     );
   }
