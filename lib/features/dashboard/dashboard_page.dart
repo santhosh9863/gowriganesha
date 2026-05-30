@@ -5,32 +5,16 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:ganesha_2026/core/constants.dart';
+import 'package:ganesha_2026/core/design/app_colors.dart';
+import 'package:ganesha_2026/core/design/app_radius.dart';
+import 'package:ganesha_2026/core/design/app_shadows.dart';
+import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/providers/dashboard_provider.dart';
 import 'package:ganesha_2026/core/providers/activity_provider.dart';
 import 'package:ganesha_2026/core/providers/chart_provider.dart';
 import 'package:ganesha_2026/core/providers/followup_provider.dart';
 import 'package:ganesha_2026/shared/widgets/app_page_header.dart';
-
-const _s8 = 8.0;
-const _s12 = 12.0;
-const _s16 = 16.0;
-const _s20 = 20.0;
-const _s24 = 24.0;
-const _s32 = 32.0;
-
-const _green = Color(0xFF0F6B3C);
-const _greenLight = Color(0xFFE8F5E9);
-const _success = Color(0xFF22C55E);
-const _amber = Color(0xFFF59E0B);
-const _red = Color(0xFFEF4444);
-const _surface = Color(0xFFF4F6F8);
-const _card = Color(0xFFFFFFFF);
-const _textPri = Color(0xFF1A1A2E);
-const _textSec = Color(0xFF6B7280);
-const _textTer = Color(0xFF9CA3AF);
-const _border = Color(0xFFE2E4E9);
-const _shadow = Color(0x0A000000);
 
 final _fmt = NumberFormat('#,##,###', 'en_IN');
 
@@ -79,7 +63,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _surface,
+      backgroundColor: AppColors.surface,
       body: SafeArea(
         child: FadeTransition(
           opacity: _fadeCtrl,
@@ -97,7 +81,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: EdgeInsets.fromLTRB(
-                    isWide ? _s32 : _s16, _s20, isWide ? _s32 : _s16, _s32,
+                    isWide ? AppSpacing.xxxl : AppSpacing.lg,
+                    AppSpacing.xl,
+                    isWide ? AppSpacing.xxxl : AppSpacing.lg,
+                    AppSpacing.xxxl,
                   ),
                   child: isWide
                       ? _WideLayout(onSettings: () => context.push('/settings'))
@@ -121,25 +108,25 @@ class _WideLayout extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         AppPageHeader(onSettings: onSettings),
-        const SizedBox(height: _s24),
+        const SizedBox(height: AppSpacing.xxl),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Expanded(flex: 5, child: _HeroCard()),
-            const SizedBox(width: _s24),
+            const SizedBox(width: AppSpacing.xxl),
             const Expanded(flex: 2, child: _QuickActions()),
           ],
         ),
-        const SizedBox(height: _s24),
+        const SizedBox(height: AppSpacing.xxl),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Expanded(flex: 2, child: _KpiGrid()),
-            const SizedBox(width: _s24),
+            const SizedBox(width: AppSpacing.xxl),
             const Expanded(flex: 3, child: _CollectionTrend()),
           ],
         ),
-        const SizedBox(height: _s24),
+        const SizedBox(height: AppSpacing.xxl),
         const _ActivityTimeline(),
       ],
     );
@@ -155,15 +142,15 @@ class _NarrowLayout extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         AppPageHeader(onSettings: onSettings),
-        SizedBox(height: _s20),
+        SizedBox(height: AppSpacing.xl),
         _HeroCard(),
-        SizedBox(height: _s16),
+        SizedBox(height: AppSpacing.lg),
         _KpiGrid(),
-        SizedBox(height: _s16),
+        SizedBox(height: AppSpacing.lg),
         _QuickActions(),
-        SizedBox(height: _s16),
+        SizedBox(height: AppSpacing.lg),
         _CollectionTrend(),
-        SizedBox(height: _s24),
+        SizedBox(height: AppSpacing.xxl),
         _ActivityTimeline(),
       ],
     );
@@ -187,16 +174,19 @@ class _CountUp extends StatelessWidget {
   }
 }
 
-class _HeroCard extends StatelessWidget {
+class _HeroCard extends ConsumerWidget {
   const _HeroCard();
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final db = ref.watch(dashboardProvider);
+    final pct = (db.progressPercent / 100).clamp(0.0, 1.0);
+
     return Container(
-      padding: const EdgeInsets.all(_s24),
+      padding: const EdgeInsets.all(AppSpacing.xxl),
       decoration: BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _border),
+        color: AppColors.card,
+        borderRadius: AppRadius.largeBorder,
+        border: Border.all(color: AppColors.outline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,35 +194,36 @@ class _HeroCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 32, height: 32,
+                padding: const EdgeInsets.all(AppSpacing.sm),
                 decoration: BoxDecoration(
-                  color: _greenLight,
-                  borderRadius: BorderRadius.circular(8),
+                  color: AppColors.primaryBg,
+                  borderRadius: AppRadius.mediumBorder,
                 ),
-                child: const Icon(Icons.trending_up_rounded, size: 18, color: _green),
+                child: const Icon(Icons.trending_up_rounded, size: 18, color: AppColors.primary),
               ),
-              const SizedBox(width: _s12),
+              const SizedBox(width: AppSpacing.md),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Festival Goal',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textTer, letterSpacing: 0.3),
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: AppColors.warmGray400,
+                      letterSpacing: 0.3,
+                    ),
                   ),
-                  Consumer(builder: (context, ref, _) {
-                    final db = ref.watch(dashboardProvider);
-                    return Text(
-                      '${db.progressPercent.toStringAsFixed(1)}% complete',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: _success),
-                    );
-                  }),
+                  Text(
+                    '${db.progressPercent.toStringAsFixed(1)}% complete',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: AppColors.success,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ),
-              const Spacer(),
-              const Icon(Icons.trending_up_rounded, size: 16, color: _textTer),
             ],
           ),
-          const SizedBox(height: _s24),
+          const SizedBox(height: AppSpacing.xxl),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -240,93 +231,69 @@ class _HeroCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Collected',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: _textSec),
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: AppColors.warmGray500,
+                      ),
                     ),
-                    const SizedBox(height: 4),
-                    Consumer(builder: (context, ref, _) {
-                      final db = ref.watch(dashboardProvider);
-                      return _CountUp(
-                        target: db.collectedTotal,
-                        style: const TextStyle(
-                          fontSize: 38, fontWeight: FontWeight.w700, color: _textPri,
-                          letterSpacing: -1.5, height: 1.0,
+                    const SizedBox(height: AppSpacing.xs),
+                    _CountUp(
+                      target: db.collectedTotal,
+                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                        color: AppColors.charcoal,
+                        letterSpacing: -1.5,
+                        height: 1.0,
+                      ),
+                      format: (v) => '${AppConstants.currencySymbol}${_fmt.format(v)}',
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      'Target: ${AppConstants.currencySymbol}${_fmt.format(db.expectedTotal)}',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.warmGray400,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: pct),
+                        duration: const Duration(milliseconds: 700),
+                        curve: Curves.easeOut,
+                        builder: (context, value, _) => LinearProgressIndicator(
+                          value: value,
+                          minHeight: 6,
+                          backgroundColor: AppColors.warmGray200,
                         ),
-                        format: (v) => '${AppConstants.currencySymbol}${_fmt.format(v)}',
-                      );
-                    }),
-                    const SizedBox(height: 4),
-                    Consumer(builder: (context, ref, _) {
-                      final db = ref.watch(dashboardProvider);
-                      return Text(
-                        'Target: ${AppConstants.currencySymbol}${_fmt.format(db.expectedTotal)}',
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: _textTer),
-                      );
-                    }),
-                    const SizedBox(height: _s20),
-                    Consumer(builder: (context, ref, _) {
-                      final db = ref.watch(dashboardProvider);
-                      final pct = db.progressPercent / 100;
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(3),
-                            child: TweenAnimationBuilder<double>(
-                              tween: Tween(begin: 0, end: pct.clamp(0.0, 1.0)),
-                              duration: const Duration(milliseconds: 700),
-                              curve: Curves.easeOut,
-                              builder: (context, value, _) => LinearProgressIndicator(
-                                value: value,
-                                minHeight: 6,
-                                backgroundColor: const Color(0xFFE5E7EB),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: _s8),
-                          Row(
-                            children: [
-                              Text(
-                                '${AppConstants.currencySymbol}${_shortFmt(db.remainingCollection)} remaining',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _textTer),
-                              ),
-                            ],
-                          ),
-                        ],
-                      );
-                    }),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      '${AppConstants.currencySymbol}${_shortFmt(db.remainingCollection)} remaining',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.warmGray400,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(width: _s24),
-              Consumer(builder: (context, ref, _) {
-                final db = ref.watch(dashboardProvider);
-                return _HeroRing(
-                  progress: (db.progressPercent / 100).clamp(0.0, 1.0),
-                  size: 96,
-                  stroke: 7,
-                );
-              }),
+              const SizedBox(width: AppSpacing.xxl),
+              _HeroRing(progress: pct, size: 96, stroke: 7),
             ],
           ),
-          const SizedBox(height: _s20),
-          Consumer(builder: (context, ref, _) {
-            final db = ref.watch(dashboardProvider);
-            final sponsorCount = db.pendingSponsorCount +
-                (db.collectedTotal > 0 ? 1 : 0);
-            return Row(
-              children: [
-                _Metric(label: 'Sponsors', value: sponsorCount),
-                _Divider(),
-                _Metric(label: 'Collections', value: '${AppConstants.currencySymbol}${_shortFmt(db.collectedTotal)}'),
-                _Divider(),
-                _Metric(label: 'Pending', value: db.pendingSponsorCount),
-                _Divider(),
-                _Metric(label: 'Visits', value: db.pendingSponsorCount),
-              ],
-            );
-          }),
+          const SizedBox(height: AppSpacing.xl),
+          Row(
+            children: [
+              _Metric(label: 'Sponsors', value: db.pendingSponsorCount),
+              _Divider(),
+              _Metric(label: 'Collected', value: AppConstants.currencySymbol + _shortFmt(db.collectedTotal)),
+              _Divider(),
+              _Metric(label: 'Pending', value: db.pendingSponsorCount),
+              _Divider(),
+              _Metric(label: 'Remaining', value: AppConstants.currencySymbol + _shortFmt(db.remainingCollection)),
+            ],
+          ),
         ],
       ),
     );
@@ -340,18 +307,24 @@ class _Metric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Expanded(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             '$value',
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: _textPri),
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: AppColors.charcoal,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 2),
           Text(
             label,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w400, color: _textTer),
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: AppColors.warmGray400,
+            ),
           ),
         ],
       ),
@@ -363,7 +336,7 @@ class _Divider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 1, height: 28, color: _border,
+      width: 1, height: 28, color: AppColors.outline,
       margin: const EdgeInsets.symmetric(horizontal: 4),
     );
   }
@@ -386,7 +359,7 @@ class _HeroRing extends StatelessWidget {
           CustomPaint(
             painter: _RingPainter(
               progress: 1, stroke: stroke,
-              color: const Color(0xFFE5E7EB),
+              color: AppColors.warmGray200,
               trackColor: const Color(0x00000000),
             ),
             size: Size(size, size),
@@ -398,7 +371,7 @@ class _HeroRing extends StatelessWidget {
             builder: (context, value, _) => CustomPaint(
               painter: _RingPainter(
                 progress: value, stroke: stroke,
-                color: _green, trackColor: const Color(0x00000000),
+                color: AppColors.primary, trackColor: const Color(0x00000000),
               ),
               size: Size(size, size),
             ),
@@ -409,7 +382,10 @@ class _HeroRing extends StatelessWidget {
             curve: Curves.easeOutCubic,
             builder: (context, value, _) => Text(
               '${(value * 100).toStringAsFixed(0)}%',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _green),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -462,25 +438,20 @@ class _KpiGrid extends ConsumerWidget {
     final db = ref.watch(dashboardProvider);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final w = (constraints.maxWidth - _s16) / 2;
+        final w = (constraints.maxWidth - AppSpacing.lg) / 2;
         return Wrap(
-          spacing: _s16, runSpacing: _s16,
+          spacing: AppSpacing.lg, runSpacing: AppSpacing.lg,
           children: [
             SizedBox(width: w, child: _KpiCard(
               icon: Icons.today_rounded, label: "Today's Collection",
               value: db.todayCollection, trend: '${db.todayEntryCount} entries',
-              color: _success, fmtCurrency: true,
+              color: AppColors.success, fmtCurrency: true,
             )),
             SizedBox(width: w, child: _KpiCard(
               icon: Icons.people_rounded, label: 'Pending Sponsors',
               value: db.pendingSponsorCount,
               trend: '${AppConstants.currencySymbol}${_shortFmt(db.pendingRemainingTotal)} remaining',
-              color: _amber, fmtCurrency: false,
-            )),
-            SizedBox(width: w, child: _KpiCard(
-              icon: Icons.notifications_rounded, label: 'Pending Visits',
-              value: db.pendingSponsorCount, trend: 'Requires action',
-              color: _green, fmtCurrency: false,
+              color: AppColors.warning, fmtCurrency: false,
             )),
             SizedBox(width: w, child: _KpiCard(
               icon: Icons.receipt_long_rounded, label: 'Expenses',
@@ -488,7 +459,12 @@ class _KpiGrid extends ConsumerWidget {
               trend: db.totalExpenses > 0
                   ? '${((db.totalExpenses / (db.collectedTotal > 0 ? db.collectedTotal : 1)) * 100).toStringAsFixed(0)}% of collected'
                   : 'No expenses',
-              color: _red, fmtCurrency: true,
+              color: AppColors.error, fmtCurrency: true,
+            )),
+            SizedBox(width: w, child: _KpiCard(
+              icon: Icons.notifications_rounded, label: 'Pending Visits',
+              value: db.pendingSponsorCount, trend: 'Needs follow-up',
+              color: AppColors.primary, fmtCurrency: false,
             )),
           ],
         );
@@ -515,24 +491,23 @@ class _KpiCardState extends State<_KpiCard> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
-        padding: const EdgeInsets.all(_s16),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
-          color: _card,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _border),
-          boxShadow: [
-            BoxShadow(
-              color: _shadow,
-              blurRadius: _hover ? 8 : 4,
-              offset: Offset(0, _hover ? 4 : 2),
-            ),
-          ],
+          color: AppColors.card,
+          borderRadius: AppRadius.largeBorder,
+          border: Border.all(
+            color: _hover
+                ? widget.color.withValues(alpha: 0.3)
+                : AppColors.outline,
+          ),
+          boxShadow: _hover ? AppShadows.elevated : AppShadows.subtle,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -541,27 +516,40 @@ class _KpiCardState extends State<_KpiCard> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
-                  width: 32, height: 32,
+                  padding: const EdgeInsets.all(AppSpacing.sm),
                   decoration: BoxDecoration(
                     color: widget.color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: AppRadius.mediumBorder,
                   ),
                   child: Icon(widget.icon, size: 16, color: widget.color),
                 ),
               ],
             ),
-            const SizedBox(height: _s12),
+            const SizedBox(height: AppSpacing.md),
             _CountUp(
               target: widget.value,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: _textPri, height: 1.0),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: AppColors.charcoal,
+                height: 1.0,
+              ),
               format: widget.fmtCurrency
                   ? (v) => '${AppConstants.currencySymbol}${_shortFmt(v)}'
                   : (v) => '$v',
             ),
-            const SizedBox(height: 4),
-            Text(widget.label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _textSec)),
-            const SizedBox(height: 4),
-            Text(widget.trend, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w400, color: _textTer)),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              widget.label,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: AppColors.warmGray500,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              widget.trend,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: AppColors.warmGray400,
+              ),
+            ),
           ],
         ),
       ),
@@ -573,23 +561,29 @@ class _QuickActions extends StatelessWidget {
   const _QuickActions();
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(bottom: _s12),
-          child: Text('Quick Actions', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textSec)),
+        Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+          child: Text(
+            'Quick Actions',
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: AppColors.warmGray500,
+            ),
+          ),
         ),
         LayoutBuilder(
           builder: (context, constraints) {
-            final w = (constraints.maxWidth - _s12) / 2;
+            final w = (constraints.maxWidth - AppSpacing.md) / 2;
             return Wrap(
-              spacing: _s12, runSpacing: _s12,
+              spacing: AppSpacing.md, runSpacing: AppSpacing.md,
               children: [
-                SizedBox(width: w, child: _ActionTile(icon: Icons.person_add_rounded, label: 'Sponsor', color: _green, route: '/collections/add')),
-                SizedBox(width: w, child: _ActionTile(icon: Icons.account_balance_wallet_rounded, label: 'Collection', color: _success, route: '/daily-collections/add')),
-                SizedBox(width: w, child: _ActionTile(icon: Icons.notifications_active_rounded, label: 'Follow Up', color: _amber, route: '/followups/add')),
-                SizedBox(width: w, child: _ActionTile(icon: Icons.receipt_rounded, label: 'Expense', color: _red, route: '/expenses/add')),
+                SizedBox(width: w, child: _ActionTile(icon: Icons.person_add_rounded, label: 'Sponsor', color: AppColors.primary, route: '/collections/add')),
+                SizedBox(width: w, child: _ActionTile(icon: Icons.account_balance_wallet_rounded, label: 'Collection', color: AppColors.success, route: '/daily-collections/add')),
+                SizedBox(width: w, child: _ActionTile(icon: Icons.notifications_active_rounded, label: 'Follow Up', color: AppColors.warning, route: '/followups/add')),
+                SizedBox(width: w, child: _ActionTile(icon: Icons.receipt_rounded, label: 'Expense', color: AppColors.error, route: '/expenses/add')),
               ],
             );
           },
@@ -615,43 +609,55 @@ class _ActionTileState extends State<_ActionTile> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
-        height: 100,
+        height: 88,
         decoration: BoxDecoration(
-          color: _card,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: widget.color.withValues(alpha: _hover ? 0.2 : 0.08)),
-          boxShadow: [
-            BoxShadow(
-              color: Color.lerp(_shadow, widget.color.withValues(alpha: 0.06), _hover ? 1 : 0)!,
-              blurRadius: _hover ? 8 : 4,
-              offset: Offset(0, _hover ? 4 : 2),
-            ),
-          ],
+          color: AppColors.card,
+          borderRadius: AppRadius.largeBorder,
+          border: Border.all(
+            color: _hover
+                ? widget.color.withValues(alpha: 0.25)
+                : AppColors.outline,
+          ),
+          boxShadow: _hover
+              ? [
+                  BoxShadow(
+                    color: widget.color.withValues(alpha: 0.08),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : AppShadows.subtle,
         ),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
             onTap: () => context.push(widget.route),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: AppRadius.largeBorder,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
                   width: 40, height: 40,
                   decoration: BoxDecoration(
-                    color: widget.color.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
+                    color: widget.color.withValues(alpha: 0.1),
+                    borderRadius: AppRadius.mediumBorder,
                   ),
                   child: Icon(widget.icon, size: 20, color: widget.color),
                 ),
-                const SizedBox(height: _s8),
-                Text(widget.label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textPri)),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  widget.label,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: AppColors.charcoal,
+                  ),
+                ),
               ],
             ),
           ),
@@ -665,6 +671,7 @@ class _CollectionTrend extends ConsumerWidget {
   const _CollectionTrend();
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final chartData = ref.watch(dailyChartProvider);
     final total = chartData.fold<int>(0, (v, p) => v + p.amount);
     final spots = chartData.asMap().entries
@@ -672,11 +679,11 @@ class _CollectionTrend extends ConsumerWidget {
     final hasData = spots.isNotEmpty && spots.any((s) => s.y > 0);
 
     return Container(
-      padding: const EdgeInsets.all(_s20),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _border),
+        color: AppColors.card,
+        borderRadius: AppRadius.largeBorder,
+        border: Border.all(color: AppColors.outline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -684,11 +691,21 @@ class _CollectionTrend extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Collection Trend', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textSec)),
-              Text('14 days', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w400, color: _textTer)),
+              Text(
+                'Collection Trend',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: AppColors.warmGray500,
+                ),
+              ),
+              Text(
+                '14 days',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: AppColors.warmGray400,
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: _s20),
+          const SizedBox(height: AppSpacing.xl),
           SizedBox(
             height: 160,
             child: hasData
@@ -700,7 +717,7 @@ class _CollectionTrend extends ConsumerWidget {
                         horizontalInterval: _roundInterval(
                           chartData.map((e) => e.amount).reduce((a, b) => a > b ? a : b).toDouble(),
                         ),
-                        getDrawingHorizontalLine: (v) => FlLine(color: _border, strokeWidth: 1),
+                        getDrawingHorizontalLine: (v) => FlLine(color: AppColors.outline, strokeWidth: 1),
                       ),
                       titlesData: const FlTitlesData(
                         topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -714,7 +731,7 @@ class _CollectionTrend extends ConsumerWidget {
                           spots: spots,
                           isCurved: true,
                           preventCurveOverShooting: true,
-                          color: _green,
+                          color: AppColors.primary,
                           barWidth: 2,
                           isStrokeCapRound: true,
                           dotData: const FlDotData(show: false),
@@ -722,8 +739,8 @@ class _CollectionTrend extends ConsumerWidget {
                             show: true,
                             gradient: LinearGradient(
                               colors: [
-                                _green.withValues(alpha: 0.12),
-                                _green.withValues(alpha: 0.0),
+                                AppColors.primary.withValues(alpha: 0.12),
+                                AppColors.primary.withValues(alpha: 0.0),
                               ],
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
@@ -751,15 +768,22 @@ class _CollectionTrend extends ConsumerWidget {
                 : const _ChartSkeleton(),
           ),
           if (hasData) ...[
-            const SizedBox(height: _s12),
+            const SizedBox(height: AppSpacing.md),
             Row(
               children: [
                 Text(
                   '${AppConstants.currencySymbol}${_fmt.format(total)}',
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _textPri),
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: AppColors.charcoal,
+                  ),
                 ),
                 const SizedBox(width: 6),
-                const Text('total in 14 days', style: TextStyle(fontSize: 12, color: _textTer)),
+                Text(
+                  'total in 14 days',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppColors.warmGray400,
+                  ),
+                ),
               ],
             ),
           ],
@@ -810,7 +834,7 @@ class _ChartSkeletonState extends State<_ChartSkeleton>
                   child: Container(
                     height: 140 * h,
                     decoration: BoxDecoration(
-                      color: _textPri.withValues(alpha: o),
+                      color: AppColors.warmGray400.withValues(alpha: o),
                       borderRadius: BorderRadius.circular(3),
                     ),
                   ),
@@ -836,11 +860,23 @@ String _relTime(DateTime dt) {
 
 Color _actColor(String type) {
   switch (type) {
-    case 'collection_recorded': return _success;
-    case 'expense_added': return _red;
-    case 'followup_added': return _amber;
-    case 'followup_completed': return _success;
-    default: return _textTer;
+    case 'collection_recorded': return AppColors.success;
+    case 'expense_added': return AppColors.error;
+    case 'followup_added': return AppColors.warning;
+    case 'followup_completed': return AppColors.success;
+    case 'sponsor_added': return AppColors.primary;
+    default: return AppColors.warmGray400;
+  }
+}
+
+IconData _actIcon(String type) {
+  switch (type) {
+    case 'collection_recorded': return Icons.account_balance_wallet_rounded;
+    case 'expense_added': return Icons.receipt_rounded;
+    case 'followup_added': return Icons.notifications_active_rounded;
+    case 'followup_completed': return Icons.check_circle_rounded;
+    case 'sponsor_added': return Icons.person_add_rounded;
+    default: return Icons.circle_rounded;
   }
 }
 
@@ -879,65 +915,91 @@ class _ActivityTimeline extends ConsumerWidget {
   const _ActivityTimeline();
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final items = ref.watch(activitiesStreamProvider).valueOrNull ?? [];
     return Container(
-      padding: const EdgeInsets.all(_s20),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _border),
+        color: AppColors.card,
+        borderRadius: AppRadius.largeBorder,
+        border: Border.all(color: AppColors.outline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Text('Recent Activity', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textSec)),
+              Text('Recent Activity', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.warmGray500)),
               Spacer(),
-              Text('Timeline', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w400, color: _textTer)),
+              Text('Timeline', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w400, color: AppColors.warmGray400)),
             ],
           ),
-          const SizedBox(height: _s16),
+          const SizedBox(height: AppSpacing.lg),
           if (items.isEmpty)
             const SizedBox(
               height: 80,
               child: Center(
-                child: Text('No activity yet', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: _textSec)),
+                child: Text('No activity yet', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.warmGray500)),
               ),
             )
           else
-            _buildList(items),
+            _buildList(items, theme),
         ],
       ),
     );
   }
 
-  Widget _buildList(List<Activity> items) {
+  Widget _buildList(List<Activity> items, ThemeData theme) {
     final groups = _groupActivities(items);
     final widgets = <Widget>[];
     var count = 0;
     for (final g in groups) {
       if (count >= 5) break;
       widgets.add(Padding(
-        padding: const EdgeInsets.only(bottom: _s8),
-        child: Text(g.label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _textTer, letterSpacing: 0.5)),
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+        child: Text(
+          g.label,
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: AppColors.warmGray400,
+            letterSpacing: 0.5,
+          ),
+        ),
       ));
       for (final a in g.activities) {
         if (count >= 5) break;
         count++;
         final c = _actColor(a.type);
+        final icon = _actIcon(a.type);
         widgets.add(Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Container(width: 8, height: 8, decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(a.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: _textPri),
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
+              Container(
+                width: 28, height: 28,
+                decoration: BoxDecoration(
+                  color: c.withValues(alpha: 0.1),
+                  borderRadius: AppRadius.mediumBorder,
+                ),
+                child: Icon(icon, size: 14, color: c),
               ),
-              Text(_relTime(a.createdAt.toDate()), style: const TextStyle(fontSize: 11, color: _textTer)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  a.title,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppColors.charcoal,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Text(
+                _relTime(a.createdAt.toDate()),
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: AppColors.warmGray400,
+                ),
+              ),
             ],
           ),
         ));
