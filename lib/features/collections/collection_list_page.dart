@@ -70,6 +70,8 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage> {
     }
     if (_filter == 'pending') {
       result = result.where((t) => t.givenAmount < t.expectedAmount).toList();
+    } else if (_filter == 'collected') {
+      result = result.where((t) => t.givenAmount >= t.expectedAmount).toList();
     }
     return result;
   }
@@ -141,6 +143,8 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage> {
               _buildFilterChip('All', 'all'),
               const SizedBox(width: 8),
               _buildFilterChip('Pending', 'pending'),
+              const SizedBox(width: 8),
+              _buildFilterChip('Collected', 'collected'),
             ],
           ),
         ),
