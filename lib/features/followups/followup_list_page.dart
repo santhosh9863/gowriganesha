@@ -166,20 +166,28 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
           SnackBar(
             content: const Text('Follow-up marked as completed'),
             duration: const Duration(seconds: 3),
-            action: SnackBarAction(
-              label: 'UNDO',
-              onPressed: () async {
-                try {
-                  final restored = item.copyWith(
-                    status: 'active',
-                    clearCompletedAt: true,
-                  );
-                  await service.updateFollowUp(restored);
-                } on Exception {
-                  // silent
-                }
-              },
-            ),
+              action: SnackBarAction(
+                label: 'UNDO',
+                onPressed: () async {
+                  try {
+                    final restored = item.copyWith(
+                      status: 'active',
+                      clearCompletedAt: true,
+                    );
+                    await service.updateFollowUp(restored);
+                    service.addActivity(Activity(
+                      id: service.generateId(),
+                      festivalId: AppConstants.festivalId,
+                      type: 'followup_undo',
+                      title: 'Completion Undone',
+                      description: '${item.sponsorName} follow-up restored',
+                      createdAt: Timestamp.now(),
+                    ));
+                  } on Exception {
+                    // silent
+                  }
+                },
+              ),
           ),
         );
     } on Exception {

@@ -167,7 +167,10 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
 
     final allFollowUps = ref.watch(allFollowUpsStreamProvider).valueOrNull ?? [];
     final sponsorFollowUps = allFollowUps
-        .where((f) => f.sponsorId == target.id)
+        .where((f) {
+          if (f.sponsorId.isNotEmpty) return f.sponsorId == target.id;
+          return f.sponsorName.toLowerCase() == target.name.toLowerCase();
+        })
         .toList();
     final active = sponsorFollowUps
         .where((f) => f.status == 'active')
