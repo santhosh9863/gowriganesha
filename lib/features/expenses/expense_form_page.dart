@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/core/models/expense.dart';
+import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 
 class ExpenseFormPage extends ConsumerStatefulWidget {
@@ -204,6 +205,14 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           createdAt: Timestamp.now(),
         );
         await service.addExpense(expense);
+        service.addActivity(Activity(
+          id: service.generateId(),
+          festivalId: AppConstants.festivalId,
+          type: 'expense_added',
+          title: 'Expense Added',
+          description: '₹${NumberFormat('#,##,###', 'en_IN').format(expense.amount)} — ${expense.note}',
+          createdAt: Timestamp.now(),
+        ));
       }
 
       if (mounted) context.pop();

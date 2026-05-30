@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/core/providers/dashboard_provider.dart';
+import 'package:ganesha_2026/core/providers/activity_provider.dart';
 import 'package:ganesha_2026/core/models/sponsor_followup.dart';
 import 'package:ganesha_2026/core/providers/followup_provider.dart';
 
@@ -892,7 +893,48 @@ class _VisitRow extends StatelessWidget {
   }
 }
 
-class _RecentActivity extends StatelessWidget {
+String _activityRelativeTime(DateTime dt) {
+  final now = DateTime.now();
+  final diff = now.difference(dt);
+  if (diff.inMinutes < 1) return 'just now';
+  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+  if (diff.inHours < 24) return '${diff.inHours}h ago';
+  if (diff.inDays == 1) return 'Yesterday';
+  if (diff.inDays < 30) return '${diff.inDays}d ago';
+  return DateFormat('d MMM').format(dt);
+}
+
+IconData _activityIcon(String type) {
+  switch (type) {
+    case 'collection_recorded':
+      return Icons.account_balance_wallet_rounded;
+    case 'expense_added':
+      return Icons.receipt_long_rounded;
+    case 'followup_added':
+      return Icons.notifications_rounded;
+    case 'followup_completed':
+      return Icons.check_circle_rounded;
+    default:
+      return Icons.circle_rounded;
+  }
+}
+
+Color _activityColor(String type, ColorScheme cs) {
+  switch (type) {
+    case 'collection_recorded':
+      return cs.tertiary;
+    case 'expense_added':
+      return cs.error;
+    case 'followup_added':
+      return cs.primary;
+    case 'followup_completed':
+      return Colors.green.shade600;
+    default:
+      return cs.onSurface;
+  }
+}
+
+class _RecentActivity extends ConsumerWidget {
   final ThemeData theme;
   final ColorScheme colorScheme;
 
@@ -902,7 +944,10 @@ class _RecentActivity extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final activitiesAsync = ref.watch(activitiesStreamProvider);
+    final items = activitiesAsync.valueOrNull ?? [];
+
     return Card(
       margin: EdgeInsets.zero,
       child: Padding(
@@ -926,31 +971,87 @@ class _RecentActivity extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-            Center(
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.inbox_rounded,
-                    size: 40,
-                    color: colorScheme.onSurface.withAlpha(50),
+            const SizedBox(height: 16),
+            if (items.isEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.inbox_rounded,
+                        size: 40,
+                        color: colorScheme.onSurface.withAlpha(50),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'No recent activity',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurface.withAlpha(100),
+                        ),
+                      ),
+                      Text(
+                        'Activity will appear here once you start recording',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurface.withAlpha(60),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'No recent activity',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurface.withAlpha(100),
+                ),
+              )
+            else
+              ...items.take(20).map((a) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: _activityColor(a.type, colorScheme)
+                                .withAlpha(30),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            _activityIcon(a.type),
+                            size: 18,
+                            color: _activityColor(a.type, colorScheme),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                a.title,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                a.description,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _activityRelativeTime(a.createdAt.toDate()),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  Text(
-                    'Activity will appear here once you start recording',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurface.withAlpha(60),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                  )),
           ],
         ),
       ),

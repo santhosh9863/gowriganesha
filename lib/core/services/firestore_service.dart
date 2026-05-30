@@ -5,6 +5,7 @@ import 'package:ganesha_2026/core/models/festival.dart';
 import 'package:ganesha_2026/core/models/target.dart';
 import 'package:ganesha_2026/core/models/expense.dart';
 import 'package:ganesha_2026/core/models/daily_collection.dart';
+import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/models/sponsor_followup.dart';
 
 class FirestoreException implements Exception {
@@ -34,6 +35,9 @@ class FirestoreService {
 
   CollectionReference<Map<String, dynamic>> get _followUps =>
       _firestore.collection('sponsor_followups');
+
+  CollectionReference<Map<String, dynamic>> get _activities =>
+      _firestore.collection('activities');
 
   String generateId() => _firestore.collection('_').doc().id;
 
@@ -331,5 +335,28 @@ class FirestoreService {
       debugPrint('[FIRESTORE] Error deleting follow-up: $e');
       throw FirestoreException('Failed to delete follow-up', originalError: e);
     }
+  }
+
+  Future<void> addActivity(Activity activity) async {
+    try {
+      await _activities.doc(activity.id).set(activity.toMap());
+      debugPrint('[FIRESTORE] Activity added: ${activity.id}');
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error adding activity: $e');
+    }
+  }
+
+  Stream<List<Activity>> watchActivities(String festivalId) {
+    return _activities
+        .where('festivalId', isEqualTo: festivalId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .handleError((e) {
+      debugPrint('[FIRESTORE] Error watching activities: $e');
+    }).map((snapshot) {
+      return snapshot.docs
+          .map((doc) => Activity.fromMap(doc.id, doc.data()))
+          .toList();
+    });
   }
 }

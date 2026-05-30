@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/core/models/target.dart';
+import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/models/sponsor_followup.dart';
 import 'package:ganesha_2026/core/providers/target_provider.dart';
 import 'package:ganesha_2026/core/providers/followup_provider.dart';
@@ -118,6 +120,15 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
         updatedAt: Timestamp.now(),
       );
       await service.updateTarget(updated);
+      final noteTxt = result['note'] as String;
+      service.addActivity(Activity(
+        id: service.generateId(),
+        festivalId: AppConstants.festivalId,
+        type: 'collection_recorded',
+        title: 'Collection Recorded',
+        description: '₹${_fmt(amount)} received from ${target.name}${noteTxt.isNotEmpty ? ' — $noteTxt' : ''}',
+        createdAt: Timestamp.now(),
+      ));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('₹${_fmt(amount)} recorded successfully')),

@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/core/models/sponsor_followup.dart';
+import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/providers/followup_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/shared/widgets/confirm_dialog.dart';
@@ -147,6 +149,14 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
         completedAt: Timestamp.now(),
       );
       await service.updateFollowUp(updated);
+      service.addActivity(Activity(
+        id: service.generateId(),
+        festivalId: AppConstants.festivalId,
+        type: 'followup_completed',
+        title: 'Follow-Up Completed',
+        description: '${item.sponsorName} marked as collected',
+        createdAt: Timestamp.now(),
+      ));
 
       if (!context.mounted) return;
 

@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/core/models/sponsor_followup.dart';
+import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 
 class FollowUpFormPage extends ConsumerStatefulWidget {
@@ -232,6 +233,14 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
           createdAt: now,
         );
         await service.addFollowUp(item);
+        service.addActivity(Activity(
+          id: service.generateId(),
+          festivalId: AppConstants.festivalId,
+          type: 'followup_added',
+          title: 'Follow-Up Added',
+          description: 'Follow-up created for ${item.sponsorName}',
+          createdAt: Timestamp.now(),
+        ));
       }
       if (mounted) context.pop();
     } on Exception catch (e) {
