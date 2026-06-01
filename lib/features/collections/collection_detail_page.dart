@@ -135,12 +135,12 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
 
     try {
       final service = ref.read(firestoreProvider);
-      final updated = target.copyWith(
-        givenAmount: target.givenAmount + amount,
-        updatedAt: Timestamp.now(),
-      );
-      await service.updateTarget(updated);
       final noteTxt = result['note'] as String;
+      await service.recordContribution(
+        targetId: target.id,
+        amount: amount,
+        note: noteTxt,
+      );
       service.addActivity(Activity(
         id: service.generateId(),
         festivalId: AppConstants.festivalId,

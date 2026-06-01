@@ -204,6 +204,38 @@ class FirestoreService {
     }
   }
 
+  Future<void> recordContribution({
+    required String targetId,
+    required int amount,
+    String note = '',
+    String recordedBy = 'system',
+  }) async {
+    try {
+      final batch = _firestore.batch();
+      final targetRef = _targets.doc(targetId);
+      final contributionRef = targetRef.collection('contributions').doc();
+
+      batch.update(targetRef, {
+        'givenAmount': FieldValue.increment(amount),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      batch.set(contributionRef, {
+        'amount': amount,
+        'note': note,
+        'recordedBy': recordedBy,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      await batch.commit();
+      debugPrint('[FIRESTORE] Contribution recorded: ${contributionRef.id}');
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error recording contribution: $e');
+      throw FirestoreException('Failed to record contribution', originalError: e);
+    }
+  }
+
   Stream<List<Expense>> watchExpenses(String festivalId) {
     return _expenses
         .where('festivalId', isEqualTo: festivalId)
