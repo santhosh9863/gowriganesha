@@ -4,17 +4,19 @@ import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
-import 'package:ganesha_2026/core/design/app_spacing.dart';
+import 'package:ganesha_2026/core/design/app_colors.dart';
 import 'package:ganesha_2026/core/design/app_radius.dart';
+import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/sponsor_followup.dart';
 import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/providers/followup_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
-import 'package:ganesha_2026/shared/widgets/amount_text.dart';
-import 'package:ganesha_2026/shared/widgets/app_card.dart';
 import 'package:ganesha_2026/shared/widgets/app_empty_state.dart';
+import 'package:ganesha_2026/shared/widgets/app_metric_card.dart';
+import 'package:ganesha_2026/shared/widgets/app_page_scaffold.dart';
+import 'package:ganesha_2026/shared/widgets/app_section_header.dart';
 import 'package:ganesha_2026/shared/widgets/app_skeleton.dart';
-import 'package:ganesha_2026/shared/widgets/app_stagger.dart';
+import 'package:ganesha_2026/shared/widgets/app_status_chip.dart';
 import 'package:ganesha_2026/shared/widgets/confirm_dialog.dart';
 
 class FollowUpListPage extends ConsumerStatefulWidget {
@@ -24,121 +26,230 @@ class FollowUpListPage extends ConsumerStatefulWidget {
   ConsumerState<FollowUpListPage> createState() => _FollowUpListPageState();
 }
 
-class _FollowUpListPageState extends ConsumerState<FollowUpListPage>
-    with SingleTickerProviderStateMixin {
-  String _filter = 'active';
-  late final AnimationController _staggerCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _staggerCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-    WidgetsBinding.instance.addPostFrameCallback((_) => _staggerCtrl.forward());
-  }
-
-  @override
-  void dispose() {
-    _staggerCtrl.dispose();
-    super.dispose();
-  }
-
+class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
   @override
   Widget build(BuildContext context) {
     final allAsync = ref.watch(allFollowUpsStreamProvider);
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Follow-Ups')),
-      body: allAsync.when(
+    return AppPageScaffold(
+      festivalName: 'Pending Visits',
+      onSettings: () => context.push('/settings'),
+      onAdd: () => context.push('/followups/add'),
+      showAdd: true,
+      bottomNavHeight: 56,
+      child: allAsync.when(
         data: (allItems) => RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(allFollowUpsStreamProvider);
           },
-          child: _buildContent(context, allItems, theme, colorScheme),
+          child: _buildContent(context, ref, allItems, theme),
         ),
         loading: () => const AppSkeletonList(),
         error: (e, _) => Center(child: Text('Error: $e')),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/followups/add'),
-        child: const Icon(Icons.add_rounded),
       ),
     );
   }
 
   Widget _buildContent(
     BuildContext context,
+    WidgetRef ref,
     List<SponsorFollowup> allItems,
     ThemeData theme,
-    ColorScheme colorScheme,
   ) {
-    final items = allItems.where((f) {
-      if (_filter == 'active') return f.status == 'active';
-      return f.status == 'completed';
-    }).toList();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
 
-    return Column(
+    final overdue = allItems.where((f) {
+      if (f.status != 'active') return false;
+      final d = f.followUpDate.toDate();
+      return DateTime(d.year, d.month, d.day).isBefore(today);
+    }).toList()..sort((a, b) => a.followUpDate.compareTo(b.followUpDate));
+
+    final dueToday = allItems.where((f) {
+      if (f.status != 'active') return false;
+      final d = f.followUpDate.toDate();
+      return DateTime(d.year, d.month, d.day) == today;
+    }).toList()..sort((a, b) => a.followUpDate.compareTo(b.followUpDate));
+
+    final upcoming = allItems.where((f) {
+      if (f.status != 'active') return false;
+      final d = f.followUpDate.toDate();
+      return DateTime(d.year, d.month, d.day).isAfter(today);
+    }).toList()..sort((a, b) => a.followUpDate.compareTo(b.followUpDate));
+
+    final completed = allItems.where((f) => f.status == 'completed').toList()
+      ..sort((a, b) {
+        final aDt = a.completedAt ?? a.createdAt;
+        final bDt = b.completedAt ?? b.createdAt;
+        return bDt.compareTo(aDt);
+      });
+
+    final hasAny = allItems.isNotEmpty;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, AppSpacing.xxxl),
       children: [
+        // Summary metrics 2x2
         Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.lg,
-            AppSpacing.sm,
+            0,
             AppSpacing.lg,
-            AppSpacing.sm,
+            AppSpacing.md,
           ),
-          child: Row(
-            children: [
-              FilterChip(
-                label: const Text('Active'),
-                selected: _filter == 'active',
-                onSelected: (_) => setState(() => _filter = 'active'),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              FilterChip(
-                label: const Text('Completed'),
-                selected: _filter == 'completed',
-                onSelected: (_) => setState(() => _filter = 'completed'),
-              ),
-            ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final w = (constraints.maxWidth - AppSpacing.sm) / 2;
+              return Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: [
+                  SizedBox(
+                    width: w,
+                    child: AppMetricCard(
+                      label: 'Overdue',
+                      value: '${overdue.length}',
+                      icon: Icons.warning_amber_rounded,
+                      iconColor: AppColors.error,
+                      iconBgColor: AppColors.errorBg,
+                    ),
+                  ),
+                  SizedBox(
+                    width: w,
+                    child: AppMetricCard(
+                      label: 'Due Today',
+                      value: '${dueToday.length}',
+                      icon: Icons.notifications_active_rounded,
+                      iconColor: AppColors.warning,
+                      iconBgColor: AppColors.warningBg,
+                    ),
+                  ),
+                  SizedBox(
+                    width: w,
+                    child: AppMetricCard(
+                      label: 'Upcoming',
+                      value: '${upcoming.length}',
+                      icon: Icons.schedule_rounded,
+                      iconColor: AppColors.warmGray500,
+                      iconBgColor: AppColors.warmGray100,
+                    ),
+                  ),
+                  SizedBox(
+                    width: w,
+                    child: AppMetricCard(
+                      label: 'Completed',
+                      value: '${completed.length}',
+                      icon: Icons.check_circle_rounded,
+                      iconColor: AppColors.success,
+                      iconBgColor: AppColors.successBg,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
-        if (items.isEmpty)
-          Expanded(
+        // Overdue section
+        if (overdue.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.sm,
+              AppSpacing.lg,
+              AppSpacing.xs,
+            ),
+            child: AppSectionHeader(
+              title: 'Overdue',
+              subtitle: '${overdue.length} pending',
+            ),
+          ),
+          ...overdue.map((f) => _FollowUpCard(
+                item: f,
+                onEdit: () => context.push('/followups/${f.id}/edit'),
+                onDelete: () => _handleDelete(context, ref, f),
+                onCollected: () => _handleCollected(context, ref, f),
+                theme: theme,
+              )),
+        ],
+        // Today section
+        if (dueToday.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              AppSpacing.xs,
+            ),
+            child: AppSectionHeader(
+              title: 'Today',
+              subtitle: '${dueToday.length} items',
+            ),
+          ),
+          ...dueToday.map((f) => _FollowUpCard(
+                item: f,
+                onEdit: () => context.push('/followups/${f.id}/edit'),
+                onDelete: () => _handleDelete(context, ref, f),
+                onCollected: () => _handleCollected(context, ref, f),
+                theme: theme,
+              )),
+        ],
+        // Upcoming section
+        if (upcoming.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              AppSpacing.xs,
+            ),
+            child: AppSectionHeader(
+              title: 'Upcoming',
+              subtitle: '${upcoming.length} scheduled',
+            ),
+          ),
+          ...upcoming.map((f) => _FollowUpCard(
+                item: f,
+                onEdit: () => context.push('/followups/${f.id}/edit'),
+                onDelete: () => _handleDelete(context, ref, f),
+                onCollected: () => _handleCollected(context, ref, f),
+                theme: theme,
+              )),
+        ],
+        // Completed section
+        if (completed.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              AppSpacing.xs,
+            ),
+            child: AppSectionHeader(
+              title: 'Completed',
+              subtitle: '${completed.length} done',
+            ),
+          ),
+          ...completed.map((f) => _FollowUpCard(
+                item: f,
+                onEdit: () => context.push('/followups/${f.id}/edit'),
+                onDelete: () => _handleDelete(context, ref, f),
+                theme: theme,
+              )),
+        ],
+        // Empty state
+        if (!hasAny)
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.xxxl),
             child: AppEmptyState(
               icon: Icons.follow_the_signs_rounded,
-              title: _filter == 'completed'
-                  ? 'No completed follow-ups'
-                  : 'No pending follow-ups',
-              subtitle: 'Tap + to add a follow-up',
-            ),
-          )
-        else
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.only(top: 0, bottom: 80),
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return AppStagger(
-                  index: index,
-                  controller: _staggerCtrl,
-                  child: _FollowUpCard(
-                    item: item,
-                    onEdit: () =>
-                        context.push('/followups/${item.id}/edit'),
-                    onDelete: () => _handleDelete(context, ref, item),
-                    onCollected: item.status == 'active'
-                        ? () => _handleCollected(context, ref, item)
-                        : null,
-                    theme: theme,
-                    colorScheme: colorScheme,
-                  ),
-                );
-              },
+              title: 'No pending visits',
+              subtitle: 'Tap + to create your first visit',
+              action: FilledButton.icon(
+                onPressed: () => context.push('/followups/add'),
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Add Visit'),
+              ),
             ),
           ),
       ],
@@ -155,7 +266,7 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage>
       builder: (ctx) => AlertDialog(
         title: const Text('Mark Collection Completed?'),
         content: const Text(
-          'This follow-up will be marked as completed and removed from pending follow-ups.',
+          'This visit will be marked as completed and removed from pending.',
         ),
         actions: [
           TextButton(
@@ -182,7 +293,7 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage>
         id: service.generateId(),
         festivalId: AppConstants.festivalId,
         type: 'followup_completed',
-        title: 'Follow-Up Completed',
+        title: 'Visit Completed',
         description: '${item.sponsorName} marked as collected',
         createdAt: Timestamp.now(),
       ));
@@ -193,36 +304,36 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage>
         ..clearSnackBars()
         ..showSnackBar(
           SnackBar(
-            content: const Text('Follow-up marked as completed'),
+            content: const Text('Visit marked as completed'),
             duration: const Duration(seconds: 3),
-              action: SnackBarAction(
-                label: 'UNDO',
-                onPressed: () async {
-                  try {
-                    final restored = item.copyWith(
-                      status: 'active',
-                      clearCompletedAt: true,
-                    );
-                    await service.updateFollowUp(restored);
-                    service.addActivity(Activity(
-                      id: service.generateId(),
-                      festivalId: AppConstants.festivalId,
-                      type: 'followup_undo',
-                      title: 'Completion Undone',
-                      description: '${item.sponsorName} follow-up restored',
-                      createdAt: Timestamp.now(),
-                    ));
-                  } on Exception {
-                    // silent
-                  }
-                },
-              ),
+            action: SnackBarAction(
+              label: 'UNDO',
+              onPressed: () async {
+                try {
+                  final restored = item.copyWith(
+                    status: 'active',
+                    clearCompletedAt: true,
+                  );
+                  await service.updateFollowUp(restored);
+                  service.addActivity(Activity(
+                    id: service.generateId(),
+                    festivalId: AppConstants.festivalId,
+                    type: 'followup_undo',
+                    title: 'Completion Undone',
+                    description: '${item.sponsorName} visit restored',
+                    createdAt: Timestamp.now(),
+                  ));
+                } on Exception {
+                  // silent
+                }
+              },
+            ),
           ),
         );
     } on Exception {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update follow-up')),
+          const SnackBar(content: Text('Failed to update visit')),
         );
       }
     }
@@ -235,9 +346,9 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage>
   ) async {
     final confirm = await showConfirmDialog(
       context,
-      title: 'Delete Follow-Up',
+      title: 'Delete Visit',
       message:
-          'Delete follow-up for "${item.sponsorName}"? This cannot be undone.',
+          'Delete visit for "${item.sponsorName}"? This cannot be undone.',
     );
     if (!confirm) return;
     try {
@@ -247,7 +358,7 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage>
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Failed to delete follow-up. Please try again.')),
+              content: Text('Failed to delete visit. Please try again.')),
         );
       }
     }
@@ -260,7 +371,6 @@ class _FollowUpCard extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback? onCollected;
   final ThemeData theme;
-  final ColorScheme colorScheme;
 
   const _FollowUpCard({
     required this.item,
@@ -268,16 +378,32 @@ class _FollowUpCard extends StatelessWidget {
     required this.onDelete,
     this.onCollected,
     required this.theme,
-    required this.colorScheme,
   });
 
-  String _formatDate(DateTime d) {
+  String _relDate(DateTime d) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final date = DateTime(d.year, d.month, d.day);
     if (date == today) return 'Today';
     if (date == today.add(const Duration(days: 1))) return 'Tomorrow';
-    return DateFormat('dd MMM').format(d);
+    if (date == today.subtract(const Duration(days: 1))) return 'Yesterday';
+    return DateFormat('d MMM').format(d);
+  }
+
+  String _initials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2) return '${parts.first[0]}${parts.last[0]}';
+    return name.isNotEmpty ? name[0] : '?';
+  }
+
+  String _relTime(DateTime dt) {
+    final d = DateTime.now().difference(dt);
+    if (d.inMinutes < 1) return 'now';
+    if (d.inMinutes < 60) return '${d.inMinutes}m ago';
+    if (d.inHours < 24) return '${d.inHours}h ago';
+    if (d.inDays == 1) return 'yesterday';
+    if (d.inDays < 30) return '${d.inDays}d ago';
+    return DateFormat('d MMM').format(dt);
   }
 
   @override
@@ -286,24 +412,30 @@ class _FollowUpCard extends StatelessWidget {
     final today = DateTime(now.year, now.month, now.day);
     final dueDate = item.followUpDate.toDate();
     final dueDay = DateTime(dueDate.year, dueDate.month, dueDate.day);
-    final isOverdue = dueDay.isBefore(today);
-    final isDueToday = dueDay == today;
-    final isActive = item.status == 'active';
+    final isOverdue = item.status == 'active' && dueDay.isBefore(today);
+    final isDueToday = item.status == 'active' && dueDay == today;
+    final isComplete = item.status == 'completed';
 
-    Color statusColor;
-    IconData statusIcon;
-    if (!isActive) {
-      statusColor = const Color(0xFF22C55E);
-      statusIcon = Icons.check_circle_rounded;
+    final Color accentColor;
+    final AppChipVariant chipVariant;
+    String statusLabel;
+
+    if (isComplete) {
+      accentColor = AppColors.success;
+      chipVariant = AppChipVariant.success;
+      statusLabel = 'Completed';
     } else if (isOverdue) {
-      statusColor = const Color(0xFFEF4444);
-      statusIcon = Icons.warning_amber_rounded;
+      accentColor = AppColors.error;
+      chipVariant = AppChipVariant.error;
+      statusLabel = 'Overdue';
     } else if (isDueToday) {
-      statusColor = const Color(0xFFF59E0B);
-      statusIcon = Icons.notifications_active_rounded;
+      accentColor = AppColors.warning;
+      chipVariant = AppChipVariant.warning;
+      statusLabel = 'Due Today';
     } else {
-      statusColor = const Color(0xFF3B82F6);
-      statusIcon = Icons.follow_the_signs_rounded;
+      accentColor = AppColors.warmGray500;
+      chipVariant = AppChipVariant.neutral;
+      statusLabel = 'Upcoming';
     }
 
     return Padding(
@@ -311,187 +443,200 @@ class _FollowUpCard extends StatelessWidget {
         horizontal: AppSpacing.lg,
         vertical: AppSpacing.xs,
       ),
-      child: AppCard(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: statusColor.withAlpha(30),
-                    borderRadius: AppRadius.cardBorder,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: AppRadius.largeBorder,
+          border: Border.all(color: AppColors.outline),
+        ),
+        child: IntrinsicHeight(
+          child: Row(
+            children: [
+              // Left accent strip
+              Container(
+                width: 4,
+                decoration: BoxDecoration(
+                  color: accentColor,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(AppRadius.large),
+                    bottomLeft: Radius.circular(AppRadius.large),
                   ),
-                  child: Icon(statusIcon, size: 22, color: statusColor),
                 ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
+              ),
+              // Content
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Row 1: Avatar + Name + Status
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Flexible(
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: accentColor.withValues(alpha: 0.1),
+                              borderRadius: AppRadius.mediumBorder,
+                            ),
+                            alignment: Alignment.center,
                             child: Text(
-                              item.sponsorName,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
+                              _initials(item.sponsorName),
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                color: accentColor,
+                                fontWeight: FontWeight.w700,
                               ),
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          if (isActive && isOverdue) ...[
-                            const SizedBox(width: AppSpacing.sm),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFEF4444).withAlpha(25),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                'OVERDUE',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: const Color(0xFFEF4444),
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 9,
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.sponsorName,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    color: AppColors.charcoal,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ),
-                            ),
-                          ],
-                          if (isActive && isDueToday) ...[
-                            const SizedBox(width: AppSpacing.sm),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF59E0B).withAlpha(25),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                'DUE TODAY',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: const Color(0xFFF59E0B),
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 9,
+                                const SizedBox(height: AppSpacing.xs),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.calendar_today_rounded,
+                                      size: 12,
+                                      color: AppColors.warmGray400,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${_relDate(dueDate)}${isComplete && item.completedAt != null ? ' (${_relTime(item.completedAt!.toDate())})' : ''}',
+                                      style: theme.textTheme.labelMedium?.copyWith(
+                                        color: AppColors.warmGray400,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
+                              ],
                             ),
-                          ],
+                          ),
+                          AppStatusChip(
+                            label: statusLabel,
+                            variant: chipVariant,
+                          ),
                         ],
                       ),
-                      const SizedBox(height: AppSpacing.xs),
+                      // Notes preview
+                      if (item.note.isNotEmpty) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          item.note,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: AppColors.warmGray500,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      // Amount (if present)
+                      if (item.amount != null) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          '${AppConstants.currencySymbol}${NumberFormat('#,##,###', 'en_IN').format(item.amount!)}',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: AppColors.charcoal,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                      // Quick actions
+                      const SizedBox(height: AppSpacing.sm),
                       Row(
                         children: [
-                          Icon(
-                            isActive
-                                ? Icons.calendar_today_rounded
-                                : Icons.check_circle_rounded,
-                            size: 14,
-                            color: statusColor,
-                          ),
-                          const SizedBox(width: AppSpacing.xs),
-                          Text(
-                            isActive
-                                ? _formatDate(dueDate)
-                                : 'Completed',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: statusColor,
-                              fontWeight: FontWeight.w600,
+                          if (item.status == 'active' && onCollected != null)
+                            _ActionButton(
+                              label: 'Collect',
+                              icon: Icons.check_circle_rounded,
+                              color: accentColor,
+                              onTap: onCollected!,
+                              theme: theme,
                             ),
+                          if (item.status == 'active' && onCollected != null)
+                            const SizedBox(width: AppSpacing.sm),
+                          _ActionButton(
+                            label: 'Edit',
+                            icon: Icons.edit_rounded,
+                            color: AppColors.warmGray500,
+                            onTap: onEdit,
+                            theme: theme,
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          _ActionButton(
+                            label: 'Delete',
+                            icon: Icons.delete_rounded,
+                            color: AppColors.warmGray400,
+                            onTap: onDelete,
+                            theme: theme,
                           ),
                         ],
                       ),
                     ],
                   ),
                 ),
-                if (isActive && onCollected != null)
-                  GestureDetector(
-                    onTap: onCollected,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: statusColor.withAlpha(20),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: statusColor.withAlpha(60),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.check_circle_rounded,
-                            size: 14,
-                            color: statusColor,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Collect',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: statusColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                const SizedBox(width: 4),
-                PopupMenuButton<String>(
-                  onSelected: (value) {
-                    if (value == 'edit') onEdit();
-                    if (value == 'delete') onDelete();
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit_rounded, size: 20),
-                          SizedBox(width: 8),
-                          Text('Edit'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete_rounded, size: 20),
-                          SizedBox(width: 8),
-                          Text('Delete'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  final ThemeData theme;
+
+  const _ActionButton({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+    required this.theme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: AppRadius.mediumBorder,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: AppRadius.mediumBorder,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: color),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-            if (item.amount != null) ...[
-              const SizedBox(height: AppSpacing.sm),
-              AmountText(
-                amount: item.amount!,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.secondary,
-                ),
-              ),
-            ],
-            if (item.note.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                item.note,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
           ],
         ),
       ),

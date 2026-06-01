@@ -15,7 +15,7 @@ const _navItems = [
   _NavItem(icon: Icons.handshake_rounded, label: 'Sponsors'),
   _NavItem(icon: Icons.account_balance_wallet_rounded, label: 'Daily'),
   _NavItem(icon: Icons.receipt_long_rounded, label: 'Expenses'),
-  _NavItem(icon: Icons.follow_the_signs_rounded, label: 'Follow-ups'),
+  _NavItem(icon: Icons.follow_the_signs_rounded, label: 'Pending Visits'),
 ];
 
 class AnimatedBottomNav extends StatelessWidget {

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ganesha_2026/core/constants.dart';
+import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/target.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 
@@ -22,6 +23,7 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
   late final TextEditingController _givenController;
   late final TextEditingController _notesController;
   bool _isLoading = true;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -72,7 +74,7 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               child: Form(
                 key: _formKey,
                 child: Column(
@@ -90,11 +92,11 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
                       validator: (v) =>
                           (v == null || v.trim().isEmpty) ? 'Name is required' : null,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     TextFormField(
                       controller: _expectedController,
                       decoration: InputDecoration(
-                        labelText: 'Expected Sponsorship',
+                        labelText: 'Commitment Amount',
                         hintText: 'e.g. 100000',
                         border: const OutlineInputBorder(),
                         prefixIcon: Icon(
@@ -105,7 +107,7 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
                       keyboardType: TextInputType.number,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
-                          return 'Expected sponsorship is required';
+                          return 'Commitment amount is required';
                         }
                         final n = int.tryParse(v.trim());
                         if (n == null || n < 0) {
@@ -114,11 +116,11 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     TextFormField(
                       controller: _givenController,
                       decoration: InputDecoration(
-                        labelText: 'Received Amount',
+                        labelText: 'Amount Raised',
                         hintText: 'e.g. 50000',
                         border: const OutlineInputBorder(),
                         prefixIcon: Icon(
@@ -129,7 +131,7 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
                       keyboardType: TextInputType.number,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
-                          return 'Received amount is required';
+                          return 'Amount raised is required';
                         }
                         final n = int.tryParse(v.trim());
                         if (n == null || n < 0) {
@@ -138,7 +140,7 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     TextFormField(
                       controller: _notesController,
                       decoration: const InputDecoration(
@@ -150,10 +152,16 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
                       maxLines: 3,
                       textCapitalization: TextCapitalization.sentences,
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: AppSpacing.xxl),
                     FilledButton.icon(
-                      onPressed: _handleSave,
-                      icon: Icon(isEditing ? Icons.save_rounded : Icons.add_rounded),
+                      onPressed: _isSaving ? null : _handleSave,
+                      icon: _isSaving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(isEditing ? Icons.save_rounded : Icons.add_rounded),
                       label: Text(isEditing ? 'Update Sponsor' : 'Add Sponsor'),
                     ),
                   ],
@@ -165,6 +173,8 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
 
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
 
     final service = ref.read(firestoreProvider);
     final now = Timestamp.now();
@@ -203,6 +213,7 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
       if (mounted) context.pop();
     } on Exception catch (e) {
       if (mounted) {
+        setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.toString())),
         );

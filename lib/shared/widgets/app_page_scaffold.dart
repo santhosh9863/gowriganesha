@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ganesha_2026/core/design/app_colors.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
+import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/shared/widgets/app_page_header.dart';
 
 class AppPageScaffold extends ConsumerWidget {
@@ -21,7 +22,10 @@ class AppPageScaffold extends ConsumerWidget {
   final bool showAdd;
   final bool showFilter;
   final bool showSearch;
-  final Widget? floatingActionButton;
+  final bool showBack;
+  final VoidCallback? onBack;
+  final double bottomNavHeight;
+  final bool showGreeting;
 
   const AppPageScaffold({
     super.key,
@@ -41,7 +45,10 @@ class AppPageScaffold extends ConsumerWidget {
     this.showAdd = false,
     this.showFilter = false,
     this.showSearch = false,
-    this.floatingActionButton,
+    this.showBack = false,
+    this.onBack,
+    this.bottomNavHeight = 0,
+    this.showGreeting = false,
   });
 
   @override
@@ -60,29 +67,86 @@ class AppPageScaffold extends ConsumerWidget {
                   _horizontalPad(context),
                   0,
                 ),
-                child: header ??
-                    AppPageHeader(
-                      greeting: greeting,
-                      festivalName: festivalName,
-                      date: date,
-                      onSettings: onSettings,
-                      onAdd: onAdd,
-                      onFilter: onFilter,
-                      onSearch: onSearch,
-                      showSettings: showSettings,
-                      showAdd: showAdd,
-                      showFilter: showFilter,
-                      showSearch: showSearch,
+                child: Row(
+                  children: [
+                    if (showBack)
+                      Padding(
+                        padding: const EdgeInsets.only(right: AppSpacing.sm),
+                        child: IconButton(
+                          icon: const Icon(Icons.arrow_back_rounded),
+                          onPressed: onBack ?? () => Navigator.of(context).pop(),
+                          tooltip: 'Back',
+                          style: IconButton.styleFrom(
+                            backgroundColor: AppColors.card,
+                            side: BorderSide(color: AppColors.outline),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppRadius.medium),
+                            ),
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 36,
+                            minHeight: 36,
+                          ),
+                          iconSize: 18,
+                        ),
+                      ),
+                    Expanded(
+                      child: header ??
+                          (showGreeting
+                              ? AppPageHeader(
+                                  greeting: greeting,
+                                  festivalName: festivalName,
+                                  date: date,
+                                  onSettings: onSettings,
+                                  onAdd: onAdd,
+                                  onFilter: onFilter,
+                                  onSearch: onSearch,
+                                  showSettings: showSettings,
+                                  showAdd: showAdd,
+                                  showFilter: showFilter,
+                                  showSearch: showSearch,
+                                )
+                              : Text(
+                                  festivalName ?? '',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall
+                                      ?.copyWith(color: AppColors.charcoal),
+                                )),
                     ),
+                  ],
+                ),
               ),
             if (showHeader) const SizedBox(height: AppSpacing.lg),
             Expanded(
-              child: _buildBody(),
+              child: Stack(
+                children: [
+                  _buildBody(),
+                  if (onAdd != null)
+                    Positioned(
+                      right: 24,
+                      bottom: bottomNavHeight + 24,
+                      child: SizedBox(
+                        width: 56,
+                        height: 56,
+                        child: FloatingActionButton(
+                          onPressed: onAdd,
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Icon(Icons.add_rounded, size: 28),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ],
         ),
       ),
-      floatingActionButton: floatingActionButton,
     );
 
     return page;

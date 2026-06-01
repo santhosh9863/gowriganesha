@@ -24,9 +24,9 @@ AppChipVariant _chipVariant(_SponsorStatus s) => switch (s) {
     };
 
 String _statusLabel(_SponsorStatus s) => switch (s) {
-      _SponsorStatus.notStarted => 'Not Started',
-      _SponsorStatus.pending => 'Pending',
-      _SponsorStatus.complete => 'Collected',
+      _SponsorStatus.notStarted => 'Ready',
+      _SponsorStatus.pending => 'Active',
+      _SponsorStatus.complete => 'Achieved',
     };
 
 String _initials(String name) {
@@ -205,14 +205,14 @@ class SponsorCard extends StatelessWidget {
                 Row(
                   children: [
                     _AmountBlock(
-                      label: 'Expected',
+                      label: 'Commitment',
                       amount: target.expectedAmount,
                       color: AppColors.warmGray500,
                       theme: theme,
                     ),
                     const SizedBox(width: AppSpacing.md),
                     _AmountBlock(
-                      label: 'Received',
+                      label: 'Raised',
                       amount: target.givenAmount,
                       color: status == _SponsorStatus.complete
                           ? AppColors.success
@@ -221,7 +221,7 @@ class SponsorCard extends StatelessWidget {
                     ),
                     const SizedBox(width: AppSpacing.md),
                     _AmountBlock(
-                      label: 'Remaining',
+                      label: 'To Reach',
                       amount: remaining < 0 ? 0 : remaining,
                       color: remaining > 0 ? AppColors.warning : AppColors.warmGray400,
                       theme: theme,
@@ -254,7 +254,7 @@ class SponsorCard extends StatelessWidget {
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     _QuickAction(
-                      label: 'Follow Up',
+                      label: 'Visit',
                       icon: Icons.notifications_active_rounded,
                       color: AppColors.warning,
                       onTap: () => context.push(

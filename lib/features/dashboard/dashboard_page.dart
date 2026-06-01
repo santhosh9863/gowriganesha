@@ -10,11 +10,20 @@ import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/design/app_shadows.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/activity.dart';
+import 'package:ganesha_2026/core/models/festival.dart';
 import 'package:ganesha_2026/core/providers/dashboard_provider.dart';
 import 'package:ganesha_2026/core/providers/activity_provider.dart';
 import 'package:ganesha_2026/core/providers/chart_provider.dart';
+import 'package:ganesha_2026/core/providers/daily_collection_provider.dart';
+import 'package:ganesha_2026/core/providers/expense_provider.dart';
 import 'package:ganesha_2026/core/providers/followup_provider.dart';
+import 'package:ganesha_2026/core/providers/target_provider.dart';
+import 'package:ganesha_2026/core/providers/festival_provider.dart';
+import 'package:ganesha_2026/shared/services/festival_countdown_service.dart';
+import 'package:ganesha_2026/shared/widgets/app_countdown_card.dart';
 import 'package:ganesha_2026/shared/widgets/app_page_header.dart';
+import 'package:ganesha_2026/shared/widgets/app_qr_sheet.dart';
+import 'package:ganesha_2026/shared/widgets/app_skeleton.dart';
 
 final _fmt = NumberFormat('#,##,###', 'en_IN');
 
@@ -62,6 +71,75 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
 
   @override
   Widget build(BuildContext context) {
+    final targetsAsync = ref.watch(targetsStreamProvider);
+    final expensesAsync = ref.watch(expensesStreamProvider);
+    final collectionsAsync = ref.watch(dailyCollectionsStreamProvider);
+
+    final festival = ref.watch(festivalProvider).valueOrNull;
+    final countdown = festival?.festivalDate != null
+        ? FestivalCountdownService().compute(festival!.festivalDate!)
+        : null;
+
+    final isLoading = targetsAsync.isLoading ||
+        expensesAsync.isLoading ||
+        collectionsAsync.isLoading;
+    final hasError = targetsAsync.hasError ||
+        expensesAsync.hasError ||
+        collectionsAsync.hasError;
+
+    if (hasError) {
+      return Scaffold(
+        backgroundColor: AppColors.surface,
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.xxxl),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.cloud_off_rounded,
+                      size: 48, color: AppColors.error),
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(
+                    'Failed to load dashboard',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(color: AppColors.charcoal),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'Check your connection and try again',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.copyWith(color: AppColors.warmGray500),
+                  ),
+                  const SizedBox(height: AppSpacing.xxl),
+                  FilledButton.icon(
+                    onPressed: () {
+                      ref.invalidate(targetsStreamProvider);
+                      ref.invalidate(expensesStreamProvider);
+                      ref.invalidate(dailyCollectionsStreamProvider);
+                    },
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.surface,
+        body: SafeArea(child: const AppSkeletonList()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: SafeArea(
@@ -87,8 +165,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                     AppSpacing.xxxl,
                   ),
                   child: isWide
-                      ? _WideLayout(onSettings: () => context.push('/settings'))
-                      : _NarrowLayout(onSettings: () => context.push('/settings')),
+                      ? _WideLayout(onSettings: () => context.push('/settings'), countdown: countdown)
+                      : _NarrowLayout(onSettings: () => context.push('/settings'), countdown: countdown),
                 ),
               );
             },
@@ -101,13 +179,18 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
 
 class _WideLayout extends StatelessWidget {
   final VoidCallback? onSettings;
-  const _WideLayout({this.onSettings});
+  final FestivalCountdownResult? countdown;
+  const _WideLayout({this.onSettings, this.countdown});
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         AppPageHeader(onSettings: onSettings),
+        if (countdown != null) ...[
+          const SizedBox(height: AppSpacing.lg),
+          AppCountdownCard(countdown: countdown),
+        ],
         const SizedBox(height: AppSpacing.xxl),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -135,13 +218,18 @@ class _WideLayout extends StatelessWidget {
 
 class _NarrowLayout extends StatelessWidget {
   final VoidCallback? onSettings;
-  const _NarrowLayout({this.onSettings});
+  final FestivalCountdownResult? countdown;
+  const _NarrowLayout({this.onSettings, this.countdown});
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         AppPageHeader(onSettings: onSettings),
+        if (countdown != null) ...[
+          SizedBox(height: AppSpacing.lg),
+          AppCountdownCard(countdown: countdown),
+        ],
         SizedBox(height: AppSpacing.xl),
         _HeroCard(),
         SizedBox(height: AppSpacing.lg),
@@ -206,7 +294,7 @@ class _HeroCard extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Festival Goal',
+                    'Festival Mission',
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       color: AppColors.warmGray400,
                       letterSpacing: 0.3,
@@ -232,7 +320,7 @@ class _HeroCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Collected',
+                      'Raised',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         color: AppColors.warmGray500,
                       ),
@@ -249,7 +337,7 @@ class _HeroCard extends ConsumerWidget {
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      'Target: ${AppConstants.currencySymbol}${_fmt.format(db.expectedTotal)}',
+                      'Goal: ${AppConstants.currencySymbol}${_fmt.format(db.expectedTotal)}',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppColors.warmGray400,
                       ),
@@ -270,7 +358,7 @@ class _HeroCard extends ConsumerWidget {
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
-                      '${AppConstants.currencySymbol}${_shortFmt(db.remainingCollection)} remaining',
+                      '${AppConstants.currencySymbol}${_shortFmt(db.remainingCollection)} to reach',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppColors.warmGray400,
                       ),
@@ -287,11 +375,11 @@ class _HeroCard extends ConsumerWidget {
             children: [
               _Metric(label: 'Sponsors', value: db.pendingSponsorCount),
               _Divider(),
-              _Metric(label: 'Collected', value: AppConstants.currencySymbol + _shortFmt(db.collectedTotal)),
+              _Metric(label: 'Raised', value: AppConstants.currencySymbol + _shortFmt(db.collectedTotal)),
               _Divider(),
-              _Metric(label: 'Pending', value: db.pendingSponsorCount),
+              _Metric(label: 'Active', value: db.pendingSponsorCount),
               _Divider(),
-              _Metric(label: 'Remaining', value: AppConstants.currencySymbol + _shortFmt(db.remainingCollection)),
+              _Metric(label: 'Goal Left', value: AppConstants.currencySymbol + _shortFmt(db.remainingCollection)),
             ],
           ),
         ],
@@ -448,9 +536,9 @@ class _KpiGrid extends ConsumerWidget {
               color: AppColors.success, fmtCurrency: true,
             )),
             SizedBox(width: w, child: _KpiCard(
-              icon: Icons.people_rounded, label: 'Pending Sponsors',
+              icon: Icons.people_rounded, label: 'Active Sponsors',
               value: db.pendingSponsorCount,
-              trend: '${AppConstants.currencySymbol}${_shortFmt(db.pendingRemainingTotal)} remaining',
+              trend: '${AppConstants.currencySymbol}${_shortFmt(db.pendingRemainingTotal)} still to reach',
               color: AppColors.warning, fmtCurrency: false,
             )),
             SizedBox(width: w, child: _KpiCard(
@@ -462,8 +550,8 @@ class _KpiGrid extends ConsumerWidget {
               color: AppColors.error, fmtCurrency: true,
             )),
             SizedBox(width: w, child: _KpiCard(
-              icon: Icons.notifications_rounded, label: 'Pending Visits',
-              value: db.pendingSponsorCount, trend: 'Needs follow-up',
+              icon: Icons.notifications_rounded, label: 'Next Visits',
+              value: db.pendingSponsorCount, trend: 'Needs visit',
               color: AppColors.primary, fmtCurrency: false,
             )),
           ],
@@ -557,11 +645,12 @@ class _KpiCardState extends State<_KpiCard> {
   }
 }
 
-class _QuickActions extends StatelessWidget {
+class _QuickActions extends ConsumerWidget {
   const _QuickActions();
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final festival = ref.watch(festivalProvider).valueOrNull;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -582,13 +671,86 @@ class _QuickActions extends StatelessWidget {
               children: [
                 SizedBox(width: w, child: _ActionTile(icon: Icons.person_add_rounded, label: 'Sponsor', color: AppColors.primary, route: '/collections/add')),
                 SizedBox(width: w, child: _ActionTile(icon: Icons.account_balance_wallet_rounded, label: 'Collection', color: AppColors.success, route: '/daily-collections/add')),
-                SizedBox(width: w, child: _ActionTile(icon: Icons.notifications_active_rounded, label: 'Follow Up', color: AppColors.warning, route: '/followups/add')),
+                SizedBox(width: w, child: _ActionTile(icon: Icons.notifications_active_rounded, label: 'Visit', color: AppColors.warning, route: '/followups/add')),
                 SizedBox(width: w, child: _ActionTile(icon: Icons.receipt_rounded, label: 'Expense', color: AppColors.error, route: '/expenses/add')),
               ],
             );
           },
         ),
+        if (festival != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          _QrAction(festival: festival),
+        ],
       ],
+    );
+  }
+}
+
+class _QrAction extends StatefulWidget {
+  final Festival festival;
+  const _QrAction({required this.festival});
+
+  @override
+  State<_QrAction> createState() => _QrActionState();
+}
+
+class _QrActionState extends State<_QrAction> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        height: 52,
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: AppRadius.largeBorder,
+          border: Border.all(
+            color: _hover
+                ? AppColors.primary.withValues(alpha: 0.25)
+                : AppColors.outline,
+          ),
+          boxShadow: _hover
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : AppShadows.subtle,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => showPaymentQrSheet(context, widget.festival),
+            borderRadius: AppRadius.largeBorder,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              child: Row(
+                children: [
+                  Icon(Icons.qr_code_rounded, size: 18, color: AppColors.primary),
+                  const SizedBox(width: AppSpacing.md),
+                  Text(
+                    'Show QR',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: AppColors.charcoal,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(Icons.chevron_right_rounded, size: 16, color: AppColors.warmGray400),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -692,7 +854,7 @@ class _CollectionTrend extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Collection Trend',
+                'Progress Trend',
                 style: theme.textTheme.titleSmall?.copyWith(
                   color: AppColors.warmGray500,
                 ),
@@ -929,7 +1091,7 @@ class _ActivityTimeline extends ConsumerWidget {
         children: [
           const Row(
             children: [
-              Text('Recent Activity', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.warmGray500)),
+              Text('Activity Feed', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.warmGray500)),
               Spacer(),
               Text('Timeline', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w400, color: AppColors.warmGray400)),
             ],

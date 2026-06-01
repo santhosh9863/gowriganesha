@@ -70,10 +70,7 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
       onSettings: () => context.push('/settings'),
       onAdd: () => context.push('/collections/add'),
       showAdd: true,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/collections/add'),
-        child: const Icon(Icons.add_rounded),
-      ),
+      bottomNavHeight: 56,
       child: targetsAsync.when(
         data: (targets) => RefreshIndicator(
           onRefresh: () async {
@@ -120,7 +117,8 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
 
     final filtered = _filterTargets(targets);
 
-    return Column(
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 80),
       children: [
         // Summary metrics 2x2
         Padding(
@@ -150,7 +148,7 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
                   SizedBox(
                     width: w,
                     child: AppMetricCard(
-                      label: 'Collected',
+                      label: 'Achieved',
                       value: '$collectedSponsors',
                       icon: Icons.check_circle_rounded,
                       iconColor: AppColors.success,
@@ -160,7 +158,7 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
                   SizedBox(
                     width: w,
                     child: AppMetricCard(
-                      label: 'Pending',
+                      label: 'Active',
                       value: '$pendingSponsors',
                       icon: Icons.schedule_rounded,
                       iconColor: AppColors.warning,
@@ -170,7 +168,7 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
                   SizedBox(
                     width: w,
                     child: AppMetricCard(
-                      label: 'Remaining',
+                      label: 'To Reach',
                       value: '${AppConstants.currencySymbol}${_fmt(remainingTotal)}',
                       icon: Icons.trending_down_rounded,
                       iconColor: AppColors.error,
@@ -240,14 +238,14 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
               ),
               const SizedBox(width: AppSpacing.sm),
               _FilterChip(
-                label: 'Pending',
+                label: 'Active',
                 selected: _filter == 'pending',
                 onTap: () => setState(() => _filter = 'pending'),
                 color: AppColors.warning,
               ),
               const SizedBox(width: AppSpacing.sm),
               _FilterChip(
-                label: 'Collected',
+                label: 'Achieved',
                 selected: _filter == 'collected',
                 onTap: () => setState(() => _filter = 'collected'),
                 color: AppColors.success,
@@ -257,46 +255,43 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
         ),
         // List or empty state
         if (filtered.isEmpty)
-          Expanded(
-            child: AppEmptyState(
-              icon: targets.isEmpty
-                  ? Icons.people_outline_rounded
-                  : Icons.search_off_rounded,
-              title: targets.isEmpty
-                  ? 'No sponsors yet'
-                  : 'No sponsors match "$_searchQuery"',
-              subtitle: targets.isEmpty
-                  ? 'Tap + to add your first sponsor'
-                  : null,
-              action: targets.isEmpty
-                  ? FilledButton.icon(
-                      onPressed: () => context.push('/collections/add'),
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      label: const Text('Add Sponsor'),
-                    )
-                  : null,
+          SizedBox(
+            height: 200,
+            child: Center(
+              child: AppEmptyState(
+                icon: targets.isEmpty
+                    ? Icons.people_outline_rounded
+                    : Icons.search_off_rounded,
+                title: targets.isEmpty
+                    ? 'No sponsors yet'
+                    : 'No sponsors match "$_searchQuery"',
+                subtitle: targets.isEmpty
+                    ? 'Tap + to add your first sponsor'
+                    : null,
+                action: targets.isEmpty
+                    ? FilledButton.icon(
+                        onPressed: () => context.push('/collections/add'),
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: const Text('Add Sponsor'),
+                      )
+                    : null,
+              ),
             ),
           )
         else
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.only(bottom: 80),
-              itemCount: filtered.length,
-              itemBuilder: (context, index) {
-                final target = filtered[index];
-                return AppStagger(
-                  index: index,
-                  controller: _staggerCtrl,
-                  child: SponsorCard(
-                    target: target,
-                    onDelete: () => _handleDelete(context, ref, target),
-                    onQuickUpdate: () =>
-                        _handleQuickUpdate(context, ref, target),
-                  ),
-                );
-              },
-            ),
-          ),
+          ...List.generate(filtered.length, (index) {
+            final target = filtered[index];
+            return AppStagger(
+              index: index,
+              controller: _staggerCtrl,
+              child: SponsorCard(
+                target: target,
+                onDelete: () => _handleDelete(context, ref, target),
+                onQuickUpdate: () =>
+                    _handleQuickUpdate(context, ref, target),
+              ),
+            );
+          }),
       ],
     );
   }
@@ -310,7 +305,7 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
       builder: (context) {
         final theme = Theme.of(context);
         return AlertDialog(
-          title: const Text('Update Received Amount'),
+          title: const Text('Record Contribution'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -323,7 +318,7 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
               ),
               const SizedBox(height: 4),
               Text(
-                'Expected: ₹${_fmt(target.expectedAmount)}',
+                'Commitment: ₹${_fmt(target.expectedAmount)}',
                 style: theme.textTheme.labelMedium?.copyWith(
                   color: theme.colorScheme.primary,
                 ),
@@ -332,8 +327,8 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
               TextField(
                 controller: controller,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Received Amount',
+                  decoration: const InputDecoration(
+                  labelText: 'Amount Raised',
                   prefixText: '₹ ',
                   border: OutlineInputBorder(),
                 ),

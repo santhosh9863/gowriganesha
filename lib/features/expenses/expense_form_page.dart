@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
+import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/expense.dart';
 import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
@@ -23,6 +24,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   late final TextEditingController _noteController;
   DateTime? _selectedDate;
   bool _isLoading = true;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -83,7 +85,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               child: Form(
                 key: _formKey,
                 child: Column(
@@ -112,7 +114,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     TextFormField(
                       controller: _noteController,
                       decoration: const InputDecoration(
@@ -126,7 +128,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       validator: (v) =>
                           (v == null || v.trim().isEmpty) ? 'Note is required' : null,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     InkWell(
                       onTap: _pickDate,
                       borderRadius: BorderRadius.circular(8),
@@ -160,10 +162,16 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                           ),
                         ),
                       ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: AppSpacing.xxl),
                     FilledButton.icon(
-                      onPressed: _handleSave,
-                      icon: Icon(isEditing ? Icons.save_rounded : Icons.add_rounded),
+                      onPressed: _isSaving ? null : _handleSave,
+                      icon: _isSaving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(isEditing ? Icons.save_rounded : Icons.add_rounded),
                       label: Text(isEditing ? 'Update Expense' : 'Add Expense'),
                     ),
                   ],
@@ -181,6 +189,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       );
       return;
     }
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
 
     final service = ref.read(firestoreProvider);
 
@@ -218,6 +228,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       if (mounted) context.pop();
     } on Exception catch (e) {
       if (mounted) {
+        setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.toString())),
         );

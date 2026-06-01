@@ -14,6 +14,8 @@ import 'package:ganesha_2026/core/providers/followup_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/shared/widgets/amount_text.dart';
 import 'package:ganesha_2026/shared/widgets/app_card.dart';
+import 'package:ganesha_2026/shared/widgets/app_page_scaffold.dart';
+import 'package:ganesha_2026/shared/widgets/app_skeleton.dart';
 import 'package:ganesha_2026/shared/widgets/confirm_dialog.dart';
 
 class CollectionDetailPage extends ConsumerStatefulWidget {
@@ -52,7 +54,7 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Receive Amount',
+                'Record Contribution',
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -66,7 +68,7 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
-                'Expected: ₹${_fmt(target.expectedAmount)}',
+                'Commitment: ₹${_fmt(target.expectedAmount)}',
                 style: theme.textTheme.labelLarge?.copyWith(
                   color: theme.colorScheme.primary,
                 ),
@@ -87,7 +89,7 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
                 controller: noteCtrl,
                 decoration: const InputDecoration(
                   labelText: 'Note (optional)',
-                  hintText: 'e.g. Collected by Sanjay',
+                  hintText: 'e.g. Received from Chikthayappa',
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -193,9 +195,10 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
     final colorScheme = theme.colorScheme;
 
     if (target == null) {
-      return Scaffold(
-        appBar: AppBar(),
-        body: const Center(child: CircularProgressIndicator()),
+      return AppPageScaffold(
+        showBack: true,
+        festivalName: 'Sponsor',
+        child: const AppSkeletonList(),
       );
     }
 
@@ -232,35 +235,38 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
       return DateTime(d.year, d.month, d.day).isBefore(today);
     });
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(target.name),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_alert_rounded),
-            tooltip: 'Add Follow-Up',
-            onPressed: () => context.push(
-              '/followups/add?sponsorId=${target.id}&sponsorName=${Uri.encodeComponent(target.name)}',
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.edit_rounded),
-            tooltip: 'Edit Sponsor',
-            onPressed: () =>
-                context.push('/collections/${target.id}/edit'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_rounded),
-            tooltip: 'Delete Sponsor',
-            onPressed: () => _deleteTarget(target),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
+    return AppPageScaffold(
+      showBack: true,
+      festivalName: target.name,
+      onSettings: () => context.push('/settings'),
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.add_alert_rounded),
+                  tooltip: 'Add Visit',
+                  onPressed: () => context.push(
+                    '/followups/add?sponsorId=${target.id}&sponsorName=${Uri.encodeComponent(target.name)}',
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit_rounded),
+                  tooltip: 'Edit Sponsor',
+                  onPressed: () =>
+                      context.push('/collections/${target.id}/edit'),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_rounded),
+                  tooltip: 'Delete Sponsor',
+                  onPressed: () => _deleteTarget(target),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
             AppCard(
               padding: const EdgeInsets.all(AppSpacing.xl),
               child: Column(
@@ -269,7 +275,7 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
                     children: [
                       Expanded(
                         child: _AmountRow(
-                          label: 'Expected',
+                          label: 'Commitment',
                           amount: target.expectedAmount,
                           color: colorScheme.primary,
                           theme: theme,
@@ -278,7 +284,7 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
                       const SizedBox(width: AppSpacing.md),
                       Expanded(
                         child: _AmountRow(
-                          label: 'Received',
+                          label: 'Raised',
                           amount: target.givenAmount,
                           color: colorScheme.tertiary,
                           theme: theme,
@@ -286,7 +292,7 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
                       ),
                       Expanded(
                         child: _AmountRow(
-                          label: 'Remaining',
+                          label: 'To Reach',
                           amount: remaining,
                           color: remaining > 0
                               ? colorScheme.error
@@ -308,7 +314,7 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
-                    '${AppConstants.currencySymbol}${_fmt(target.givenAmount)} of ${AppConstants.currencySymbol}${_fmt(target.expectedAmount)} collected (${(progress * 100).toStringAsFixed(0)}%)',
+                    '${AppConstants.currencySymbol}${_fmt(target.givenAmount)} of ${AppConstants.currencySymbol}${_fmt(target.expectedAmount)} raised (${(progress * 100).toStringAsFixed(0)}%)',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: colorScheme.tertiary,
                       fontWeight: FontWeight.w600,
@@ -323,7 +329,7 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
               child: FilledButton.icon(
                 onPressed: () => _handleReceiveAmount(target),
                 icon: const Icon(Icons.payments_rounded, size: 18),
-                label: const Text('Receive Amount'),
+                label: const Text('Record Contribution'),
               ),
             ),
             if (hasOverdue) ...[
@@ -344,7 +350,7 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Text(
-                        '${active.where((f) { final d = f.followUpDate.toDate(); return DateTime(d.year, d.month, d.day).isBefore(today); }).length} follow-up${active.where((f) { final d = f.followUpDate.toDate(); return DateTime(d.year, d.month, d.day).isBefore(today); }).length == 1 ? '' : 's'} overdue — take action',
+                        '${active.where((f) { final d = f.followUpDate.toDate(); return DateTime(d.year, d.month, d.day).isBefore(today); }).length} visit${active.where((f) { final d = f.followUpDate.toDate(); return DateTime(d.year, d.month, d.day).isBefore(today); }).length == 1 ? '' : 's'} overdue — take action',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: colorScheme.error,
                           fontWeight: FontWeight.w600,
@@ -358,7 +364,7 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
             if (sponsorFollowUps.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.xxl),
               Text(
-                'Follow-Up History',
+                'Visit History',
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
+import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/sponsor_followup.dart';
 import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
@@ -26,6 +27,7 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
   bool _isLoading = true;
   String _sponsorId = '';
   bool _initialized = false;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -80,7 +82,7 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
       initialDate: _followUpDate ?? now,
       firstDate: now,
       lastDate: now.add(const Duration(days: 365)),
-      helpText: 'Select follow-up date',
+      helpText: 'Select visit date',
     );
     if (picked != null) setState(() => _followUpDate = picked);
   }
@@ -96,12 +98,12 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEditing ? 'Edit Follow-Up' : 'Add Follow-Up'),
+        title: Text(isEditing ? 'Edit Visit' : 'Add Visit'),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               child: Form(
                 key: _formKey,
                 child: Column(
@@ -123,13 +125,13 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
                           ? 'Sponsor name is required'
                           : null,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     InkWell(
                       onTap: _pickDate,
                       borderRadius: BorderRadius.circular(8),
                       child: InputDecorator(
                         decoration: InputDecoration(
-                          labelText: 'Follow-Up Date',
+                          labelText: 'Visit Date',
                           border: const OutlineInputBorder(),
                           prefixIcon: Icon(
                             Icons.calendar_today_rounded,
@@ -152,13 +154,13 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
                       Padding(
                         padding: const EdgeInsets.only(top: 8, left: 12),
                         child: Text(
-                          'Follow-up date is required',
+                          'Visit date is required',
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: colorScheme.error,
                           ),
                         ),
                       ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     TextFormField(
                       controller: _amountController,
                       decoration: InputDecoration(
@@ -172,7 +174,7 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
                       ),
                       keyboardType: TextInputType.number,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     TextFormField(
                       controller: _noteController,
                       decoration: const InputDecoration(
@@ -186,14 +188,20 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
                       validator: (v) =>
                           (v == null || v.trim().isEmpty) ? 'Note is required' : null,
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: AppSpacing.xxl),
                     FilledButton.icon(
-                      onPressed: _handleSave,
-                      icon: Icon(isEditing
-                          ? Icons.save_rounded
-                          : Icons.add_rounded),
+                      onPressed: _isSaving ? null : _handleSave,
+                      icon: _isSaving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(isEditing
+                              ? Icons.save_rounded
+                              : Icons.add_rounded),
                       label:
-                          Text(isEditing ? 'Update Follow-Up' : 'Add Follow-Up'),
+                          Text(isEditing ? 'Update Visit' : 'Add Visit'),
                     ),
                   ],
                 ),
@@ -206,10 +214,12 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
     if (!_formKey.currentState!.validate()) return;
     if (_followUpDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a follow-up date')),
+        const SnackBar(content: Text('Please select a visit date')),
       );
       return;
     }
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
 
     final service = ref.read(firestoreProvider);
     final now = Timestamp.now();
@@ -245,14 +255,15 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
           id: service.generateId(),
           festivalId: AppConstants.festivalId,
           type: 'followup_added',
-          title: 'Follow-Up Added',
-          description: 'Follow-up created for ${item.sponsorName}',
+          title: 'Visit Added',
+          description: 'Visit created for ${item.sponsorName}',
           createdAt: Timestamp.now(),
         ));
       }
       if (mounted) context.pop();
     } on Exception catch (e) {
       if (mounted) {
+        setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e')),
         );

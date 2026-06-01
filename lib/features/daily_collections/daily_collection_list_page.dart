@@ -49,6 +49,8 @@ class _DailyCollectionListPageState
     return AppPageScaffold(
       festivalName: 'Daily Collections',
       onSettings: () => context.push('/settings'),
+      onAdd: () => context.push('/daily-collections/add'),
+      bottomNavHeight: 56,
       child: dailyCollectionAsync.when(
         data: (collections) => RefreshIndicator(
           onRefresh: () async {

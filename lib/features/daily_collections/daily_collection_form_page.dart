@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
+import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/daily_collection.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 
@@ -24,6 +25,7 @@ class _DailyCollectionFormPageState
   late final TextEditingController _noteController;
   DateTime? _selectedDate;
   bool _isLoading = true;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -84,7 +86,7 @@ class _DailyCollectionFormPageState
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               child: Form(
                 key: _formKey,
                 child: Column(
@@ -113,7 +115,7 @@ class _DailyCollectionFormPageState
                         return null;
                       },
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     TextFormField(
                       controller: _noteController,
                       decoration: const InputDecoration(
@@ -124,8 +126,10 @@ class _DailyCollectionFormPageState
                       ),
                       maxLines: 3,
                       textCapitalization: TextCapitalization.sentences,
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Note is required' : null,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     InkWell(
                       onTap: _pickDate,
                       borderRadius: BorderRadius.circular(8),
@@ -160,11 +164,17 @@ class _DailyCollectionFormPageState
                           ),
                         ),
                       ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: AppSpacing.xxl),
                     FilledButton.icon(
-                      onPressed: _handleSave,
-                      icon: Icon(
-                          isEditing ? Icons.save_rounded : Icons.add_rounded),
+                      onPressed: _isSaving ? null : _handleSave,
+                      icon: _isSaving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              isEditing ? Icons.save_rounded : Icons.add_rounded),
                       label: Text(isEditing
                           ? 'Update Collection'
                           : 'Add Collection'),
@@ -184,6 +194,8 @@ class _DailyCollectionFormPageState
       );
       return;
     }
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
 
     final service = ref.read(firestoreProvider);
 
@@ -213,6 +225,7 @@ class _DailyCollectionFormPageState
       if (mounted) context.pop();
     } on Exception catch (e) {
       if (mounted) {
+        setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.toString())),
         );

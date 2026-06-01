@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/core/models/festival.dart';
 import 'package:ganesha_2026/core/models/target.dart';
 import 'package:ganesha_2026/core/models/expense.dart';
@@ -62,6 +65,30 @@ class FirestoreService {
     } on FirebaseException catch (e) {
       debugPrint('[FIRESTORE] Error setting budget: $e');
       throw FirestoreException('Failed to save budget', originalError: e);
+    }
+  }
+
+  Reference get _qrRef => FirebaseStorage.instance
+      .ref('festival-assets/${AppConstants.festivalId}/payment_qr.png');
+
+  Future<String> uploadQrImage(File image) async {
+    try {
+      final task = await _qrRef.putFile(image);
+      final url = await task.ref.getDownloadURL();
+      debugPrint('[STORAGE] QR image uploaded');
+      return url;
+    } on FirebaseException catch (e) {
+      debugPrint('[STORAGE] Error uploading QR: $e');
+      throw FirestoreException('Failed to upload QR image', originalError: e);
+    }
+  }
+
+  Future<void> deleteQrImage() async {
+    try {
+      await _qrRef.delete();
+      debugPrint('[STORAGE] QR image deleted');
+    } on FirebaseException catch (e) {
+      debugPrint('[STORAGE] Error deleting QR: $e');
     }
   }
 
