@@ -336,13 +336,6 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
               ),
             ),
             const SizedBox(height: AppSpacing.xxl),
-            Text(
-              'Contribution History',
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
             _ContributionList(targetId: target.id),
             if (hasOverdue) ...[
               const SizedBox(height: AppSpacing.lg),
@@ -596,39 +589,82 @@ class _ContributionList extends ConsumerWidget {
     final contributionsAsync = ref.watch(contributionsStreamProvider(targetId));
     final theme = Theme.of(context);
 
-    return contributionsAsync.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 8),
-        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-      ),
-      error: (e, _) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Text(
-          'Failed to load contributions',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.error,
-          ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Contribution History',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            contributionsAsync.whenOrNull(
+              data: (contributions) => Text(
+                '  ${contributions.length} ${contributions.length == 1 ? 'entry' : 'entries'}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ) ?? const SizedBox.shrink(),
+          ],
         ),
-      ),
-      data: (contributions) {
-        if (contributions.isEmpty) {
-          return AppEmptyState(
-            icon: Icons.receipt_long_rounded,
-            title: 'No contribution history',
-            subtitle: 'Contributions and corrections will appear here.',
-          );
-        }
+        const SizedBox(height: AppSpacing.sm),
+        contributionsAsync.when(
+          loading: () => Column(
+            children: List.generate(3, (_) => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  AppSkeleton(width: 34, height: 34, borderRadius: 8),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppSkeleton(width: double.infinity, height: 14),
+                        SizedBox(height: 6),
+                        AppSkeleton(width: 100, height: 10),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  AppSkeleton(width: 80, height: 16),
+                ],
+              ),
+            )),
+          ),
+          error: (e, _) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'Failed to load contributions',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ),
+          data: (contributions) {
+            if (contributions.isEmpty) {
+              return AppEmptyState(
+                icon: Icons.receipt_long_rounded,
+                title: 'No contribution history',
+                subtitle: 'Contributions and corrections will appear here.',
+              );
+            }
 
-        return Column(
-          children: contributions
-              .map((c) => _ContributionRow(
-                    contribution: c,
-                    theme: theme,
-                    colorScheme: theme.colorScheme,
-                  ))
-              .toList(),
-        );
-      },
+            return Column(
+              children: contributions
+                  .map((c) => _ContributionRow(
+                        contribution: c,
+                        theme: theme,
+                        colorScheme: theme.colorScheme,
+                      ))
+                  .toList(),
+            );
+          },
+        ),
+      ],
     );
   }
 }
@@ -701,17 +737,16 @@ class _ContributionRow extends StatelessWidget {
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 1),
+                          horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: iconBg,
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         typeLabel,
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: iconColor,
                           fontWeight: FontWeight.w600,
-                          fontSize: 9,
                         ),
                       ),
                     ),
