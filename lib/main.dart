@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:ganesha_2026/app.dart';
 import 'package:ganesha_2026/firebase_options.dart';
 
@@ -13,7 +14,9 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  debugPrint('[FIREBASE] Initialization successful');
+  await FirebaseAuth.instance.signInAnonymously();
+
+  debugPrint('[FIREBASE] Anonymous auth established');
 
   runApp(
     const ProviderScope(
