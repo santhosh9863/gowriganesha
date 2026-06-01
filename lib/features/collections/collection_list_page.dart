@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/core/design/app_colors.dart';
@@ -298,78 +297,143 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
 
   Future<void> _handleQuickUpdate(
       BuildContext context, WidgetRef ref, Target target) async {
-    final controller =
-        TextEditingController(text: target.givenAmount.toString());
-    final result = await showDialog<int>(
+    final newTotalCtrl = TextEditingController();
+    final reasonCtrl = TextEditingController();
+    int? newTotal;
+
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) {
-        final theme = Theme.of(context);
-        return AlertDialog(
-          title: const Text('Record Contribution'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                target.name,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final delta = newTotal != null ? newTotal! - target.givenAmount : 0;
+            final isValid = newTotal != null && newTotal! >= 0;
+            final hasReason = reasonCtrl.text.trim().isNotEmpty;
+
+            return AlertDialog(
+              title: const Text('Adjust Total'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    target.name,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Commitment: ₹${_fmt(target.expectedAmount)}',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Current Total: ₹${_fmt(target.givenAmount)}',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: newTotalCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'New Total',
+                      prefixText: '₹ ',
+                      border: OutlineInputBorder(),
+                    ),
+                    autofocus: true,
+                    onChanged: (v) {
+                      setDialogState(() {
+                        newTotal = int.tryParse(v.trim());
+                      });
+                    },
+                  ),
+                  if (newTotal != null && newTotal != target.givenAmount) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      delta > 0
+                          ? 'Correction: +₹${_fmt(delta)}'
+                          : 'Correction: -₹${_fmt(-delta)}',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: delta > 0
+                            ? Colors.green
+                            : theme.colorScheme.error,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: reasonCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Correction reason',
+                      hintText: 'e.g. Missed entry from last visit',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: Icon(
+                        Icons.notes_rounded,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    onChanged: (_) => setDialogState(() {}),
+                  ),
+                ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Commitment: ₹${_fmt(target.expectedAmount)}',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: theme.colorScheme.primary,
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: controller,
-                keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                  labelText: 'Amount Raised',
-                  prefixText: '₹ ',
-                  border: OutlineInputBorder(),
+                FilledButton(
+                  onPressed: (isValid && hasReason)
+                      ? () => Navigator.pop(ctx, {
+                            'newTotal': newTotal!,
+                            'reason': reasonCtrl.text.trim(),
+                          })
+                      : null,
+                  child: const Text('Apply Correction'),
                 ),
-                autofocus: true,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final v = int.tryParse(controller.text.trim());
-                if (v != null && v >= 0) {
-                  Navigator.pop(context, v);
-                }
-              },
-              child: const Text('Update'),
-            ),
-          ],
+              ],
+            );
+          },
         );
       },
     );
 
-    controller.dispose();
+    newTotalCtrl.dispose();
+    reasonCtrl.dispose();
 
-    if (result == null || result == target.givenAmount) return;
+    if (result == null) return;
 
     try {
       final service = ref.read(firestoreProvider);
-      final updated = target.copyWith(
-        givenAmount: result,
-        updatedAt: Timestamp.now(),
+      await service.recordCorrection(
+        targetId: target.id,
+        currentTotal: target.givenAmount,
+        newTotal: result['newTotal'] as int,
+        note: result['reason'] as String,
       );
-      await service.updateTarget(updated);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Correction applied')),
+        );
+      }
     } on Exception {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update amount')),
+          const SnackBar(content: Text('Failed to apply correction')),
         );
       }
     }

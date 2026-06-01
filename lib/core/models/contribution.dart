@@ -1,7 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+enum ContributionType {
+  contribution,
+  correction,
+}
+
 class Contribution {
   final String id;
+  final ContributionType type;
   final int amount;
   final String note;
   final String recordedBy;
@@ -10,6 +16,7 @@ class Contribution {
 
   const Contribution({
     required this.id,
+    this.type = ContributionType.contribution,
     required this.amount,
     this.note = '',
     this.recordedBy = 'system',
@@ -19,6 +26,7 @@ class Contribution {
 
   Map<String, dynamic> toMap() {
     return {
+      'type': type.name,
       'amount': amount,
       'note': note,
       'recordedBy': recordedBy,
@@ -30,6 +38,10 @@ class Contribution {
   factory Contribution.fromMap(String id, Map<String, dynamic> map) {
     return Contribution(
       id: id,
+      type: ContributionType.values.firstWhere(
+        (e) => e.name == map['type'] as String?,
+        orElse: () => ContributionType.contribution,
+      ),
       amount: map['amount'] as int? ?? 0,
       note: map['note'] as String? ?? '',
       recordedBy: map['recordedBy'] as String? ?? 'system',
@@ -40,6 +52,7 @@ class Contribution {
 
   Contribution copyWith({
     String? id,
+    ContributionType? type,
     int? amount,
     String? note,
     String? recordedBy,
@@ -48,6 +61,7 @@ class Contribution {
   }) {
     return Contribution(
       id: id ?? this.id,
+      type: type ?? this.type,
       amount: amount ?? this.amount,
       note: note ?? this.note,
       recordedBy: recordedBy ?? this.recordedBy,

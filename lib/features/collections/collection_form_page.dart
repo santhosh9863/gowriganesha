@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/target.dart';
@@ -22,6 +23,7 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
   late final TextEditingController _expectedController;
   late final TextEditingController _givenController;
   late final TextEditingController _notesController;
+  Target? _loadedTarget;
   bool _isLoading = true;
   bool _isSaving = false;
 
@@ -39,11 +41,16 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
     }
   }
 
+  String _fmt(int n) {
+    return NumberFormat('#,##,###', 'en_IN').format(n);
+  }
+
   Future<void> _loadTarget() async {
     final service = ref.read(firestoreProvider);
     final target = await service.getTarget(widget.targetId!);
 
     if (target != null && mounted) {
+      _loadedTarget = target;
       _nameController.text = target.name;
       _expectedController.text = target.expectedAmount.toString();
       _givenController.text = target.givenAmount.toString();
@@ -116,30 +123,68 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: AppSpacing.lg),
-                    TextFormField(
-                      controller: _givenController,
-                      decoration: InputDecoration(
-                        labelText: 'Amount Raised',
-                        hintText: 'e.g. 50000',
-                        border: const OutlineInputBorder(),
-                        prefixIcon: Icon(
-                          Icons.currency_rupee_rounded,
-                          color: colorScheme.tertiary,
+                    if (isEditing && _loadedTarget != null)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(12),
                         ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline_rounded,
+                              size: 20,
+                              color: colorScheme.primary,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Total Collected',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  Text(
+                                    '₹${_fmt(_loadedTarget!.givenAmount)}',
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      TextFormField(
+                        controller: _givenController,
+                        decoration: InputDecoration(
+                          labelText: 'Amount Raised',
+                          hintText: 'e.g. 50000',
+                          border: const OutlineInputBorder(),
+                          prefixIcon: Icon(
+                            Icons.currency_rupee_rounded,
+                            color: colorScheme.tertiary,
+                          ),
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Amount raised is required';
+                          }
+                          final n = int.tryParse(v.trim());
+                          if (n == null || n < 0) {
+                            return 'Enter a valid amount';
+                          }
+                          return null;
+                        },
                       ),
-                      keyboardType: TextInputType.number,
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return 'Amount raised is required';
-                        }
-                        final n = int.tryParse(v.trim());
-                        if (n == null || n < 0) {
-                          return 'Enter a valid amount';
-                        }
-                        return null;
-                      },
-                    ),
                     const SizedBox(height: AppSpacing.lg),
                     TextFormField(
                       controller: _notesController,
@@ -181,12 +226,13 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
 
     try {
       if (widget.targetId != null) {
+        final givenAmount = _loadedTarget?.givenAmount ?? 0;
         final target = Target(
           id: widget.targetId!,
           festivalId: AppConstants.festivalId,
           name: _nameController.text.trim(),
           expectedAmount: int.parse(_expectedController.text.trim()),
-          givenAmount: int.parse(_givenController.text.trim()),
+          givenAmount: givenAmount,
           notes: _notesController.text.trim().isEmpty
               ? null
               : _notesController.text.trim(),

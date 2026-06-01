@@ -9,6 +9,7 @@ import 'package:ganesha_2026/core/models/target.dart';
 import 'package:ganesha_2026/core/models/expense.dart';
 import 'package:ganesha_2026/core/models/daily_collection.dart';
 import 'package:ganesha_2026/core/models/activity.dart';
+import 'package:ganesha_2026/core/models/contribution.dart';
 import 'package:ganesha_2026/core/models/sponsor_followup.dart';
 
 class FirestoreException implements Exception {
@@ -221,6 +222,7 @@ class FirestoreService {
       });
 
       batch.set(contributionRef, {
+        'type': ContributionType.contribution.name,
         'amount': amount,
         'note': note,
         'recordedBy': recordedBy,
@@ -233,6 +235,47 @@ class FirestoreService {
     } on FirebaseException catch (e) {
       debugPrint('[FIRESTORE] Error recording contribution: $e');
       throw FirestoreException('Failed to record contribution', originalError: e);
+    }
+  }
+
+  Future<void> recordCorrection({
+    required String targetId,
+    required int currentTotal,
+    required int newTotal,
+    String note = '',
+    String recordedBy = 'system',
+  }) async {
+    if (newTotal < 0) {
+      throw FirestoreException('New total cannot be negative');
+    }
+
+    final delta = newTotal - currentTotal;
+    if (delta == 0) return;
+
+    try {
+      final batch = _firestore.batch();
+      final targetRef = _targets.doc(targetId);
+      final contributionRef = targetRef.collection('contributions').doc();
+
+      batch.update(targetRef, {
+        'givenAmount': FieldValue.increment(delta),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      batch.set(contributionRef, {
+        'type': ContributionType.correction.name,
+        'amount': delta,
+        'note': note,
+        'recordedBy': recordedBy,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      await batch.commit();
+      debugPrint('[FIRESTORE] Correction recorded: ${contributionRef.id} (delta=$delta)');
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error recording correction: $e');
+      throw FirestoreException('Failed to record correction', originalError: e);
     }
   }
 
