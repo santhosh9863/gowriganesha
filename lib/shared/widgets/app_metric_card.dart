@@ -33,7 +33,7 @@ class AppMetricCard extends StatelessWidget {
     final iconCol = iconColor ?? AppColors.primary;
 
     final card = Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: AppRadius.largeBorder,
@@ -46,12 +46,12 @@ class AppMetricCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(AppSpacing.sm),
+                padding: const EdgeInsets.all(AppSpacing.xs),
                 decoration: BoxDecoration(
                   color: cardColor,
                   borderRadius: AppRadius.mediumBorder,
                 ),
-                child: Icon(icon, size: 18, color: iconCol),
+                child: Icon(icon, size: 14, color: iconCol),
               ),
               const Spacer(),
               if (trend != null)
@@ -81,7 +81,7 @@ class AppMetricCard extends StatelessWidget {
                       const SizedBox(width: 2),
                       Text(
                         trend!,
-                        style: theme.textTheme.labelLarge?.copyWith(
+                        style: theme.textTheme.labelMedium?.copyWith(
                           color: isTrendUp
                               ? AppColors.success
                               : AppColors.error,
@@ -93,17 +93,17 @@ class AppMetricCard extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.sm),
           Text(
             value,
-            style: theme.textTheme.displaySmall?.copyWith(
+            style: theme.textTheme.titleLarge?.copyWith(
               color: AppColors.charcoal,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 1),
           Text(
             label,
-            style: theme.textTheme.bodyMedium?.copyWith(
+            style: theme.textTheme.labelMedium?.copyWith(
               color: AppColors.warmGray500,
             ),
           ),

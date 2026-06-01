@@ -118,6 +118,77 @@ class FirestoreService {
     }
   }
 
+  Future<List<Target>> getAllTargets(String festivalId) async {
+    try {
+      final snapshot = await _targets
+          .where('festivalId', isEqualTo: festivalId)
+          .get();
+      return snapshot.docs
+          .map((doc) => Target.fromMap(doc.id, doc.data()))
+          .toList();
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error fetching all targets: $e');
+      throw FirestoreException('Failed to load targets', originalError: e);
+    }
+  }
+
+  Future<List<Expense>> getAllExpenses(String festivalId) async {
+    try {
+      final snapshot = await _expenses
+          .where('festivalId', isEqualTo: festivalId)
+          .get();
+      return snapshot.docs
+          .map((doc) => Expense.fromMap(doc.id, doc.data()))
+          .toList();
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error fetching all expenses: $e');
+      throw FirestoreException('Failed to load expenses', originalError: e);
+    }
+  }
+
+  Future<List<DailyCollection>> getAllDailyCollections(String festivalId) async {
+    try {
+      final snapshot = await _dailyCollections
+          .where('festivalId', isEqualTo: festivalId)
+          .get();
+      return snapshot.docs
+          .map((doc) => DailyCollection.fromMap(doc.id, doc.data()))
+          .toList();
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error fetching all daily collections: $e');
+      throw FirestoreException('Failed to load daily collections', originalError: e);
+    }
+  }
+
+  Future<List<SponsorFollowup>> getAllFollowUps(String festivalId) async {
+    try {
+      final snapshot = await _followUps
+          .where('festivalId', isEqualTo: festivalId)
+          .get();
+      return snapshot.docs
+          .map((doc) => SponsorFollowup.fromMap(doc.id, doc.data()))
+          .toList();
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error fetching all follow-ups: $e');
+      throw FirestoreException('Failed to load follow-ups', originalError: e);
+    }
+  }
+
+  Future<List<Activity>> getAllActivities(String festivalId) async {
+    try {
+      final snapshot = await _activities
+          .where('festivalId', isEqualTo: festivalId)
+          .orderBy('createdAt', descending: true)
+          .get();
+      return snapshot.docs
+          .map((doc) => Activity.fromMap(doc.id, doc.data()))
+          .toList();
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error fetching all activities: $e');
+      throw FirestoreException('Failed to load activities', originalError: e);
+    }
+  }
+
   Stream<List<Target>> watchTargets(String festivalId) {
     return _targets
         .where('festivalId', isEqualTo: festivalId)
@@ -491,6 +562,7 @@ class FirestoreService {
     return _activities
         .where('festivalId', isEqualTo: festivalId)
         .orderBy('createdAt', descending: true)
+        .limit(50)
         .snapshots()
         .handleError((e) {
       debugPrint('[FIRESTORE] Error watching activities: $e');

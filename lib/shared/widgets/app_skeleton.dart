@@ -29,11 +29,16 @@ class _AppSkeletonState extends State<AppSkeleton>
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
-    )..repeat();
+    )..repeat()..addListener(_onTick);
+  }
+
+  void _onTick() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _ctrl.removeListener(_onTick);
     _ctrl.dispose();
     super.dispose();
   }
@@ -41,31 +46,26 @@ class _AppSkeletonState extends State<AppSkeleton>
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return AnimatedBuilder(
-      animation: _ctrl,
-      builder: (context, _) {
-        return Container(
-          width: widget.width,
-          height: widget.height,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(widget.borderRadius),
-            gradient: LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: [
-                colorScheme.surfaceContainerHighest.withAlpha(100),
-                colorScheme.surfaceContainerHighest.withAlpha(200),
-                colorScheme.surfaceContainerHighest.withAlpha(100),
-              ],
-              stops: [
-                max(0.0, _ctrl.value - 0.3),
-                _ctrl.value,
-                min(1.0, _ctrl.value + 0.3),
-              ],
-            ),
-          ),
-        );
-      },
+    return Container(
+      width: widget.width,
+      height: widget.height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(widget.borderRadius),
+        gradient: LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            colorScheme.surfaceContainerHighest.withAlpha(100),
+            colorScheme.surfaceContainerHighest.withAlpha(200),
+            colorScheme.surfaceContainerHighest.withAlpha(100),
+          ],
+          stops: [
+            max(0.0, _ctrl.value - 0.3),
+            _ctrl.value,
+            min(1.0, _ctrl.value + 0.3),
+          ],
+        ),
+      ),
     );
   }
 }

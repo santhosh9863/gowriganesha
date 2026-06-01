@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
+import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/target.dart';
+import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
+import 'package:ganesha_2026/shared/utils/amount_format.dart';
 
 class CollectionFormPage extends ConsumerStatefulWidget {
   final String? targetId;
@@ -42,7 +44,7 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
   }
 
   String _fmt(int n) {
-    return NumberFormat('#,##,###', 'en_IN').format(n);
+    return fmtAmount(n);
   }
 
   Future<void> _loadTarget() async {
@@ -52,8 +54,8 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
     if (target != null && mounted) {
       _loadedTarget = target;
       _nameController.text = target.name;
-      _expectedController.text = target.expectedAmount.toString();
-      _givenController.text = target.givenAmount.toString();
+      _expectedController.text = fmtAmount(target.expectedAmount);
+      _givenController.text = fmtAmount(target.givenAmount);
       _notesController.text = target.notes ?? '';
     }
     if (mounted) setState(() => _isLoading = false);
@@ -104,7 +106,7 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
                       controller: _expectedController,
                       decoration: InputDecoration(
                         labelText: 'Commitment Amount',
-                        hintText: 'e.g. 100000',
+                        hintText: 'e.g. 1,00,000',
                         border: const OutlineInputBorder(),
                         prefixIcon: Icon(
                           Icons.currency_rupee_rounded,
@@ -112,11 +114,12 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
                         ),
                       ),
                       keyboardType: TextInputType.number,
+                      inputFormatters: const [IndianAmountInputFormatter()],
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
                           return 'Commitment amount is required';
                         }
-                        final n = int.tryParse(v.trim());
+                        final n = tryParseAmount(v.trim());
                         if (n == null || n < 0) {
                           return 'Enter a valid amount';
                         }
@@ -126,10 +129,10 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
                     if (isEditing && _loadedTarget != null)
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(AppSpacing.lg),
                         decoration: BoxDecoration(
                           color: colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: AppRadius.mediumBorder,
                         ),
                         child: Row(
                           children: [
@@ -149,8 +152,8 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
                                       color: colorScheme.onSurfaceVariant,
                                     ),
                                   ),
-                                  Text(
-                                    '₹${_fmt(_loadedTarget!.givenAmount)}',
+                    Text(
+                                      '${AppConstants.currencySymbol}${_fmt(_loadedTarget!.givenAmount)}',
                                     style: theme.textTheme.titleMedium?.copyWith(
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -165,8 +168,8 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
                       TextFormField(
                         controller: _givenController,
                         decoration: InputDecoration(
-                          labelText: 'Amount Raised',
-                          hintText: 'e.g. 50000',
+                          labelText: 'Amount Collected',
+                          hintText: 'e.g. 50,000',
                           border: const OutlineInputBorder(),
                           prefixIcon: Icon(
                             Icons.currency_rupee_rounded,
@@ -174,11 +177,12 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
                           ),
                         ),
                         keyboardType: TextInputType.number,
+                        inputFormatters: const [IndianAmountInputFormatter()],
                         validator: (v) {
                           if (v == null || v.trim().isEmpty) {
                             return 'Amount raised is required';
                           }
-                          final n = int.tryParse(v.trim());
+                          final n = tryParseAmount(v.trim());
                           if (n == null || n < 0) {
                             return 'Enter a valid amount';
                           }
@@ -231,7 +235,7 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
           id: widget.targetId!,
           festivalId: AppConstants.festivalId,
           name: _nameController.text.trim(),
-          expectedAmount: int.parse(_expectedController.text.trim()),
+          expectedAmount: parseAmount(_expectedController.text.trim()),
           givenAmount: givenAmount,
           notes: _notesController.text.trim().isEmpty
               ? null
@@ -240,13 +244,23 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
           updatedAt: now,
         );
         await service.updateTarget(target);
+        service.addActivity(Activity(
+          id: service.generateId(),
+          festivalId: AppConstants.festivalId,
+          type: 'sponsor_updated',
+          title: 'Sponsor Updated',
+          description: '${target.name} updated — commitment of ${AppConstants.currencySymbol}${fmtAmount(target.expectedAmount)}',
+          createdAt: Timestamp.now(),
+          recordId: target.id,
+          entityType: 'target',
+        ));
       } else {
         final target = Target(
           id: service.generateId(),
           festivalId: AppConstants.festivalId,
           name: _nameController.text.trim(),
-          expectedAmount: int.parse(_expectedController.text.trim()),
-          givenAmount: int.parse(_givenController.text.trim()),
+          expectedAmount: parseAmount(_expectedController.text.trim()),
+          givenAmount: parseAmount(_givenController.text.trim()),
           notes: _notesController.text.trim().isEmpty
               ? null
               : _notesController.text.trim(),
@@ -254,6 +268,16 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
           updatedAt: now,
         );
         await service.addTarget(target);
+        service.addActivity(Activity(
+          id: service.generateId(),
+          festivalId: AppConstants.festivalId,
+          type: 'sponsor_added',
+          title: 'Sponsor Added',
+          description: '${target.name} added — commitment of ${AppConstants.currencySymbol}${fmtAmount(target.expectedAmount)}',
+          createdAt: Timestamp.now(),
+          recordId: target.id,
+          entityType: 'target',
+        ));
       }
 
       if (mounted) context.pop();

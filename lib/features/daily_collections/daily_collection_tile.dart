@@ -5,6 +5,7 @@ import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/core/design/app_colors.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/daily_collection.dart';
+import 'package:ganesha_2026/shared/utils/amount_format.dart';
 
 class DailyCollectionTile extends StatelessWidget {
   final DailyCollection dailyCollection;
@@ -139,6 +140,6 @@ class DailyCollectionTile extends StatelessWidget {
   }
 
   String _fmt(int n) {
-    return NumberFormat('#,##,###', 'en_IN').format(n);
+    return fmtAmount(n);
   }
 }

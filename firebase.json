@@ -1,5 +1,1 @@
-{
-  "firestore": {
-    "rules": "firestore.rules"
-  }
-}
+{"firestore":{"rules":"firestore.rules"},"storage":{"rules":"storage.rules"},"flutter":{"platforms":{"android":{"default":{"projectId":"sri-gowri-ganesha","appId":"1:219118146107:android:6d1fddee44cf3acaa2421e","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"sri-gowri-ganesha","configurations":{"android":"1:219118146107:android:6d1fddee44cf3acaa2421e"}}}}}}

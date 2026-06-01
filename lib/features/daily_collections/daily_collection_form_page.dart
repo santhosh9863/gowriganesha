@@ -7,6 +7,7 @@ import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/daily_collection.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
+import 'package:ganesha_2026/shared/utils/amount_format.dart';
 
 class DailyCollectionFormPage extends ConsumerStatefulWidget {
   final String? dailyCollectionId;
@@ -44,7 +45,7 @@ class _DailyCollectionFormPageState
     final dc = await service.getDailyCollection(widget.dailyCollectionId!);
 
     if (dc != null && mounted) {
-      _amountController.text = dc.amount.toString();
+      _amountController.text = fmtAmount(dc.amount);
       _noteController.text = dc.note;
       _selectedDate = dc.date.toDate();
     }
@@ -96,7 +97,7 @@ class _DailyCollectionFormPageState
                       controller: _amountController,
                       decoration: InputDecoration(
                         labelText: 'Amount',
-                        hintText: 'e.g. 5000',
+                        hintText: 'e.g. 5,000',
                         border: const OutlineInputBorder(),
                         prefixIcon: Icon(
                           Icons.currency_rupee_rounded,
@@ -104,11 +105,12 @@ class _DailyCollectionFormPageState
                         ),
                       ),
                       keyboardType: TextInputType.number,
+                      inputFormatters: const [IndianAmountInputFormatter()],
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
                           return 'Amount is required';
                         }
-                        final n = int.tryParse(v.trim());
+                        final n = tryParseAmount(v.trim());
                         if (n == null || n <= 0) {
                           return 'Enter an amount greater than 0';
                         }
@@ -126,8 +128,7 @@ class _DailyCollectionFormPageState
                       ),
                       maxLines: 3,
                       textCapitalization: TextCapitalization.sentences,
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Note is required' : null,
+                      validator: null,
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     InkWell(
@@ -204,7 +205,7 @@ class _DailyCollectionFormPageState
         final dc = DailyCollection(
           id: widget.dailyCollectionId!,
           festivalId: AppConstants.festivalId,
-          amount: int.parse(_amountController.text.trim()),
+          amount: parseAmount(_amountController.text.trim()),
           note: _noteController.text.trim(),
           date: Timestamp.fromDate(_selectedDate!),
           createdAt: Timestamp.now(),
@@ -214,7 +215,7 @@ class _DailyCollectionFormPageState
         final dc = DailyCollection(
           id: service.generateId(),
           festivalId: AppConstants.festivalId,
-          amount: int.parse(_amountController.text.trim()),
+          amount: parseAmount(_amountController.text.trim()),
           note: _noteController.text.trim(),
           date: Timestamp.fromDate(_selectedDate!),
           createdAt: Timestamp.now(),

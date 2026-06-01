@@ -1,0 +1,155 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:ganesha_2026/core/services/firestore_service.dart';
+import 'package:ganesha_2026/core/constants.dart';
+import 'package:ganesha_2026/core/models/target.dart';
+import 'package:ganesha_2026/core/models/expense.dart';
+import 'package:ganesha_2026/core/models/daily_collection.dart';
+import 'package:ganesha_2026/core/models/sponsor_followup.dart';
+import 'package:ganesha_2026/core/models/activity.dart';
+
+String _csvEscape(String s) {
+  if (s.contains(',') || s.contains('"') || s.contains('\n')) {
+    return '"${s.replaceAll('"', '""')}"';
+  }
+  return s;
+}
+
+String _tsStr(Timestamp ts) {
+  return DateFormat('dd MMM yyyy HH:mm').format(ts.toDate());
+}
+
+String _dateStr(Timestamp ts) {
+  return DateFormat('dd MMM yyyy').format(ts.toDate());
+}
+
+String _buildSponsorsCsv(List<Target> items) {
+  final buf = StringBuffer('Name,Commitment,Collected,Remaining,Status,Created Date\n');
+  for (final t in items) {
+    final remaining = t.expectedAmount - t.givenAmount;
+    final status = t.givenAmount >= t.expectedAmount ? 'Achieved' : 'Active';
+    buf.writeln(
+        '${_csvEscape(t.name)},${t.expectedAmount},${t.givenAmount},$remaining,$status,${_dateStr(t.createdAt)}');
+  }
+  return buf.toString();
+}
+
+String _buildCollectionsCsv(List<CollectionEntry> items) {
+  final buf = StringBuffer('Amount,Sponsor,Created Date\n');
+  for (final c in items) {
+    buf.writeln('${c.amount},${_csvEscape(c.sponsorName)},${_dateStr(c.createdAt)}');
+  }
+  return buf.toString();
+}
+
+String _buildDailyCollectionsCsv(List<DailyCollection> items) {
+  final buf = StringBuffer('Amount,Source,Created Date\n');
+  for (final dc in items) {
+    final note = dc.note.isNotEmpty ? dc.note : '-';
+    buf.writeln('${dc.amount},${_csvEscape(note)},${_dateStr(dc.createdAt)}');
+  }
+  return buf.toString();
+}
+
+String _buildExpensesCsv(List<Expense> items) {
+  final buf = StringBuffer('Amount,Purpose,Created Date\n');
+  for (final e in items) {
+    final note = e.note.isNotEmpty ? e.note : '-';
+    buf.writeln('${e.amount},${_csvEscape(note)},${_dateStr(e.createdAt)}');
+  }
+  return buf.toString();
+}
+
+String _buildVisitsCsv(List<SponsorFollowup> items) {
+  final buf = StringBuffer('Sponsor,Visit Date,Status,Amount,Created Date\n');
+  for (final v in items) {
+    final amount = v.amount != null ? '${v.amount}' : '-';
+    buf.writeln(
+        '${_csvEscape(v.sponsorName)},${_dateStr(v.followUpDate)},${v.status},$amount,${_dateStr(v.createdAt)}');
+  }
+  return buf.toString();
+}
+
+String _buildActivityCsv(List<Activity> items) {
+  final buf = StringBuffer('Event Type,Description,Timestamp\n');
+  for (final a in items) {
+    final desc = a.description.isNotEmpty ? a.description : a.title;
+    buf.writeln(
+        '${_csvEscape(a.type)},${_csvEscape(desc)},${_tsStr(a.createdAt)}');
+  }
+  return buf.toString();
+}
+
+class CollectionEntry {
+  final int amount;
+  final String sponsorName;
+  final Timestamp createdAt;
+  const CollectionEntry({required this.amount, required this.sponsorName, required this.createdAt});
+}
+
+Future<void> exportAllData(BuildContext context, FirestoreService service) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final festivalId = AppConstants.festivalId;
+
+  try {
+    final results = await Future.wait([
+      service.getAllTargets(festivalId),
+      service.getAllExpenses(festivalId),
+      service.getAllDailyCollections(festivalId),
+      service.getAllFollowUps(festivalId),
+      service.getAllActivities(festivalId),
+    ]);
+
+    final targets = results[0] as List<Target>;
+    final expenses = results[1] as List<Expense>;
+    final dailyCollections = results[2] as List<DailyCollection>;
+    final followUps = results[3] as List<SponsorFollowup>;
+    final activities = results[4] as List<Activity>;
+
+    // Build collection entries from targets (each contribution is a collection)
+    final collectionEntries = <CollectionEntry>[];
+    for (final t in targets) {
+      if (t.givenAmount > 0) {
+        collectionEntries.add(CollectionEntry(
+          amount: t.givenAmount,
+          sponsorName: t.name,
+          createdAt: t.updatedAt,
+        ));
+      }
+    }
+
+    final tmpDir = await getTemporaryDirectory();
+    final exportDir = Directory('${tmpDir.path}/ganesha_export');
+    if (await exportDir.exists()) {
+      await exportDir.delete(recursive: true);
+    }
+    await exportDir.create();
+
+    final files = <XFile>[
+      await _writeFile(exportDir, 'sponsors.csv', _buildSponsorsCsv(targets)),
+      await _writeFile(exportDir, 'collections.csv', _buildCollectionsCsv(collectionEntries)),
+      await _writeFile(exportDir, 'daily_collections.csv', _buildDailyCollectionsCsv(dailyCollections)),
+      await _writeFile(exportDir, 'expenses.csv', _buildExpensesCsv(expenses)),
+      await _writeFile(exportDir, 'visits.csv', _buildVisitsCsv(followUps)),
+      await _writeFile(exportDir, 'activity.csv', _buildActivityCsv(activities)),
+    ];
+
+    await Share.shareXFiles(files, text: 'Ganesha Festival Data Export');
+  } on Exception catch (e) {
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(content: Text('Export failed: $e')),
+      );
+  }
+}
+
+Future<XFile> _writeFile(Directory dir, String name, String content) async {
+  final file = File('${dir.path}/$name');
+  await file.writeAsString(content);
+  return XFile(file.path);
+}

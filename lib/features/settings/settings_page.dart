@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
@@ -8,11 +9,14 @@ import 'package:ganesha_2026/core/design/app_colors.dart';
 import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/design/app_shadows.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
+import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/models/festival.dart';
 import 'package:ganesha_2026/core/models/expense.dart';
 import 'package:ganesha_2026/core/providers/budget_provider.dart';
 import 'package:ganesha_2026/core/providers/expense_provider.dart';
-import 'package:ganesha_2026/core/providers/festival_provider.dart';
+import 'package:ganesha_2026/core/providers/festival_provider.dart'; // exports firestoreProvider
+import 'package:ganesha_2026/shared/utils/amount_format.dart';
+import 'package:ganesha_2026/shared/utils/export_data.dart';
 import 'package:ganesha_2026/shared/widgets/amount_text.dart';
 import 'package:ganesha_2026/shared/widgets/app_page_scaffold.dart';
 import 'package:ganesha_2026/shared/widgets/app_section_header.dart';
@@ -184,9 +188,10 @@ class _BudgetCard extends StatelessWidget {
               TextField(
                 controller: controller,
                 keyboardType: TextInputType.number,
+                inputFormatters: const [IndianAmountInputFormatter()],
                 decoration: const InputDecoration(
                   labelText: 'Budget Amount',
-                  prefixText: '\u20B9 ',
+                  prefixText: '${AppConstants.currencySymbol} ',
                   prefixStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   border: OutlineInputBorder(),
                 ),
@@ -195,7 +200,7 @@ class _BudgetCard extends StatelessWidget {
               const SizedBox(height: 20),
               FilledButton(
                 onPressed: () {
-                  final v = int.tryParse(controller.text.trim());
+                  final v = tryParseAmount(controller.text.trim());
                   if (v != null && v > 0) {
                     Navigator.of(ctx).pop(v);
                   }
@@ -221,7 +226,7 @@ class _BudgetCard extends StatelessWidget {
       ..showSnackBar(
         SnackBar(
           content: Text(
-            'Budget updated to \u20B9${NumberFormat('#,##,###', 'en_IN').format(result)}',
+            'Budget updated to ${AppConstants.currencySymbol}${fmtAmount(result)}',
           ),
         ),
       );
@@ -230,7 +235,6 @@ class _BudgetCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final formatter = NumberFormat('#,##,###', 'en_IN');
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
@@ -325,8 +329,8 @@ class _BudgetCard extends StatelessWidget {
                     const SizedBox(width: 6),
                     Text(
                       isOver
-                          ? 'Over budget by \u20B9${formatter.format(remaining.abs())}'
-                          : '\u20B9${formatter.format(remaining)} remaining',
+                          ? 'Over budget by ${AppConstants.currencySymbol}${fmtAmount(remaining.abs())}'
+                          : '${AppConstants.currencySymbol}${fmtAmount(remaining)} remaining',
                       style: theme.textTheme.labelMedium?.copyWith(
                         color: isOver ? AppColors.error : AppColors.success,
                         fontWeight: FontWeight.w600,
@@ -334,7 +338,7 @@ class _BudgetCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '\u00B7 \u20B9${formatter.format(total)} spent',
+                      '\u00B7 ${AppConstants.currencySymbol}${fmtAmount(total)} spent',
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: AppColors.warmGray400,
                       ),
@@ -410,6 +414,16 @@ class _FestivalInfoCard extends StatelessWidget {
           );
     final service = ref.read(firestoreProvider);
     await service.setFestival(updated);
+    service.addActivity(Activity(
+      id: service.generateId(),
+      festivalId: AppConstants.festivalId,
+      type: 'festival_updated',
+      title: 'Festival Setting Updated',
+      description: '$label updated',
+      createdAt: Timestamp.now(),
+      recordId: festival.id,
+      entityType: 'festival',
+    ));
     ref.invalidate(festivalProvider);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context)
@@ -433,6 +447,16 @@ class _FestivalInfoCard extends StatelessWidget {
     final updated = festival.copyWith(festivalDate: picked);
     final service = ref.read(firestoreProvider);
     await service.setFestival(updated);
+    service.addActivity(Activity(
+      id: service.generateId(),
+      festivalId: AppConstants.festivalId,
+      type: 'festival_updated',
+      title: 'Festival Date Updated',
+      description: 'Festival date set to ${DateFormat('d MMMM yyyy').format(picked)}',
+      createdAt: Timestamp.now(),
+      recordId: festival.id,
+      entityType: 'festival',
+    ));
     ref.invalidate(festivalProvider);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context)
@@ -470,6 +494,16 @@ class _FestivalInfoCard extends StatelessWidget {
       final url = await service.uploadQrImage(file);
       final updated = festival.copyWith(qrImageUrl: url);
       await service.setFestival(updated);
+      service.addActivity(Activity(
+        id: service.generateId(),
+        festivalId: AppConstants.festivalId,
+        type: 'qr_updated',
+        title: 'QR Code Updated',
+        description: 'Payment QR code updated',
+        createdAt: Timestamp.now(),
+        recordId: festival.id,
+        entityType: 'festival',
+      ));
       ref.invalidate(festivalProvider);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
@@ -872,10 +906,11 @@ class _AboutCard extends StatelessWidget {
 // ──────────────────────────────────────────────
 // Export Card
 // ──────────────────────────────────────────────
-class _ExportCard extends StatelessWidget {
+class _ExportCard extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final service = ref.read(firestoreProvider);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
@@ -908,7 +943,7 @@ class _ExportCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Download expenses and reports',
+                    'Sponsors, collections, expenses & visits',
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: AppColors.warmGray500,
                     ),
@@ -917,13 +952,7 @@ class _ExportCard extends StatelessWidget {
               ),
             ),
             TextButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context)
-                  ..clearSnackBars()
-                  ..showSnackBar(
-                    const SnackBar(content: Text('Export coming soon')),
-                  );
-              },
+              onPressed: () => exportAllData(context, service),
               child: const Text('Export'),
             ),
           ],

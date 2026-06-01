@@ -15,6 +15,7 @@ import 'package:ganesha_2026/shared/widgets/app_metric_card.dart';
 import 'package:ganesha_2026/shared/widgets/app_page_scaffold.dart';
 import 'package:ganesha_2026/shared/widgets/app_section_header.dart';
 import 'package:ganesha_2026/shared/widgets/app_skeleton.dart';
+import 'package:ganesha_2026/shared/utils/amount_format.dart';
 import 'package:ganesha_2026/shared/widgets/confirm_dialog.dart';
 
 class ExpenseListPage extends ConsumerWidget {
@@ -62,8 +63,6 @@ class ExpenseListPage extends ConsumerWidget {
       );
     }
 
-    final formatter = NumberFormat('#,##,###', 'en_IN');
-
     final totalExpenses = expenses.fold<int>(0, (s, e) => s + e.amount);
     final largestExpense = expenses.fold<int>(0, (s, e) => s > e.amount ? s : e.amount);
     final budget = budgetAsync.valueOrNull ?? 0;
@@ -108,7 +107,7 @@ class ExpenseListPage extends ConsumerWidget {
                     width: w,
                     child: AppMetricCard(
                       label: 'Total Expenses',
-                      value: '${AppConstants.currencySymbol}${formatter.format(totalExpenses)}',
+                      value: '${AppConstants.currencySymbol}${fmtAmount(totalExpenses)}',
                       icon: Icons.receipt_long_rounded,
                       iconColor: AppColors.error,
                       iconBgColor: AppColors.errorBg,
@@ -119,8 +118,8 @@ class ExpenseListPage extends ConsumerWidget {
                     child: AppMetricCard(
                       label: isOverBudget ? 'Over Budget' : 'Remaining Balance',
                       value: isOverBudget
-                          ? '-${AppConstants.currencySymbol}${formatter.format(remaining.abs())}'
-                          : '${AppConstants.currencySymbol}${formatter.format(remaining)}',
+                          ? '-${AppConstants.currencySymbol}${fmtAmount(remaining.abs())}'
+                          : '${AppConstants.currencySymbol}${fmtAmount(remaining)}',
                       icon: isOverBudget
                           ? Icons.warning_amber_rounded
                           : Icons.account_balance_wallet_rounded,
@@ -132,7 +131,7 @@ class ExpenseListPage extends ConsumerWidget {
                     width: w,
                     child: AppMetricCard(
                       label: 'Largest Expense',
-                      value: '${AppConstants.currencySymbol}${formatter.format(largestExpense)}',
+                      value: '${AppConstants.currencySymbol}${fmtAmount(largestExpense)}',
                       icon: Icons.arrow_upward_rounded,
                       iconColor: AppColors.warning,
                       iconBgColor: AppColors.warningBg,
@@ -164,7 +163,7 @@ class ExpenseListPage extends ConsumerWidget {
             ),
             child: AppSectionHeader(
               title: key,
-              subtitle: '${grouped[key]!.length} entries · ${AppConstants.currencySymbol}${formatter.format(grouped[key]!.fold<int>(0, (s, e) => s + e.amount))}',
+              subtitle: '${grouped[key]!.length} entries · ${AppConstants.currencySymbol}${fmtAmount(grouped[key]!.fold<int>(0, (s, e) => s + e.amount))}',
             ),
           ),
           ...grouped[key]!.map((e) => ExpenseTile(
@@ -181,8 +180,7 @@ class ExpenseListPage extends ConsumerWidget {
     WidgetRef ref,
     Expense expense,
   ) async {
-    final formatter = NumberFormat('#,##,###', 'en_IN');
-    final amountStr = '${AppConstants.currencySymbol}${formatter.format(expense.amount)}';
+    final amountStr = '${AppConstants.currencySymbol}${fmtAmount(expense.amount)}';
     final confirm = await showConfirmDialog(
       context,
       title: 'Delete Expense',

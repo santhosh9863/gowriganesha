@@ -8,6 +8,7 @@ import 'package:ganesha_2026/core/design/app_colors.dart';
 import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/daily_collection.dart';
+import 'package:ganesha_2026/shared/utils/amount_format.dart';
 import 'package:ganesha_2026/core/providers/daily_collection_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/features/daily_collections/daily_collection_tile.dart';
@@ -29,7 +30,6 @@ class DailyCollectionListPage extends ConsumerStatefulWidget {
 class _DailyCollectionListPageState
     extends ConsumerState<DailyCollectionListPage> {
   final _amountController = TextEditingController();
-  final _noteController = TextEditingController();
   bool _isSaving = false;
 
   static const _amountChips = [1000, 2000, 5000, 10000];
@@ -37,7 +37,6 @@ class _DailyCollectionListPageState
   @override
   void dispose() {
     _amountController.dispose();
-    _noteController.dispose();
     super.dispose();
   }
 
@@ -224,9 +223,10 @@ class _DailyCollectionListPageState
                 TextField(
                   controller: _amountController,
                   keyboardType: TextInputType.number,
+                  inputFormatters: const [IndianAmountInputFormatter()],
                   decoration: InputDecoration(
                     labelText: 'Amount',
-                    hintText: 'e.g. 5000',
+                    hintText: 'e.g. 5,000',
                     prefixText: '${AppConstants.currencySymbol} ',
                     filled: true,
                     fillColor: AppColors.warmGray50,
@@ -246,31 +246,12 @@ class _DailyCollectionListPageState
                   runSpacing: AppSpacing.sm,
                   children: _amountChips.map((a) => _AmountChip(
                     amount: a,
-                    isSelected: _amountController.text == a.toString(),
+                    isSelected: _amountController.text == fmtAmount(a),
                     onTap: () {
-                      _amountController.text = a.toString();
+                      _amountController.text = fmtAmount(a);
                     },
                     theme: theme,
                   )).toList(),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                TextField(
-                  controller: _noteController,
-                  decoration: InputDecoration(
-                    labelText: 'Source / Note',
-                    hintText: 'e.g. Sponsor name or purpose',
-                    filled: true,
-                    fillColor: AppColors.warmGray50,
-                    border: OutlineInputBorder(
-                      borderRadius: AppRadius.mediumBorder,
-                      borderSide: BorderSide(color: AppColors.outline),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: AppSpacing.md,
-                    ),
-                  ),
-                  textCapitalization: TextCapitalization.sentences,
                 ),
                 const SizedBox(height: AppSpacing.md),
                 FilledButton.icon(
@@ -365,26 +346,11 @@ class _DailyCollectionListPageState
 
   Future<void> _handleRecord(WidgetRef ref) async {
     final amountStr = _amountController.text.trim();
-    final note = _noteController.text.trim();
-
-    if (amountStr.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter an amount')),
-      );
-      return;
-    }
-
-    final amount = int.tryParse(amountStr);
+    if (amountStr.isEmpty) return;
+    final amount = tryParseAmount(amountStr);
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter a valid amount')),
-      );
-      return;
-    }
-
-    if (note.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a note')),
       );
       return;
     }
@@ -398,14 +364,13 @@ class _DailyCollectionListPageState
         id: service.generateId(),
         festivalId: AppConstants.festivalId,
         amount: amount,
-        note: note,
+        note: '',
         date: now,
         createdAt: now,
       );
       await service.addDailyCollection(dc);
 
       _amountController.clear();
-      _noteController.clear();
     } on Exception catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -422,9 +387,7 @@ class _DailyCollectionListPageState
     WidgetRef ref,
     DailyCollection dc,
   ) async {
-    final formatter = NumberFormat('#,##,###', 'en_IN');
-    final amountStr =
-        '${AppConstants.currencySymbol}${formatter.format(dc.amount)}';
+    final amountStr = '${AppConstants.currencySymbol}${fmtAmount(dc.amount)}';
     final dateStr = DateFormat('dd MMM yyyy').format(dc.date.toDate());
     final confirm = await showConfirmDialog(
       context,
@@ -448,7 +411,7 @@ class _DailyCollectionListPageState
   }
 
   String _fmt(int n) {
-    return NumberFormat('#,##,###', 'en_IN').format(n);
+    return fmtAmount(n);
   }
 }
 
@@ -467,7 +430,6 @@ class _AmountChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fmt = NumberFormat('#,##,###', 'en_IN');
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -488,7 +450,7 @@ class _AmountChip extends StatelessWidget {
           ),
         ),
         child: Text(
-          '${AppConstants.currencySymbol}${fmt.format(amount)}',
+          '${AppConstants.currencySymbol}${fmtAmount(amount)}',
           style: theme.textTheme.labelLarge?.copyWith(
             color: isSelected ? AppColors.primary : AppColors.warmGray500,
             fontWeight: FontWeight.w600,

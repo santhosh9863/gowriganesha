@@ -8,6 +8,7 @@ import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/sponsor_followup.dart';
 import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
+import 'package:ganesha_2026/shared/utils/amount_format.dart';
 
 class FollowUpFormPage extends ConsumerStatefulWidget {
   final String? followUpId;
@@ -37,6 +38,8 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
     _noteController = TextEditingController();
     if (widget.followUpId != null) {
       _loadFollowUp();
+    } else {
+      _followUpDate = DateTime.now();
     }
   }
 
@@ -47,8 +50,8 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
       _initialized = true;
       final queryParams = GoRouterState.of(context).uri.queryParameters;
       _sponsorId = queryParams['sponsorId'] ?? '';
-      final sponsorName = queryParams['sponsorName'];
-      if (sponsorName != null) {
+      final sponsorName = (queryParams['sponsorName'] ?? queryParams['targetName']) ?? '';
+      if (sponsorName.isNotEmpty) {
         _sponsorNameController.text = Uri.decodeComponent(sponsorName);
       }
       _isLoading = false;
@@ -60,7 +63,7 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
     final item = await service.getFollowUp(widget.followUpId!);
     if (item != null && mounted) {
       _sponsorNameController.text = item.sponsorName;
-      _amountController.text = item.amount?.toString() ?? '';
+      _amountController.text = item.amount != null ? fmtAmount(item.amount!) : '';
       _noteController.text = item.note;
       _followUpDate = item.followUpDate.toDate();
     }
@@ -109,23 +112,24 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    TextFormField(
-                      controller: _sponsorNameController,
-                      decoration: InputDecoration(
-                        labelText: 'Sponsor Name',
-                        hintText: 'e.g. Doctor',
-                        border: const OutlineInputBorder(),
-                        prefixIcon: Icon(
-                          Icons.person_rounded,
-                          color: colorScheme.primary,
+                    if (_sponsorId.isEmpty)
+                      TextFormField(
+                        controller: _sponsorNameController,
+                        decoration: InputDecoration(
+                          labelText: 'Sponsor Name',
+                          hintText: 'e.g. Doctor',
+                          border: const OutlineInputBorder(),
+                          prefixIcon: Icon(
+                            Icons.person_rounded,
+                            color: colorScheme.primary,
+                          ),
                         ),
+                        textCapitalization: TextCapitalization.words,
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Sponsor name is required'
+                            : null,
                       ),
-                      textCapitalization: TextCapitalization.words,
-                      validator: (v) => (v == null || v.trim().isEmpty)
-                          ? 'Sponsor name is required'
-                          : null,
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
+                    if (_sponsorId.isEmpty) const SizedBox(height: AppSpacing.lg),
                     InkWell(
                       onTap: _pickDate,
                       borderRadius: BorderRadius.circular(8),
@@ -165,7 +169,7 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
                       controller: _amountController,
                       decoration: InputDecoration(
                         labelText: 'Amount (optional)',
-                        hintText: 'e.g. 5000',
+                        hintText: 'e.g. 5,000',
                         border: const OutlineInputBorder(),
                         prefixIcon: Icon(
                           Icons.currency_rupee_rounded,
@@ -173,6 +177,7 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
                         ),
                       ),
                       keyboardType: TextInputType.number,
+                      inputFormatters: const [IndianAmountInputFormatter()],
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     TextFormField(
@@ -185,8 +190,7 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
                       ),
                       maxLines: 3,
                       textCapitalization: TextCapitalization.sentences,
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Note is required' : null,
+                      validator: null,
                     ),
                     const SizedBox(height: AppSpacing.xxl),
                     FilledButton.icon(
@@ -225,7 +229,7 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
     final now = Timestamp.now();
     final amountText = _amountController.text.trim();
     final amount =
-        amountText.isNotEmpty ? int.tryParse(amountText) : null;
+        amountText.isNotEmpty ? tryParseAmount(amountText) : null;
 
     try {
       if (widget.followUpId != null) {
@@ -256,8 +260,10 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
           festivalId: AppConstants.festivalId,
           type: 'followup_added',
           title: 'Visit Added',
-          description: 'Visit created for ${item.sponsorName}',
+          description: 'Visit scheduled for ${item.sponsorName}',
           createdAt: Timestamp.now(),
+          recordId: item.id,
+          entityType: 'sponsor_followup',
         ));
       }
       if (mounted) context.pop();

@@ -14,6 +14,7 @@ import 'package:ganesha_2026/core/providers/followup_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/core/providers/contribution_provider.dart';
 import 'package:ganesha_2026/core/models/contribution.dart';
+import 'package:ganesha_2026/shared/utils/amount_format.dart';
 import 'package:ganesha_2026/shared/widgets/amount_text.dart';
 import 'package:ganesha_2026/shared/widgets/app_card.dart';
 import 'package:ganesha_2026/shared/widgets/app_page_scaffold.dart';
@@ -80,6 +81,7 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
               TextField(
                 controller: amountCtrl,
                 keyboardType: TextInputType.number,
+                inputFormatters: const [IndianAmountInputFormatter()],
                 decoration: const InputDecoration(
                   labelText: 'Amount',
                   prefixText: '₹ ',
@@ -110,7 +112,7 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
                     flex: 2,
                     child: FilledButton(
                       onPressed: () {
-                        final v = int.tryParse(amountCtrl.text.trim());
+                        final v = tryParseAmount(amountCtrl.text.trim());
                         if (v != null && v > 0) {
                           Navigator.pop(ctx, {
                             'amount': v,
@@ -150,12 +152,14 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
         type: 'collection_recorded',
         title: 'Collection Recorded',
         description:
-            '₹${_fmt(amount)} received from ${target.name}${noteTxt.isNotEmpty ? ' — $noteTxt' : ''}',
+            'Collection of ${AppConstants.currencySymbol}${fmtAmount(amount)} received from ${target.name}${noteTxt.isNotEmpty ? ' — $noteTxt' : ''}',
         createdAt: Timestamp.now(),
+        recordId: target.id,
+        entityType: 'target',
       ));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('₹${_fmt(amount)} recorded successfully')),
+          SnackBar(content: Text('${AppConstants.currencySymbol}${fmtAmount(amount)} recorded')),
         );
       }
     } on Exception catch (e) {
@@ -188,7 +192,7 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
   }
 
   String _fmt(int n) {
-    return NumberFormat('#,##,###', 'en_IN').format(n);
+    return fmtAmount(n);
   }
 
   @override
@@ -538,7 +542,7 @@ class _FollowUpRow extends StatelessWidget {
                   ),
                 if (followup.amount != null)
                   Text(
-                    '₹${NumberFormat('#,##,###', 'en_IN').format(followup.amount)}',
+                    '${AppConstants.currencySymbol}${fmtAmount(followup.amount!)}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colorScheme.secondary,
                       fontWeight: FontWeight.w600,
@@ -764,7 +768,7 @@ class _ContributionRow extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            '$amountPrefix₹${NumberFormat('#,##,###', 'en_IN').format(contribution.amount)}',
+            '$amountPrefix${AppConstants.currencySymbol}${fmtAmount(contribution.amount)}',
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.bold,
               color: amountColor,

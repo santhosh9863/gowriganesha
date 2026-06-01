@@ -7,7 +7,6 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/core/design/app_colors.dart';
 import 'package:ganesha_2026/core/design/app_radius.dart';
-import 'package:ganesha_2026/core/design/app_shadows.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/models/festival.dart';
@@ -20,13 +19,10 @@ import 'package:ganesha_2026/core/providers/followup_provider.dart';
 import 'package:ganesha_2026/core/providers/target_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/shared/services/festival_countdown_service.dart';
-import 'package:ganesha_2026/shared/widgets/app_countdown_card.dart';
+import 'package:ganesha_2026/shared/utils/amount_format.dart';
 import 'package:ganesha_2026/shared/widgets/app_page_header.dart';
 import 'package:ganesha_2026/shared/widgets/app_qr_sheet.dart';
 import 'package:ganesha_2026/shared/widgets/app_skeleton.dart';
-
-final _fmt = NumberFormat('#,##,###', 'en_IN');
-
 String _shortFmt(int n) {
   if (n >= 100000) return '${(n / 100000).toStringAsFixed(1)}L';
   if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
@@ -79,6 +75,11 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
     final countdown = festival?.festivalDate != null
         ? FestivalCountdownService().compute(festival!.festivalDate!)
         : null;
+
+    final qrUrl = festival?.qrImageUrl;
+    if (qrUrl != null && qrUrl.isNotEmpty) {
+      precacheImage(NetworkImage(qrUrl), context);
+    }
 
     final isLoading = targetsAsync.isLoading ||
         expensesAsync.isLoading ||
@@ -188,14 +189,14 @@ class _WideLayout extends StatelessWidget {
       children: [
         AppPageHeader(onSettings: onSettings),
         if (countdown != null) ...[
-          const SizedBox(height: AppSpacing.lg),
-          AppCountdownCard(countdown: countdown),
+          const SizedBox(height: AppSpacing.sm),
+          _CompactCountdown(countdown: countdown!),
         ],
         const SizedBox(height: AppSpacing.xxl),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Expanded(flex: 5, child: _HeroCard()),
+            const Expanded(flex: 5, child: _FestivalMission()),
             const SizedBox(width: AppSpacing.xxl),
             const Expanded(flex: 2, child: _QuickActions()),
           ],
@@ -227,19 +228,19 @@ class _NarrowLayout extends StatelessWidget {
       children: [
         AppPageHeader(onSettings: onSettings),
         if (countdown != null) ...[
-          SizedBox(height: AppSpacing.lg),
-          AppCountdownCard(countdown: countdown),
+          const SizedBox(height: AppSpacing.sm),
+          _CompactCountdown(countdown: countdown!),
         ],
-        SizedBox(height: AppSpacing.xl),
-        _HeroCard(),
-        SizedBox(height: AppSpacing.lg),
-        _KpiGrid(),
-        SizedBox(height: AppSpacing.lg),
-        _QuickActions(),
-        SizedBox(height: AppSpacing.lg),
-        _CollectionTrend(),
-        SizedBox(height: AppSpacing.xxl),
-        _ActivityTimeline(),
+        const SizedBox(height: AppSpacing.md),
+        const _FestivalMission(),
+        const SizedBox(height: AppSpacing.md),
+        const _QuickActions(),
+        const SizedBox(height: AppSpacing.md),
+        const _KpiGrid(),
+        const SizedBox(height: AppSpacing.md),
+        const _CollectionTrend(),
+        const SizedBox(height: AppSpacing.xl),
+        const _ActivityTimeline(),
       ],
     );
   }
@@ -253,24 +254,63 @@ class _CountUp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: target.toDouble()),
-      duration: const Duration(milliseconds: 700),
-      curve: Curves.easeOut,
-      builder: (context, value, _) => Text(format(value.round()), style: style),
+    return Text(format(target), style: style);
+  }
+}
+
+class _CompactCountdown extends StatelessWidget {
+  final FestivalCountdownResult countdown;
+  const _CompactCountdown({required this.countdown});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: AppRadius.mediumBorder,
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            countdown.isPast
+                ? Icons.check_circle_rounded
+                : Icons.schedule_rounded,
+            size: 18,
+            color: countdown.isPast ? AppColors.warmGray400 : AppColors.warning,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Text(
+            countdown.title,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppColors.charcoal,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            countdown.formattedDate,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppColors.warmGray400,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _HeroCard extends ConsumerWidget {
-  const _HeroCard();
+class _FestivalMission extends ConsumerWidget {
+  const _FestivalMission();
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final db = ref.watch(dashboardProvider);
     final pct = (db.progressPercent / 100).clamp(0.0, 1.0);
 
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.xxl),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: AppRadius.largeBorder,
@@ -282,104 +322,107 @@ class _HeroCard extends ConsumerWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(AppSpacing.sm),
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: AppColors.primaryBg,
                   borderRadius: AppRadius.mediumBorder,
                 ),
-                child: const Icon(Icons.trending_up_rounded, size: 18, color: AppColors.primary),
+                child: const Icon(Icons.flag_rounded, size: 16, color: AppColors.primary),
               ),
-              const SizedBox(width: AppSpacing.md),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Festival Mission',
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: AppColors.warmGray400,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                  Text(
-                    '${db.progressPercent.toStringAsFixed(1)}% complete',
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: AppColors.success,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                'Festival Mission',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: AppColors.warmGray500,
+                  letterSpacing: 0.3,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.xxl),
+          const SizedBox(height: AppSpacing.md),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Raised',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: AppColors.warmGray500,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
                     _CountUp(
                       target: db.collectedTotal,
-                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                      style: Theme.of(context).textTheme.displayLarge?.copyWith(
                         color: AppColors.charcoal,
+                        fontWeight: FontWeight.w800,
                         letterSpacing: -1.5,
                         height: 1.0,
                       ),
-                      format: (v) => '${AppConstants.currencySymbol}${_fmt.format(v)}',
+                      format: (v) => '${AppConstants.currencySymbol}${fmtAmount(v)}',
                     ),
-                    const SizedBox(height: AppSpacing.xs),
+                    const SizedBox(height: 4),
                     Text(
-                      'Goal: ${AppConstants.currencySymbol}${_fmt.format(db.expectedTotal)}',
+                      'Goal: ${AppConstants.currencySymbol}${fmtAmount(db.expectedTotal)}',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.warmGray400,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xl),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(3),
-                      child: TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0, end: pct),
-                        duration: const Duration(milliseconds: 700),
-                        curve: Curves.easeOut,
-                        builder: (context, value, _) => LinearProgressIndicator(
-                          value: value,
-                          minHeight: 6,
-                          backgroundColor: AppColors.warmGray200,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      '${AppConstants.currencySymbol}${_shortFmt(db.remainingCollection)} to reach',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppColors.warmGray400,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: AppSpacing.xxl),
-              _HeroRing(progress: pct, size: 96, stroke: 7),
+              const SizedBox(width: AppSpacing.lg),
+              _HeroRing(progress: pct, size: 64, stroke: 5),
             ],
           ),
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.md),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: pct),
+              duration: const Duration(milliseconds: 700),
+              curve: Curves.easeOut,
+              builder: (context, value, _) => LinearProgressIndicator(
+                value: value,
+                minHeight: 10,
+                backgroundColor: AppColors.warmGray200,
+                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryBg,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '${db.progressPercent.toStringAsFixed(1)}%',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Text(
+                '${AppConstants.currencySymbol}${_shortFmt(db.remainingCollection)} to reach',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: AppColors.warmGray400,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Divider(height: 1, color: AppColors.outline),
+          const SizedBox(height: AppSpacing.md),
           Row(
             children: [
-              _Metric(label: 'Sponsors', value: db.pendingSponsorCount),
+              _Metric(label: 'Pending', value: db.pendingSponsorCount),
               _Divider(),
-              _Metric(label: 'Raised', value: AppConstants.currencySymbol + _shortFmt(db.collectedTotal)),
+              _Metric(label: 'Expenses', value: AppConstants.currencySymbol + _shortFmt(db.totalExpenses)),
               _Divider(),
-              _Metric(label: 'Active', value: db.pendingSponsorCount),
-              _Divider(),
-              _Metric(label: 'Goal Left', value: AppConstants.currencySymbol + _shortFmt(db.remainingCollection)),
+              _Metric(label: 'Balance', value: AppConstants.currencySymbol + _shortFmt(db.balance)),
             ],
           ),
         ],
@@ -526,9 +569,9 @@ class _KpiGrid extends ConsumerWidget {
     final db = ref.watch(dashboardProvider);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final w = (constraints.maxWidth - AppSpacing.lg) / 2;
+        final w = (constraints.maxWidth - AppSpacing.sm) / 2;
         return Wrap(
-          spacing: AppSpacing.lg, runSpacing: AppSpacing.lg,
+          spacing: AppSpacing.sm, runSpacing: AppSpacing.sm,
           children: [
             SizedBox(width: w, child: _KpiCard(
               icon: Icons.today_rounded, label: "Today's Collection",
@@ -550,8 +593,8 @@ class _KpiGrid extends ConsumerWidget {
               color: AppColors.error, fmtCurrency: true,
             )),
             SizedBox(width: w, child: _KpiCard(
-              icon: Icons.notifications_rounded, label: 'Next Visits',
-              value: db.pendingSponsorCount, trend: 'Needs visit',
+              icon: Icons.notifications_rounded, label: 'Pending Visits',
+              value: db.activeVisitCount, trend: '${db.overdueVisitCount} overdue',
               color: AppColors.primary, fmtCurrency: false,
             )),
           ],
@@ -561,7 +604,7 @@ class _KpiGrid extends ConsumerWidget {
   }
 }
 
-class _KpiCard extends StatefulWidget {
+class _KpiCard extends StatelessWidget {
   final IconData icon;
   final String label;
   final int value;
@@ -571,75 +614,50 @@ class _KpiCard extends StatefulWidget {
   const _KpiCard({required this.icon, required this.label, required this.value, required this.trend, required this.color, required this.fmtCurrency});
 
   @override
-  State<_KpiCard> createState() => _KpiCardState();
-}
-
-class _KpiCardState extends State<_KpiCard> {
-  bool _hover = false;
-
-  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: AppRadius.largeBorder,
-          border: Border.all(
-            color: _hover
-                ? widget.color.withValues(alpha: 0.3)
-                : AppColors.outline,
-          ),
-          boxShadow: _hover ? AppShadows.elevated : AppShadows.subtle,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: widget.color.withValues(alpha: 0.1),
-                    borderRadius: AppRadius.mediumBorder,
-                  ),
-                  child: Icon(widget.icon, size: 16, color: widget.color),
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: AppRadius.largeBorder,
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.xs),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: AppRadius.mediumBorder,
                 ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.md),
-            _CountUp(
-              target: widget.value,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                color: AppColors.charcoal,
-                height: 1.0,
+                child: Icon(icon, size: 14, color: color),
               ),
-              format: widget.fmtCurrency
-                  ? (v) => '${AppConstants.currencySymbol}${_shortFmt(v)}'
-                  : (v) => '$v',
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _CountUp(
+            target: value,
+            style: theme.textTheme.titleLarge?.copyWith(
+              color: AppColors.charcoal,
+              height: 1.0,
             ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              widget.label,
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: AppColors.warmGray500,
-              ),
+            format: fmtCurrency
+                ? (v) => '${AppConstants.currencySymbol}${_shortFmt(v)}'
+                : (v) => '$v',
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: AppColors.warmGray500,
             ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              widget.trend,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: AppColors.warmGray400,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -655,99 +673,84 @@ class _QuickActions extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
           child: Text(
             'Quick Actions',
-            style: theme.textTheme.titleSmall?.copyWith(
+            style: theme.textTheme.labelLarge?.copyWith(
               color: AppColors.warmGray500,
             ),
           ),
         ),
         LayoutBuilder(
           builder: (context, constraints) {
-            final w = (constraints.maxWidth - AppSpacing.md) / 2;
+            final w = (constraints.maxWidth - AppSpacing.sm) / 2;
             return Wrap(
-              spacing: AppSpacing.md, runSpacing: AppSpacing.md,
+              spacing: AppSpacing.sm, runSpacing: AppSpacing.sm,
               children: [
-                SizedBox(width: w, child: _ActionTile(icon: Icons.person_add_rounded, label: 'Sponsor', color: AppColors.primary, route: '/collections/add')),
-                SizedBox(width: w, child: _ActionTile(icon: Icons.account_balance_wallet_rounded, label: 'Collection', color: AppColors.success, route: '/daily-collections/add')),
-                SizedBox(width: w, child: _ActionTile(icon: Icons.notifications_active_rounded, label: 'Visit', color: AppColors.warning, route: '/followups/add')),
-                SizedBox(width: w, child: _ActionTile(icon: Icons.receipt_rounded, label: 'Expense', color: AppColors.error, route: '/expenses/add')),
+                SizedBox(width: w, child: _ActionTile(icon: Icons.person_add_rounded, label: 'Sponsor', color: AppColors.primary, onTap: () => context.push('/collections/add'))),
+                SizedBox(width: w, child: _ActionTile(icon: Icons.account_balance_wallet_rounded, label: 'Collection', color: AppColors.success, onTap: () => context.push('/daily-collections/add'))),
+                SizedBox(width: w, child: _ActionTile(icon: Icons.notifications_active_rounded, label: 'Visit', color: AppColors.warning, onTap: () => context.push('/followups/add'))),
+                SizedBox(width: w, child: _ActionTile(icon: Icons.receipt_rounded, label: 'Expense', color: AppColors.error, onTap: () => context.push('/expenses/add'))),
               ],
             );
           },
         ),
         if (festival != null) ...[
-          const SizedBox(height: AppSpacing.md),
-          _QrAction(festival: festival),
+          const SizedBox(height: AppSpacing.xs),
+          _QrStrip(festival: festival),
         ],
       ],
     );
   }
 }
 
-class _QrAction extends StatefulWidget {
+class _QrStrip extends StatelessWidget {
   final Festival festival;
-  const _QrAction({required this.festival});
-
-  @override
-  State<_QrAction> createState() => _QrActionState();
-}
-
-class _QrActionState extends State<_QrAction> {
-  bool _hover = false;
+  const _QrStrip({required this.festival});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-        height: 52,
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: AppRadius.largeBorder,
-          border: Border.all(
-            color: _hover
-                ? AppColors.primary.withValues(alpha: 0.25)
-                : AppColors.outline,
-          ),
-          boxShadow: _hover
-              ? [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.06),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : AppShadows.subtle,
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => showPaymentQrSheet(context, widget.festival),
+    return Material(
+      color: AppColors.card,
+      borderRadius: AppRadius.largeBorder,
+      child: InkWell(
+        onTap: () => showPaymentQrSheet(context, festival),
+        borderRadius: AppRadius.largeBorder,
+        child: Container(
+          height: 52,
+          decoration: BoxDecoration(
             borderRadius: AppRadius.largeBorder,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-              child: Row(
-                children: [
-                  Icon(Icons.qr_code_rounded, size: 18, color: AppColors.primary),
-                  const SizedBox(width: AppSpacing.md),
-                  Text(
-                    'Show QR',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: AppColors.charcoal,
-                      fontWeight: FontWeight.w600,
-                    ),
+            border: Border.all(color: AppColors.outline),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryBg,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(AppRadius.large),
+                    bottomLeft: Radius.circular(AppRadius.large),
                   ),
-                  const Spacer(),
-                  Icon(Icons.chevron_right_rounded, size: 16, color: AppColors.warmGray400),
-                ],
+                ),
+                child: const Icon(Icons.qr_code_rounded, size: 22, color: AppColors.primary),
               ),
-            ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Text(
+                  'Show Payment QR',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: AppColors.charcoal,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(right: AppSpacing.md),
+                child: Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.warmGray400),
+              ),
+            ],
           ),
         ),
       ),
@@ -755,73 +758,47 @@ class _QrActionState extends State<_QrAction> {
   }
 }
 
-class _ActionTile extends StatefulWidget {
+class _ActionTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
-  final String route;
-  const _ActionTile({required this.icon, required this.label, required this.color, required this.route});
-
-  @override
-  State<_ActionTile> createState() => _ActionTileState();
-}
-
-class _ActionTileState extends State<_ActionTile> {
-  bool _hover = false;
+  final VoidCallback onTap;
+  const _ActionTile({required this.icon, required this.label, required this.color, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-        height: 88,
-        decoration: BoxDecoration(
-          color: AppColors.card,
+    return Container(
+      height: 72,
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: AppRadius.largeBorder,
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
           borderRadius: AppRadius.largeBorder,
-          border: Border.all(
-            color: _hover
-                ? widget.color.withValues(alpha: 0.25)
-                : AppColors.outline,
-          ),
-          boxShadow: _hover
-              ? [
-                  BoxShadow(
-                    color: widget.color.withValues(alpha: 0.08),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : AppShadows.subtle,
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => context.push(widget.route),
-            borderRadius: AppRadius.largeBorder,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 40, height: 40,
-                  decoration: BoxDecoration(
-                    color: widget.color.withValues(alpha: 0.1),
-                    borderRadius: AppRadius.mediumBorder,
-                  ),
-                  child: Icon(widget.icon, size: 20, color: widget.color),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 34, height: 34,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: AppRadius.mediumBorder,
                 ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  widget.label,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: AppColors.charcoal,
-                  ),
+                child: Icon(icon, size: 18, color: color),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                label,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: AppColors.charcoal,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -867,9 +844,9 @@ class _CollectionTrend extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.md),
           SizedBox(
-            height: 160,
+            height: 140,
             child: hasData
                 ? LineChart(
                     LineChartData(
@@ -934,7 +911,7 @@ class _CollectionTrend extends ConsumerWidget {
             Row(
               children: [
                 Text(
-                  '${AppConstants.currencySymbol}${_fmt.format(total)}',
+                  '${AppConstants.currencySymbol}${fmtAmount(total)}',
                   style: theme.textTheme.titleLarge?.copyWith(
                     color: AppColors.charcoal,
                   ),
@@ -969,43 +946,44 @@ class _ChartSkeletonState extends State<_ChartSkeleton>
   void initState() {
     super.initState();
     _ctrl = AnimationController(vsync: this, duration: const Duration(seconds: 2))
-      ..repeat(reverse: true);
+      ..repeat(reverse: true)
+      ..addListener(_onTick);
+  }
+
+  void _onTick() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _ctrl.removeListener(_onTick);
     _ctrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _ctrl,
-      builder: (context, _) {
-        final o = 0.04 + _ctrl.value * 0.06;
-        return SizedBox(
-          height: 160,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: List.generate(10, (i) {
-              final h = 0.2 + (i.isEven ? 0.3 : 0.5) + (i % 3 == 0 ? 0.2 : 0.0);
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 3),
-                  child: Container(
-                    height: 140 * h,
-                    decoration: BoxDecoration(
-                      color: AppColors.warmGray400.withValues(alpha: o),
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
+    final o = 0.04 + _ctrl.value * 0.06;
+    return SizedBox(
+      height: 140,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: List.generate(10, (i) {
+          final h = 0.2 + (i.isEven ? 0.3 : 0.5) + (i % 3 == 0 ? 0.2 : 0.0);
+          return Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: Container(
+                height: 140 * h,
+                decoration: BoxDecoration(
+                  color: AppColors.warmGray400.withValues(alpha: o),
+                  borderRadius: BorderRadius.circular(3),
                 ),
-              );
-            }),
-          ),
-        );
-      },
+              ),
+            ),
+          );
+        }),
+      ),
     );
   }
 }
@@ -1023,10 +1001,15 @@ String _relTime(DateTime dt) {
 Color _actColor(String type) {
   switch (type) {
     case 'collection_recorded': return AppColors.success;
+    case 'collection_corrected': return AppColors.warning;
     case 'expense_added': return AppColors.error;
     case 'followup_added': return AppColors.warning;
     case 'followup_completed': return AppColors.success;
+    case 'followup_undo': return AppColors.warmGray500;
     case 'sponsor_added': return AppColors.primary;
+    case 'sponsor_updated': return AppColors.info;
+    case 'festival_updated': return AppColors.warmGray500;
+    case 'qr_updated': return AppColors.info;
     default: return AppColors.warmGray400;
   }
 }
@@ -1034,10 +1017,15 @@ Color _actColor(String type) {
 IconData _actIcon(String type) {
   switch (type) {
     case 'collection_recorded': return Icons.account_balance_wallet_rounded;
+    case 'collection_corrected': return Icons.edit_note_rounded;
     case 'expense_added': return Icons.receipt_rounded;
     case 'followup_added': return Icons.notifications_active_rounded;
     case 'followup_completed': return Icons.check_circle_rounded;
+    case 'followup_undo': return Icons.undo_rounded;
     case 'sponsor_added': return Icons.person_add_rounded;
+    case 'sponsor_updated': return Icons.edit_rounded;
+    case 'festival_updated': return Icons.settings_rounded;
+    case 'qr_updated': return Icons.qr_code_rounded;
     default: return Icons.circle_rounded;
   }
 }
@@ -1080,7 +1068,7 @@ class _ActivityTimeline extends ConsumerWidget {
     final theme = Theme.of(context);
     final items = ref.watch(activitiesStreamProvider).valueOrNull ?? [];
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.xl),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: AppRadius.largeBorder,
@@ -1091,12 +1079,12 @@ class _ActivityTimeline extends ConsumerWidget {
         children: [
           const Row(
             children: [
-              Text('Activity Feed', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.warmGray500)),
+              Text('Activity Feed', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.warmGray500)),
               Spacer(),
-              Text('Timeline', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w400, color: AppColors.warmGray400)),
+              Text('Timeline', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w400, color: AppColors.warmGray400)),
             ],
           ),
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.sm),
           if (items.isEmpty)
             const SizedBox(
               height: 80,
@@ -1105,13 +1093,27 @@ class _ActivityTimeline extends ConsumerWidget {
               ),
             )
           else
-            _buildList(items, theme),
+            _buildList(context, items, theme),
         ],
       ),
     );
   }
 
-  Widget _buildList(List<Activity> items, ThemeData theme) {
+  void _navigateToActivity(BuildContext context, Activity a) {
+    if (a.recordId == null || a.entityType == null) return;
+    switch (a.entityType) {
+      case 'target':
+        context.push('/collections/${a.recordId}');
+      case 'expense':
+        context.push('/expenses/${a.recordId}/edit');
+      case 'sponsor_followup':
+        context.push('/followups/${a.recordId}/edit');
+      default:
+        break;
+    }
+  }
+
+  Widget _buildList(BuildContext context, List<Activity> items, ThemeData theme) {
     final groups = _groupActivities(items);
     final widgets = <Widget>[];
     var count = 0;
@@ -1132,37 +1134,42 @@ class _ActivityTimeline extends ConsumerWidget {
         count++;
         final c = _actColor(a.type);
         final icon = _actIcon(a.type);
+        final canNavigate = a.recordId != null && a.entityType != null;
         widgets.add(Padding(
           padding: const EdgeInsets.only(bottom: 10),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 28, height: 28,
-                decoration: BoxDecoration(
-                  color: c.withValues(alpha: 0.1),
-                  borderRadius: AppRadius.mediumBorder,
-                ),
-                child: Icon(icon, size: 14, color: c),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  a.title,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppColors.charcoal,
+          child: InkWell(
+            onTap: canNavigate ? () => _navigateToActivity(context, a) : null,
+            borderRadius: AppRadius.mediumBorder,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 28, height: 28,
+                  decoration: BoxDecoration(
+                    color: c.withValues(alpha: 0.1),
+                    borderRadius: AppRadius.mediumBorder,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  child: Icon(icon, size: 14, color: c),
                 ),
-              ),
-              Text(
-                _relTime(a.createdAt.toDate()),
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: AppColors.warmGray400,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    a.description.isNotEmpty ? a.description : a.title,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.charcoal,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-            ],
+                Text(
+                  _relTime(a.createdAt.toDate()),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: AppColors.warmGray400,
+                  ),
+                ),
+              ],
+            ),
           ),
         ));
       }

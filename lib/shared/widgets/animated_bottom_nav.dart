@@ -45,7 +45,7 @@ class AnimatedBottomNav extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+          padding: const EdgeInsets.fromLTRB(2, 2, 2, 0),
           child: Row(
             children: List.generate(_navItems.length, (index) {
               return Expanded(
@@ -90,7 +90,7 @@ class _NavBarItemState extends State<_NavBarItem>
     _controller = AnimationController(
       duration: const Duration(milliseconds: 200),
       vsync: this,
-    );
+    )..addListener(_onTick);
     _scale = Tween<double>(begin: 1.0, end: 1.15).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
@@ -100,6 +100,10 @@ class _NavBarItemState extends State<_NavBarItem>
     if (widget.isSelected) {
       _controller.value = 1.0;
     }
+  }
+
+  void _onTick() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -116,6 +120,7 @@ class _NavBarItemState extends State<_NavBarItem>
 
   @override
   void dispose() {
+    _controller.removeListener(_onTick);
     _controller.dispose();
     super.dispose();
   }
@@ -127,59 +132,53 @@ class _NavBarItemState extends State<_NavBarItem>
     return GestureDetector(
       onTap: widget.onTap,
       behavior: HitTestBehavior.opaque,
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, _) {
-          return SizedBox(
-            height: 56,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Positioned.fill(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Opacity(
-                      opacity: _pillOpacity.value,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withAlpha(26),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
+      child: SizedBox(
+        height: 52,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned.fill(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Opacity(
+                  opacity: _pillOpacity.value,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withAlpha(26),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                 ),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Transform.scale(
-                      scale: _scale.value,
-                      child: Icon(
-                        widget.item.icon,
-                        size: 24,
-                        color: widget.isSelected
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurface.withAlpha(128),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      widget.item.label,
-                      style: TextStyle(
-                        fontSize: 11,
-        fontWeight:
-                                widget.isSelected ? FontWeight.w600 : FontWeight.w400,
-                        color: widget.isSelected
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurface.withAlpha(128),
-                      ),
-                    ),
-                  ],
+              ),
+            ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Transform.scale(
+                  scale: _scale.value,
+                  child: Icon(
+                    widget.item.icon,
+                    size: 22,
+                    color: widget.isSelected
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurface.withAlpha(128),
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  widget.item.label,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: widget.isSelected ? FontWeight.w600 : FontWeight.w400,
+                    color: widget.isSelected
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurface.withAlpha(128),
+                  ),
                 ),
               ],
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }

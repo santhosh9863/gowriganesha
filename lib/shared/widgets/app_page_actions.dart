@@ -79,19 +79,19 @@ class _ActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 36,
-      height: 36,
+      width: 48,
+      height: 48,
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.medium),
         border: Border.all(color: AppColors.outline),
       ),
       child: IconButton(
-        icon: Icon(icon, size: 18, color: AppColors.warmGray500),
+        icon: Icon(icon, size: 22, color: AppColors.warmGray500),
         onPressed: onTap,
         padding: EdgeInsets.zero,
         tooltip: tooltip,
-        splashRadius: 18,
+        splashRadius: 24,
       ),
     );
   }

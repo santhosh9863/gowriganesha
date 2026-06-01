@@ -7,6 +7,7 @@ import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/design/app_shadows.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/target.dart';
+import 'package:ganesha_2026/shared/utils/amount_format.dart';
 import 'package:ganesha_2026/shared/widgets/app_status_chip.dart';
 
 enum _SponsorStatus { notStarted, pending, complete }
@@ -46,8 +47,6 @@ String _relTime(DateTime dt) {
   if (d.inDays < 30) return '${d.inDays}d ago';
   return DateFormat('d MMM').format(dt);
 }
-
-final _fmt = NumberFormat('#,##,###', 'en_IN');
 
 class SponsorCard extends StatelessWidget {
   final Target target;
@@ -92,18 +91,18 @@ class SponsorCard extends StatelessWidget {
           borderRadius: AppRadius.largeBorder,
           onTap: () => context.push('/collections/${target.id}'),
           child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
+            padding: const EdgeInsets.all(AppSpacing.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Top row: Avatar, Name, Status, Menu
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     // Avatar with initials
                     Container(
-                      width: 40,
-                      height: 40,
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
                         color: AppColors.primaryBg,
                         borderRadius: AppRadius.mediumBorder,
@@ -187,20 +186,20 @@ class SponsorCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.sm),
                 // Progress bar
                 ClipRRect(
                   borderRadius: BorderRadius.circular(3),
                   child: LinearProgressIndicator(
                     value: ratio,
-                    minHeight: 5,
+                    minHeight: 4,
                     backgroundColor: AppColors.warmGray200,
                     color: status == _SponsorStatus.complete
                         ? AppColors.success
                         : AppColors.primary,
                   ),
                 ),
-                const SizedBox(height: AppSpacing.sm),
+                const SizedBox(height: AppSpacing.xs),
                 // Amounts row
                 Row(
                   children: [
@@ -228,7 +227,7 @@ class SponsorCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: AppSpacing.sm),
                 // Bottom row: Last updated + Quick actions
                 Row(
                   children: [
@@ -251,6 +250,7 @@ class SponsorCard extends StatelessWidget {
                       color: AppColors.primary,
                       onTap: onQuickUpdate,
                       theme: theme,
+                      filled: true,
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     _QuickAction(
@@ -258,17 +258,8 @@ class SponsorCard extends StatelessWidget {
                       icon: Icons.notifications_active_rounded,
                       color: AppColors.warning,
                       onTap: () => context.push(
-                        '/followups/add?targetName=$_name',
+                        '/followups/add?sponsorId=${target.id}&sponsorName=$_name',
                       ),
-                      theme: theme,
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    _QuickAction(
-                      label: 'View',
-                      icon: Icons.visibility_rounded,
-                      color: AppColors.warmGray500,
-                      onTap: () =>
-                          context.push('/collections/${target.id}'),
                       theme: theme,
                     ),
                   ],
@@ -304,7 +295,7 @@ class _AmountBlock extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${AppConstants.currencySymbol}${_fmt.format(amount)}',
+            '${AppConstants.currencySymbol}${fmtAmount(amount)}',
             style: theme.textTheme.titleSmall?.copyWith(
               color: color,
               fontWeight: FontWeight.w700,
@@ -329,6 +320,7 @@ class _QuickAction extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
   final ThemeData theme;
+  final bool filled;
 
   const _QuickAction({
     required this.label,
@@ -336,6 +328,7 @@ class _QuickAction extends StatelessWidget {
     required this.color,
     required this.onTap,
     required this.theme,
+    this.filled = false,
   });
 
   @override
@@ -344,23 +337,23 @@ class _QuickAction extends StatelessWidget {
       onTap: onTap,
       borderRadius: AppRadius.mediumBorder,
       child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
+        padding: EdgeInsets.symmetric(
+          horizontal: filled ? AppSpacing.md : AppSpacing.sm,
           vertical: AppSpacing.xs,
         ),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
+          color: filled ? color : color.withValues(alpha: 0.08),
           borderRadius: AppRadius.mediumBorder,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 13, color: color),
+            Icon(icon, size: 13, color: filled ? Colors.white : color),
             const SizedBox(width: 4),
             Text(
               label,
               style: theme.textTheme.labelMedium?.copyWith(
-                color: color,
+                color: filled ? Colors.white : color,
                 fontWeight: FontWeight.w600,
               ),
             ),

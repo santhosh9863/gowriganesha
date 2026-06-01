@@ -53,8 +53,25 @@ class AppPageScaffold extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+    final showFab = onAdd != null && !keyboardOpen;
+    final fab = showFab
+        ? FloatingActionButton(
+            onPressed: onAdd,
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(Icons.add_rounded, size: 28),
+          )
+        : null;
+
     final page = Scaffold(
       backgroundColor: AppColors.surface,
+      floatingActionButton: fab,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -118,32 +135,7 @@ class AppPageScaffold extends ConsumerWidget {
                 ),
               ),
             if (showHeader) const SizedBox(height: AppSpacing.lg),
-            Expanded(
-              child: Stack(
-                children: [
-                  _buildBody(),
-                  if (onAdd != null)
-                    Positioned(
-                      right: 24,
-                      bottom: bottomNavHeight + 24,
-                      child: SizedBox(
-                        width: 56,
-                        height: 56,
-                        child: FloatingActionButton(
-                          onPressed: onAdd,
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          elevation: 4,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const Icon(Icons.add_rounded, size: 28),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
+            Expanded(child: _buildBody(showFab)),
           ],
         ),
       ),
@@ -152,10 +144,17 @@ class AppPageScaffold extends ConsumerWidget {
     return page;
   }
 
-  Widget _buildBody() {
-    final body = padding != null
+  Widget _buildBody(bool showFab) {
+    var body = padding != null
         ? Padding(padding: padding!, child: child)
         : child;
+
+    if (showFab) {
+      body = Padding(
+        padding: const EdgeInsets.only(bottom: 80.0),
+        child: body,
+      );
+    }
 
     if (onRefresh != null) {
       return RefreshIndicator(

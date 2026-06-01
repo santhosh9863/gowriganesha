@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/core/design/app_colors.dart';
 import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ganesha_2026/core/models/target.dart';
+import 'package:ganesha_2026/shared/utils/amount_format.dart';
+import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/providers/target_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/features/collections/collection_tile.dart';
@@ -125,7 +127,7 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
             AppSpacing.lg,
             0,
             AppSpacing.lg,
-            AppSpacing.md,
+            AppSpacing.sm,
           ),
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -225,7 +227,7 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
             AppSpacing.lg,
             0,
             AppSpacing.lg,
-            AppSpacing.md,
+            AppSpacing.sm,
           ),
           child: Row(
             children: [
@@ -241,13 +243,6 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
                 selected: _filter == 'pending',
                 onTap: () => setState(() => _filter = 'pending'),
                 color: AppColors.warning,
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              _FilterChip(
-                label: 'Achieved',
-                selected: _filter == 'collected',
-                onTap: () => setState(() => _filter = 'collected'),
-                color: AppColors.success,
               ),
             ],
           ),
@@ -349,6 +344,7 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
                   TextField(
                     controller: newTotalCtrl,
                     keyboardType: TextInputType.number,
+                    inputFormatters: const [IndianAmountInputFormatter()],
                     decoration: const InputDecoration(
                       labelText: 'New Total',
                       prefixText: '₹ ',
@@ -357,7 +353,7 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
                     autofocus: true,
                     onChanged: (v) {
                       setDialogState(() {
-                        newTotal = int.tryParse(v.trim());
+                        newTotal = tryParseAmount(v.trim());
                       });
                     },
                   ),
@@ -425,6 +421,16 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
         newTotal: result['newTotal'] as int,
         note: result['reason'] as String,
       );
+      service.addActivity(Activity(
+        id: service.generateId(),
+        festivalId: AppConstants.festivalId,
+        type: 'collection_corrected',
+        title: 'Collection Corrected',
+        description: 'Correction applied to ${target.name} — total adjusted by ${AppConstants.currencySymbol}${fmtAmount((result['newTotal'] as int) - target.givenAmount)}',
+        createdAt: Timestamp.now(),
+        recordId: target.id,
+        entityType: 'target',
+      ));
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Correction applied')),
@@ -461,8 +467,7 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
   }
 
   String _fmt(int n) {
-    final fmt = NumberFormat('#,##,###', 'en_IN');
-    return fmt.format(n);
+    return fmtAmount(n);
   }
 }
 

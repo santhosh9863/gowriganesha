@@ -11,6 +11,7 @@ import 'package:ganesha_2026/core/models/sponsor_followup.dart';
 import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/providers/followup_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
+import 'package:ganesha_2026/shared/utils/amount_format.dart';
 import 'package:ganesha_2026/shared/widgets/app_empty_state.dart';
 import 'package:ganesha_2026/shared/widgets/app_metric_card.dart';
 import 'package:ganesha_2026/shared/widgets/app_page_scaffold.dart';
@@ -27,13 +28,15 @@ class FollowUpListPage extends ConsumerStatefulWidget {
 }
 
 class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
+  int _tabIndex = 0;
+
   @override
   Widget build(BuildContext context) {
     final allAsync = ref.watch(allFollowUpsStreamProvider);
     final theme = Theme.of(context);
 
     return AppPageScaffold(
-      festivalName: 'Pending Visits',
+      festivalName: 'Visits',
       onSettings: () => context.push('/settings'),
       onAdd: () => context.push('/followups/add'),
       showAdd: true,
@@ -150,86 +153,102 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
             },
           ),
         ),
-        // Overdue section
-        if (overdue.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.sm,
-              AppSpacing.lg,
-              AppSpacing.xs,
-            ),
-            child: AppSectionHeader(
-              title: 'Overdue',
-              subtitle: '${overdue.length} pending',
-            ),
+        // Tab chips
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.sm,
+            AppSpacing.lg,
+            AppSpacing.sm,
           ),
-          ...overdue.map((f) => _FollowUpCard(
-                item: f,
-                onEdit: () => context.push('/followups/${f.id}/edit'),
-                onDelete: () => _handleDelete(context, ref, f),
-                onCollected: () => _handleCollected(context, ref, f),
-                theme: theme,
-              )),
-        ],
-        // Today section
-        if (dueToday.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.md,
-              AppSpacing.lg,
-              AppSpacing.xs,
-            ),
-            child: AppSectionHeader(
-              title: 'Today',
-              subtitle: '${dueToday.length} items',
-            ),
+          child: Row(
+            children: [
+              _TabChip(
+                label: 'Pending',
+                count: allItems.length - completed.length,
+                selected: _tabIndex == 0,
+                onTap: () => setState(() => _tabIndex = 0),
+                color: AppColors.warning,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              _TabChip(
+                label: 'Completed',
+                count: completed.length,
+                selected: _tabIndex == 1,
+                onTap: () => setState(() => _tabIndex = 1),
+                color: AppColors.success,
+              ),
+            ],
           ),
-          ...dueToday.map((f) => _FollowUpCard(
-                item: f,
-                onEdit: () => context.push('/followups/${f.id}/edit'),
-                onDelete: () => _handleDelete(context, ref, f),
-                onCollected: () => _handleCollected(context, ref, f),
-                theme: theme,
-              )),
-        ],
-        // Upcoming section
-        if (upcoming.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.md,
-              AppSpacing.lg,
-              AppSpacing.xs,
+        ),
+        // Pending sections
+        if (_tabIndex == 0) ...[
+          if (overdue.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.sm,
+                AppSpacing.lg,
+                AppSpacing.xs,
+              ),
+              child: AppSectionHeader(
+                title: 'Overdue',
+                subtitle: '${overdue.length} pending',
+              ),
             ),
-            child: AppSectionHeader(
-              title: 'Upcoming',
-              subtitle: '${upcoming.length} scheduled',
+            ...overdue.map((f) => _FollowUpCard(
+                  item: f,
+                  onEdit: () => context.push('/followups/${f.id}/edit'),
+                  onDelete: () => _handleDelete(context, ref, f),
+                  onCollected: () => _handleCollected(context, ref, f),
+                  theme: theme,
+                )),
+          ],
+          if (dueToday.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.md,
+                AppSpacing.lg,
+                AppSpacing.xs,
+              ),
+              child: AppSectionHeader(
+                title: 'Today',
+                subtitle: '${dueToday.length} items',
+              ),
             ),
-          ),
-          ...upcoming.map((f) => _FollowUpCard(
-                item: f,
-                onEdit: () => context.push('/followups/${f.id}/edit'),
-                onDelete: () => _handleDelete(context, ref, f),
-                onCollected: () => _handleCollected(context, ref, f),
-                theme: theme,
-              )),
+            ...dueToday.map((f) => _FollowUpCard(
+                  item: f,
+                  onEdit: () => context.push('/followups/${f.id}/edit'),
+                  onDelete: () => _handleDelete(context, ref, f),
+                  onCollected: () => _handleCollected(context, ref, f),
+                  theme: theme,
+                )),
+          ],
+          if (upcoming.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.md,
+                AppSpacing.lg,
+                AppSpacing.xs,
+              ),
+              child: AppSectionHeader(
+                title: 'Upcoming',
+                subtitle: '${upcoming.length} scheduled',
+              ),
+            ),
+            ...upcoming.map((f) => _FollowUpCard(
+                  item: f,
+                  onEdit: () => context.push('/followups/${f.id}/edit'),
+                  onDelete: () => _handleDelete(context, ref, f),
+                  onCollected: () => _handleCollected(context, ref, f),
+                  theme: theme,
+                )),
+          ],
         ],
         // Completed section
-        if (completed.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.md,
-              AppSpacing.lg,
-              AppSpacing.xs,
-            ),
-            child: AppSectionHeader(
-              title: 'Completed',
-              subtitle: '${completed.length} done',
-            ),
-          ),
+        if (_tabIndex == 1 && completed.isNotEmpty) ...[
           ...completed.map((f) => _FollowUpCard(
                 item: f,
                 onEdit: () => context.push('/followups/${f.id}/edit'),
@@ -243,13 +262,23 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
             padding: const EdgeInsets.only(top: AppSpacing.xxxl),
             child: AppEmptyState(
               icon: Icons.follow_the_signs_rounded,
-              title: 'No pending visits',
+              title: 'No visits yet',
               subtitle: 'Tap + to create your first visit',
               action: FilledButton.icon(
                 onPressed: () => context.push('/followups/add'),
                 icon: const Icon(Icons.add_rounded, size: 18),
                 label: const Text('Add Visit'),
               ),
+            ),
+          ),
+        // Empty pending state
+        if (hasAny && _tabIndex == 0 && allItems.length == completed.length)
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.xxxl),
+            child: AppEmptyState(
+              icon: Icons.check_circle_outline_rounded,
+              title: 'All caught up!',
+              subtitle: 'No pending visits',
             ),
           ),
       ],
@@ -294,8 +323,10 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
         festivalId: AppConstants.festivalId,
         type: 'followup_completed',
         title: 'Visit Completed',
-        description: '${item.sponsorName} marked as collected',
+        description: 'Visit completed for ${item.sponsorName}',
         createdAt: Timestamp.now(),
+        recordId: item.id,
+        entityType: 'sponsor_followup',
       ));
 
       if (!context.mounted) return;
@@ -320,8 +351,10 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
                     festivalId: AppConstants.festivalId,
                     type: 'followup_undo',
                     title: 'Completion Undone',
-                    description: '${item.sponsorName} visit restored',
+                    description: 'Visit restored for ${item.sponsorName}',
                     createdAt: Timestamp.now(),
+                    recordId: item.id,
+                    entityType: 'sponsor_followup',
                   ));
                 } on Exception {
                   // silent
@@ -546,7 +579,7 @@ class _FollowUpCard extends StatelessWidget {
                       if (item.amount != null) ...[
                         const SizedBox(height: AppSpacing.xs),
                         Text(
-                          '${AppConstants.currencySymbol}${NumberFormat('#,##,###', 'en_IN').format(item.amount!)}',
+                          '${AppConstants.currencySymbol}${fmtAmount(item.amount!)}',
                           style: theme.textTheme.titleMedium?.copyWith(
                             color: AppColors.charcoal,
                             fontWeight: FontWeight.w700,
@@ -635,6 +668,79 @@ class _ActionButton extends StatelessWidget {
               style: theme.textTheme.labelMedium?.copyWith(
                 color: color,
                 fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TabChip extends StatelessWidget {
+  final String label;
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+  final Color color;
+
+  const _TabChip({
+    required this.label,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: selected
+              ? color.withValues(alpha: 0.1)
+              : Colors.transparent,
+          borderRadius: AppRadius.mediumBorder,
+          border: Border.all(
+            color: selected
+                ? color.withValues(alpha: 0.3)
+                : AppColors.outline,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: selected ? color : AppColors.warmGray500,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 6,
+                vertical: 1,
+              ),
+              decoration: BoxDecoration(
+                color: selected ? color : AppColors.warmGray200,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '$count',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: selected ? Colors.white : AppColors.warmGray500,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 10,
+                ),
               ),
             ),
           ],
