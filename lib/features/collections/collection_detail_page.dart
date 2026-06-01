@@ -12,9 +12,12 @@ import 'package:ganesha_2026/core/models/sponsor_followup.dart';
 import 'package:ganesha_2026/core/providers/target_provider.dart';
 import 'package:ganesha_2026/core/providers/followup_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
+import 'package:ganesha_2026/core/providers/contribution_provider.dart';
+import 'package:ganesha_2026/core/models/contribution.dart';
 import 'package:ganesha_2026/shared/widgets/amount_text.dart';
 import 'package:ganesha_2026/shared/widgets/app_card.dart';
 import 'package:ganesha_2026/shared/widgets/app_page_scaffold.dart';
+import 'package:ganesha_2026/shared/widgets/app_empty_state.dart';
 import 'package:ganesha_2026/shared/widgets/app_skeleton.dart';
 import 'package:ganesha_2026/shared/widgets/confirm_dialog.dart';
 
@@ -332,6 +335,15 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
                 label: const Text('Record Contribution'),
               ),
             ),
+            const SizedBox(height: AppSpacing.xxl),
+            Text(
+              'Contribution History',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _ContributionList(targetId: target.id),
             if (hasOverdue) ...[
               const SizedBox(height: AppSpacing.lg),
               Container(
@@ -566,6 +578,161 @@ class _FollowUpRow extends StatelessWidget {
                         ? colorScheme.primary
                         : colorScheme.tertiary,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ContributionList extends ConsumerWidget {
+  final String targetId;
+
+  const _ContributionList({required this.targetId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final contributionsAsync = ref.watch(contributionsStreamProvider(targetId));
+    final theme = Theme.of(context);
+
+    return contributionsAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Text(
+          'Failed to load contributions',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.error,
+          ),
+        ),
+      ),
+      data: (contributions) {
+        if (contributions.isEmpty) {
+          return AppEmptyState(
+            icon: Icons.receipt_long_rounded,
+            title: 'No contribution history',
+            subtitle: 'Contributions and corrections will appear here.',
+          );
+        }
+
+        return Column(
+          children: contributions
+              .map((c) => _ContributionRow(
+                    contribution: c,
+                    theme: theme,
+                    colorScheme: theme.colorScheme,
+                  ))
+              .toList(),
+        );
+      },
+    );
+  }
+}
+
+class _ContributionRow extends StatelessWidget {
+  final Contribution contribution;
+  final ThemeData theme;
+  final ColorScheme colorScheme;
+
+  const _ContributionRow({
+    required this.contribution,
+    required this.theme,
+    required this.colorScheme,
+  });
+
+  String _relativeTime(Timestamp ts) {
+    final diff = DateTime.now().difference(ts.toDate());
+    if (diff.inMinutes < 1) return 'now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays == 1) return 'yesterday';
+    if (diff.inDays < 30) return '${diff.inDays}d ago';
+    return DateFormat('d MMM').format(ts.toDate());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isCorrection = contribution.type == ContributionType.correction;
+    final icon = isCorrection ? Icons.tune_rounded : Icons.payments_rounded;
+    final iconColor = isCorrection ? colorScheme.error : colorScheme.primary;
+    final iconBg = isCorrection
+        ? colorScheme.error.withAlpha(25)
+        : colorScheme.primary.withAlpha(30);
+    final amountColor =
+        isCorrection ? colorScheme.error : colorScheme.primary;
+    final amountPrefix = isCorrection && contribution.amount >= 0 ? '+' : '';
+    final typeLabel = isCorrection ? 'Correction' : 'Contribution';
+    final note = contribution.note.isNotEmpty
+        ? contribution.note
+        : (isCorrection ? 'Amount adjusted' : 'Received from sponsor');
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 18, color: iconColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  note,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: iconBg,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        typeLabel,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: iconColor,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 9,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _relativeTime(contribution.createdAt),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '$amountPrefix₹${NumberFormat('#,##,###', 'en_IN').format(contribution.amount)}',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: amountColor,
             ),
           ),
         ],

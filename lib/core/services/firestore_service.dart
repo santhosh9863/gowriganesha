@@ -205,6 +205,21 @@ class FirestoreService {
     }
   }
 
+  Stream<List<Contribution>> streamContributions(String targetId) {
+    return _targets
+        .doc(targetId)
+        .collection('contributions')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .handleError((e) {
+      debugPrint('[FIRESTORE] Error streaming contributions: $e');
+    }).map((snapshot) {
+      return snapshot.docs
+          .map((doc) => Contribution.fromMap(doc.id, doc.data()))
+          .toList();
+    });
+  }
+
   Future<void> recordContribution({
     required String targetId,
     required int amount,
