@@ -583,20 +583,18 @@ class FirestoreService {
     }
   }
 
-  Future<void> clearActivityFeed({String? festivalId}) async {
+  Future<void> clearActivityFeed() async {
     const batchLimit = 500;
     bool hasMore;
     int totalDeleted = 0;
 
-    debugPrint('[CLEAR] Clear Activity Feed pressed${festivalId != null ? ' for festival $festivalId' : ''}');
+    debugPrint('[CLEAR] Clear Activity Feed pressed');
 
     try {
       do {
-        Query<Map<String, dynamic>> query = _activities.limit(batchLimit);
-
-        if (festivalId != null) {
-          query = query.where('festivalId', isEqualTo: festivalId);
-        }
+        final Query<Map<String, dynamic>> query = _activities
+            .orderBy('createdAt', descending: true)
+            .limit(batchLimit);
 
         final snapshot = await query.get();
         final docs = snapshot.docs;

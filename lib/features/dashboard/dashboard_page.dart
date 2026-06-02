@@ -18,8 +18,6 @@ import 'package:ganesha_2026/core/providers/expense_provider.dart';
 import 'package:ganesha_2026/core/providers/followup_provider.dart';
 import 'package:ganesha_2026/core/providers/target_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
-import 'package:ganesha_2026/core/providers/auth_provider.dart';
-import 'package:ganesha_2026/core/utils/permissions.dart';
 import 'package:ganesha_2026/shared/services/festival_countdown_service.dart';
 import 'package:ganesha_2026/shared/utils/amount_format.dart';
 import 'package:ganesha_2026/shared/widgets/app_page_header.dart';
@@ -1089,7 +1087,6 @@ class _ActivityTimeline extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final items = ref.watch(activitiesStreamProvider).valueOrNull ?? [];
-    final role = ref.watch(roleProvider);
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -1104,18 +1101,6 @@ class _ActivityTimeline extends ConsumerWidget {
             children: [
               const Text('Activity Feed', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.warmGray500)),
               const Spacer(),
-              if (items.isNotEmpty && canClearFeed(role))
-                TextButton.icon(
-                  onPressed: () => _handleClearFeed(context, ref),
-                  icon: const Icon(Icons.delete_outline_rounded, size: 14),
-                  label: Text('Clear (${items.length})', style: const TextStyle(fontSize: 11)),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.warmGray400,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                ),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -1131,49 +1116,6 @@ class _ActivityTimeline extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  void _handleClearFeed(BuildContext context, WidgetRef ref) async {
-    debugPrint('[CLEAR] Clear Feed button pressed');
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Clear Activity Feed?'),
-        content: const Text('This will permanently remove all activity records.\nThis action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Clear Feed'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) {
-      debugPrint('[CLEAR] User cancelled');
-      return;
-    }
-    debugPrint('[CLEAR] User confirmed — proceeding');
-    if (!context.mounted) return;
-
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      messenger..clearSnackBars()..showSnackBar(const SnackBar(content: Text('Clearing activity feed...')));
-      final service = ref.read(firestoreProvider);
-      debugPrint('[CLEAR] Calling clearActivityFeed()...');
-      await service.clearActivityFeed(festivalId: AppConstants.festivalId);
-      debugPrint('[CLEAR] clearActivityFeed() completed successfully');
-      ref.invalidate(activitiesStreamProvider);
-      debugPrint('[CLEAR] activitiesStreamProvider invalidated');
-      messenger..clearSnackBars()..showSnackBar(const SnackBar(content: Text('Activity feed cleared')));
-      debugPrint('[CLEAR] Success snackbar shown');
-    } on Exception catch (e) {
-      debugPrint('[CLEAR] Caught exception: $e');
-      messenger..clearSnackBars()..showSnackBar(SnackBar(content: Text('Error: $e')));
-    }
   }
 
   void _navigateToActivity(BuildContext context, Activity a) {

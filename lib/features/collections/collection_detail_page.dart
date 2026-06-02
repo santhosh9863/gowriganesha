@@ -267,7 +267,7 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
               TextField(
                 controller: reasonCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'Reason (required)',
+                  labelText: 'Reason (optional)',
                   hintText: 'e.g. Refund, correction, adjustment',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.notes_rounded),
@@ -290,7 +290,7 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
                       onPressed: () {
                         final v = tryParseAmount(amountCtrl.text.trim());
                         final reason = reasonCtrl.text.trim();
-                        if (v != null && v >= 0 && reason.isNotEmpty) {
+                        if (v != null && v >= 0) {
                           final data = {'newTotal': v, 'reason': reason};
                           Navigator.pop(ctx, data);
                         }
