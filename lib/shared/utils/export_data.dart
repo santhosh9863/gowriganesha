@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
@@ -92,6 +93,14 @@ class CollectionEntry {
 }
 
 Future<void> exportAllData(BuildContext context, FirestoreService service) async {
+  if (kIsWeb) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(const SnackBar(content: Text('Export is not available on web. Please use the mobile app.')));
+    return;
+  }
+
   final messenger = ScaffoldMessenger.of(context);
   final festivalId = AppConstants.festivalId;
   final warnings = <String>[];

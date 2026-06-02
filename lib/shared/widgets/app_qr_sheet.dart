@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -39,6 +40,13 @@ class _PaymentQrSheetState extends State<_PaymentQrSheet> {
   bool _sharing = false;
 
   Future<void> _shareQr() async {
+    if (kIsWeb) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(const SnackBar(content: Text('QR sharing is not available on web. Please use the mobile app.')));
+      return;
+    }
     setState(() => _sharing = true);
     try {
       final boundary = _repaintKey.currentContext?.findRenderObject()

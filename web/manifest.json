@@ -1,11 +1,12 @@
 {
-    "name": "ganesha_2026",
-    "short_name": "ganesha_2026",
+    "name": "Sankalpa",
+    "short_name": "Sankalpa",
+    "description": "A firm resolve. A mission that will be completed, no matter what.",
     "start_url": ".",
+    "scope": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F4F4F0",
+    "theme_color": "#0F6B3C",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

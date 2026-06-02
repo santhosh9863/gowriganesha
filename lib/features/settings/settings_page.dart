@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -704,9 +705,10 @@ class _FestivalInfoCardState extends ConsumerState<_FestivalInfoCard> {
       debugPrint('[DIAG:_uploadQrImage] cancelled or not mounted');
       return;
     }
-    final file = File(picked.path);
+    debugPrint('[DIAG:_uploadQrImage] platform: ${kIsWeb ? "web" : "mobile"}');
+
     if (!context.mounted) {
-      debugPrint('[DIAG:_uploadQrImage] NOT MOUNTED after file');
+      debugPrint('[DIAG:_uploadQrImage] NOT MOUNTED after pick');
       return;
     }
 
@@ -729,7 +731,9 @@ class _FestivalInfoCardState extends ConsumerState<_FestivalInfoCard> {
     try {
       debugPrint('[DIAG:_uploadQrImage] BEFORE firestore upload');
       final service = ref.read(firestoreProvider);
-      final url = await service.uploadQrImage(file);
+      final url = kIsWeb
+          ? await service.uploadQrImageBytes(await picked.readAsBytes())
+          : await service.uploadQrImage(File(picked.path));
       final updated = widget.festival.copyWith(qrImageUrl: url);
       await service.setFestival(updated);
       service.addActivity(Activity(
@@ -981,24 +985,26 @@ class _InfoRow extends StatelessWidget {
       children: [
         Icon(icon, size: 18, color: AppColors.warmGray400),
         const SizedBox(width: AppSpacing.md),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: AppColors.warmGray500,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: AppColors.warmGray500,
+                ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              value,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.charcoal,
-                fontWeight: FontWeight.w600,
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppColors.charcoal,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );

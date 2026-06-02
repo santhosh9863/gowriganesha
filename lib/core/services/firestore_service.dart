@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:ganesha_2026/core/constants.dart';
@@ -93,6 +92,18 @@ class FirestoreService {
       final task = await _qrRef.putFile(image);
       final url = await task.ref.getDownloadURL();
       debugPrint('[STORAGE] QR image uploaded');
+      return url;
+    } on FirebaseException catch (e) {
+      debugPrint('[STORAGE] Error uploading QR: $e');
+      throw FirestoreException('Failed to upload QR image', originalError: e);
+    }
+  }
+
+  Future<String> uploadQrImageBytes(Uint8List bytes) async {
+    try {
+      final task = await _qrRef.putData(bytes);
+      final url = await task.ref.getDownloadURL();
+      debugPrint('[STORAGE] QR image uploaded from bytes');
       return url;
     } on FirebaseException catch (e) {
       debugPrint('[STORAGE] Error uploading QR: $e');
