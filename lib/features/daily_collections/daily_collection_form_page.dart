@@ -223,7 +223,11 @@ class _DailyCollectionFormPageState
         await service.addDailyCollection(dc);
       }
 
-      if (mounted) context.pop();
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) context.pop();
+        });
+      }
     } on Exception catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);

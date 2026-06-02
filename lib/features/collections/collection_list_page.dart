@@ -11,6 +11,7 @@ import 'package:ganesha_2026/shared/utils/amount_format.dart';
 import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/providers/target_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
+import 'package:ganesha_2026/core/providers/financial_metrics_provider.dart';
 import 'package:ganesha_2026/features/collections/collection_tile.dart';
 import 'package:ganesha_2026/shared/widgets/app_empty_state.dart';
 import 'package:ganesha_2026/shared/widgets/app_metric_card.dart';
@@ -37,16 +38,21 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
   @override
   void initState() {
     super.initState();
+    debugPrint('[LIFECYCLE] CollectionListPage.initState');
     _staggerCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) => _staggerCtrl.forward());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      debugPrint('[LIFECYCLE] CollectionListPage.postFrameCallback (stagger forward)');
+      _staggerCtrl.forward();
+    });
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    debugPrint('[LIFECYCLE] CollectionListPage.didChangeDependencies');
     if (!_initialized) {
       _initialized = true;
       final filter = GoRouterState.of(context).uri.queryParameters['filter'];
@@ -56,6 +62,8 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
 
   @override
   void dispose() {
+    debugPrint('[LIFECYCLE] CollectionListPage.dispose');
+    _staggerCtrl.stop();
     _staggerCtrl.dispose();
     _searchController.dispose();
     super.dispose();
@@ -63,6 +71,7 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('[BUILD] CollectionListPage.build');
     final targetsAsync = ref.watch(targetsStreamProvider);
     final theme = Theme.of(context);
 
@@ -112,14 +121,12 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
     final totalSponsors = targets.length;
     final collectedSponsors = targets.where((t) => t.givenAmount >= t.expectedAmount).length;
     final pendingSponsors = targets.where((t) => t.givenAmount < t.expectedAmount).length;
-    final expectedTotal = targets.fold<int>(0, (v, t) => v + t.expectedAmount);
-    final collectedTotal = targets.fold<int>(0, (v, t) => v + t.givenAmount);
-    final remainingTotal = expectedTotal - collectedTotal;
+    final metrics = ref.watch(financialMetricsProvider);
 
     final filtered = _filterTargets(targets);
 
     return ListView(
-      padding: const EdgeInsets.only(bottom: 80),
+      padding: const EdgeInsets.only(bottom: 72),
       children: [
         // Summary metrics 2x2
         Padding(
@@ -169,8 +176,8 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
                   SizedBox(
                     width: w,
                     child: AppMetricCard(
-                      label: 'To Reach',
-                      value: '${AppConstants.currencySymbol}${_fmt(remainingTotal)}',
+                      label: 'Sponsor Remaining',
+                      value: '${AppConstants.currencySymbol}${_fmt(metrics.sponsorRemaining)}',
                       icon: Icons.trending_down_rounded,
                       iconColor: AppColors.error,
                       iconBgColor: AppColors.errorBg,
@@ -243,6 +250,13 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
                 selected: _filter == 'pending',
                 onTap: () => setState(() => _filter = 'pending'),
                 color: AppColors.warning,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              _FilterChip(
+                label: 'Completed',
+                selected: _filter == 'collected',
+                onTap: () => setState(() => _filter = 'collected'),
+                color: AppColors.success,
               ),
             ],
           ),
@@ -394,10 +408,13 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
                 ),
                 FilledButton(
                   onPressed: (isValid && hasReason)
-                      ? () => Navigator.pop(ctx, {
+                      ? () {
+                          final data = {
                             'newTotal': newTotal!,
                             'reason': reasonCtrl.text.trim(),
-                          })
+                          };
+                          Navigator.pop(ctx, data);
+                        }
                       : null,
                   child: const Text('Apply Correction'),
                 ),
@@ -407,9 +424,6 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
         );
       },
     );
-
-    newTotalCtrl.dispose();
-    reasonCtrl.dispose();
 
     if (result == null) return;
 

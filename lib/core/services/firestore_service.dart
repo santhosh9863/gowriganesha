@@ -46,7 +46,23 @@ class FirestoreService {
   CollectionReference<Map<String, dynamic>> get _activities =>
       _firestore.collection('activities');
 
+  CollectionReference<Map<String, dynamic>> get _config =>
+      _firestore.collection('config');
+
   String generateId() => _firestore.collection('_').doc().id;
+
+  Future<String?> getAdminPasswordHash() async {
+    final doc = await _config.doc('security').get();
+    if (!doc.exists || doc.data() == null) return null;
+    return doc.data()!['adminPasswordHash'] as String?;
+  }
+
+  Future<void> setAdminPasswordHash(String hash) async {
+    await _config.doc('security').set({
+      'adminPasswordHash': hash,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
 
   Future<int> getBudget(String settingsId) async {
     try {
@@ -250,8 +266,17 @@ class FirestoreService {
 
   Future<void> deleteTarget(String targetId) async {
     try {
-      await _targets.doc(targetId).delete();
-      debugPrint('[FIRESTORE] Target deleted: $targetId');
+      final batch = _firestore.batch();
+      final contributions = await _targets
+          .doc(targetId)
+          .collection('contributions')
+          .get();
+      for (final doc in contributions.docs) {
+        batch.delete(doc.reference);
+      }
+      batch.delete(_targets.doc(targetId));
+      await batch.commit();
+      debugPrint('[FIRESTORE] Target deleted: $targetId (${contributions.docs.length} contributions cleaned up)');
     } on FirebaseException catch (e) {
       debugPrint('[FIRESTORE] Error deleting target: $e');
       throw FirestoreException('Failed to delete target', originalError: e);
@@ -555,6 +580,47 @@ class FirestoreService {
       debugPrint('[FIRESTORE] Activity added: ${activity.id}');
     } on FirebaseException catch (e) {
       debugPrint('[FIRESTORE] Error adding activity: $e');
+    }
+  }
+
+  Future<void> clearActivityFeed({String? festivalId}) async {
+    const batchLimit = 500;
+    bool hasMore;
+    int totalDeleted = 0;
+
+    debugPrint('[CLEAR] Clear Activity Feed pressed${festivalId != null ? ' for festival $festivalId' : ''}');
+
+    try {
+      do {
+        Query<Map<String, dynamic>> query = _activities.limit(batchLimit);
+
+        if (festivalId != null) {
+          query = query.where('festivalId', isEqualTo: festivalId);
+        }
+
+        final snapshot = await query.get();
+        final docs = snapshot.docs;
+        hasMore = docs.length >= batchLimit;
+
+        if (docs.isNotEmpty) {
+          debugPrint('[CLEAR] Found ${docs.length} activity documents in this batch');
+          final batch = _firestore.batch();
+          for (final doc in docs) {
+            batch.delete(doc.reference);
+          }
+          await batch.commit();
+          totalDeleted += docs.length;
+          debugPrint('[CLEAR] Deleted ${docs.length} documents in this batch (total: $totalDeleted)');
+        }
+      } while (hasMore);
+
+      debugPrint('[CLEAR] Successfully cleared $totalDeleted activity documents');
+    } on FirebaseException catch (e) {
+      debugPrint('[CLEAR] Firestore error: ${e.code} - ${e.message}');
+      rethrow;
+    } catch (e) {
+      debugPrint('[CLEAR] Unexpected error: $e');
+      rethrow;
     }
   }
 

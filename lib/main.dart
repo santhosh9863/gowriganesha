@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ganesha_2026/app.dart';
 import 'package:ganesha_2026/firebase_options.dart';
+import 'package:ganesha_2026/core/providers/auth_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  FlutterError.onError = (details) {
+    FlutterError.dumpErrorToConsole(details);
+  };
 
   debugPrint('[FIREBASE] Initialization started');
 
@@ -14,15 +19,16 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  await FirebaseAuth.instance.signInAnonymously();
+  debugPrint('[FIREBASE] Initialized');
 
-  debugPrint('[FIREBASE] Anonymous auth established');
+  final prefs = await SharedPreferences.getInstance();
 
   runApp(
-    const ProviderScope(
-      child: GaneshaApp(),
+    ProviderScope(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+      ],
+      child: const GaneshaApp(),
     ),
   );
-
-  debugPrint('[FIREBASE] App started');
 }

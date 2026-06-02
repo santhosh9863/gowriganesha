@@ -38,6 +38,7 @@ class _AppSkeletonState extends State<AppSkeleton>
 
   @override
   void dispose() {
+    _ctrl.stop();
     _ctrl.removeListener(_onTick);
     _ctrl.dispose();
     super.dispose();

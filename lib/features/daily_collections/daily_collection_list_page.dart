@@ -35,13 +35,21 @@ class _DailyCollectionListPageState
   static const _amountChips = [1000, 2000, 5000, 10000];
 
   @override
+  void initState() {
+    super.initState();
+    debugPrint('[LIFECYCLE] DailyCollectionListPage.initState');
+  }
+
+  @override
   void dispose() {
+    debugPrint('[LIFECYCLE] DailyCollectionListPage.dispose');
     _amountController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('[BUILD] DailyCollectionListPage.build');
     final dailyCollectionAsync = ref.watch(dailyCollectionsStreamProvider);
     final theme = Theme.of(context);
 
@@ -115,7 +123,7 @@ class _DailyCollectionListPageState
     final hasAny = collections.isNotEmpty;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(0, 0, 0, AppSpacing.xxxl),
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 72),
       children: [
         // Summary metrics 2x2
         Padding(

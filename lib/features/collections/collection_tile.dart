@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
@@ -7,6 +8,8 @@ import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/design/app_shadows.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/target.dart';
+import 'package:ganesha_2026/core/providers/auth_provider.dart';
+import 'package:ganesha_2026/core/utils/permissions.dart';
 import 'package:ganesha_2026/shared/utils/amount_format.dart';
 import 'package:ganesha_2026/shared/widgets/app_status_chip.dart';
 
@@ -48,7 +51,7 @@ String _relTime(DateTime dt) {
   return DateFormat('d MMM').format(dt);
 }
 
-class SponsorCard extends StatelessWidget {
+class SponsorCard extends ConsumerWidget {
   final Target target;
   final VoidCallback onDelete;
   final VoidCallback onQuickUpdate;
@@ -61,8 +64,10 @@ class SponsorCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final role = ref.watch(roleProvider);
+    final showAdminMenu = canEditRecords(role) || canDelete(role);
     final status = _status(target);
     final ratio = target.expectedAmount > 0
         ? (target.givenAmount / target.expectedAmount).clamp(0.0, 1.0)
@@ -153,37 +158,40 @@ class SponsorCard extends StatelessWidget {
                     ),
                     const SizedBox(width: AppSpacing.xs),
                     // Menu
-                    PopupMenuButton<String>(
-                      onSelected: (value) {
-                        if (value == 'edit') {
-                          context.push('/collections/${target.id}/edit');
-                        } else if (value == 'delete') {
-                          onDelete();
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: 'edit',
-                          child: Row(
-                            children: [
-                              Icon(Icons.edit_rounded, size: 20),
-                              SizedBox(width: 8),
-                              Text('Edit'),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete_rounded, size: 20),
-                              SizedBox(width: 8),
-                              Text('Delete'),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                    if (showAdminMenu)
+                      PopupMenuButton<String>(
+                        onSelected: (value) {
+                          if (value == 'edit') {
+                            context.push('/collections/${target.id}/edit');
+                          } else if (value == 'delete') {
+                            onDelete();
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          if (canEditRecords(role))
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.edit_rounded, size: 20),
+                                  SizedBox(width: 8),
+                                  Text('Edit'),
+                                ],
+                              ),
+                            ),
+                          if (canDelete(role))
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete_rounded, size: 20),
+                                  SizedBox(width: 8),
+                                  Text('Delete'),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.sm),

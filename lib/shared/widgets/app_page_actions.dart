@@ -27,6 +27,8 @@ class AppPageActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canSeeSettings = showSettings && onSettings != null;
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -54,7 +56,7 @@ class AppPageActions extends StatelessWidget {
           ),
           const SizedBox(width: AppSpacing.sm),
         ],
-        if (showSettings && onSettings != null)
+        if (canSeeSettings)
           _ActionButton(
             icon: Icons.settings_rounded,
             onTap: onSettings,

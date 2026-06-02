@@ -280,7 +280,11 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
         ));
       }
 
-      if (mounted) context.pop();
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) context.pop();
+        });
+      }
     } on Exception catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);

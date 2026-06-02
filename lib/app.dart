@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ganesha_2026/core/theme.dart';
+import 'package:ganesha_2026/core/models/user_role.dart';
+import 'package:ganesha_2026/core/providers/auth_provider.dart';
 import 'package:ganesha_2026/shared/widgets/app_scaffold.dart';
 import 'package:ganesha_2026/shared/widgets/page_transitions.dart';
+import 'package:ganesha_2026/features/auth/entry_page.dart';
 import 'package:ganesha_2026/features/dashboard/dashboard_page.dart';
 import 'package:ganesha_2026/features/collections/collection_list_page.dart';
 import 'package:ganesha_2026/features/collections/collection_detail_page.dart';
@@ -15,6 +19,155 @@ import 'package:ganesha_2026/features/followups/followup_list_page.dart';
 import 'package:ganesha_2026/features/followups/followup_form_page.dart';
 import 'package:ganesha_2026/features/settings/settings_page.dart';
 
+class _RouterRefreshNotifier extends ChangeNotifier {
+  void signal() => notifyListeners();
+}
+
+final _routerRefreshProvider = Provider<ChangeNotifier>((ref) {
+  final notifier = _RouterRefreshNotifier();
+  ref.listen(roleProvider, (_, _) => notifier.signal());
+  return notifier;
+});
+
+final routerProvider = Provider<GoRouter>((ref) {
+  final refreshNotifier = ref.watch(_routerRefreshProvider);
+
+  return GoRouter(
+    initialLocation: '/entry',
+    refreshListenable: refreshNotifier,
+    redirect: (context, state) {
+      final role = ref.read(roleProvider);
+      final location = state.uri.toString();
+
+      if (role == UserRole.none) {
+        if (location != '/entry') return '/entry';
+        return null;
+      }
+
+      if (role == UserRole.volunteer) {
+        if (RegExp(r'^/expenses/[^/]+/edit$').hasMatch(location)) {
+          return '/';
+        }
+      }
+
+      if (location == '/entry') return '/';
+
+      return null;
+    },
+    routes: [
+      GoRoute(
+        path: '/entry',
+        pageBuilder: (context, state) => PageTransition.fadeSlide(const EntryPage()),
+      ),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            AppScaffold(navigationShell: navigationShell),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              _buildRoute('/', const DashboardPage()),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/collections',
+                pageBuilder: (context, state) =>
+                    PageTransition.fadeSlide(const CollectionListPage()),
+                routes: [
+                  _buildRoute('add', const CollectionFormPage()),
+                  GoRoute(
+                    path: ':targetId',
+                    pageBuilder: (context, state) {
+                      final targetId = state.pathParameters['targetId']!;
+                      return PageTransition.fadeSlide(
+                        CollectionDetailPage(targetId: targetId),
+                      );
+                    },
+                  ),
+                  GoRoute(
+                    path: ':targetId/edit',
+                    pageBuilder: (context, state) {
+                      final targetId = state.pathParameters['targetId']!;
+                      return PageTransition.fadeSlide(
+                        CollectionFormPage(targetId: targetId),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/daily-collections',
+                pageBuilder: (context, state) =>
+                    PageTransition.fadeSlide(const DailyCollectionListPage()),
+                routes: [
+                  _buildRoute('add', const DailyCollectionFormPage()),
+                  GoRoute(
+                    path: ':dailyCollectionId/edit',
+                    pageBuilder: (context, state) {
+                      final id = state.pathParameters['dailyCollectionId']!;
+                      return PageTransition.fadeSlide(
+                        DailyCollectionFormPage(dailyCollectionId: id),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/expenses',
+                pageBuilder: (context, state) =>
+                    PageTransition.fadeSlide(const ExpenseListPage()),
+                routes: [
+                  _buildRoute('add', const ExpenseFormPage()),
+                  GoRoute(
+                    path: ':expenseId/edit',
+                    pageBuilder: (context, state) {
+                      final expenseId = state.pathParameters['expenseId']!;
+                      return PageTransition.fadeSlide(
+                        ExpenseFormPage(expenseId: expenseId),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/followups',
+                pageBuilder: (context, state) =>
+                    PageTransition.fadeSlide(const FollowUpListPage()),
+                routes: [
+                  _buildRoute('add', const FollowUpFormPage()),
+                  GoRoute(
+                    path: ':followUpId/edit',
+                    pageBuilder: (context, state) {
+                      final id = state.pathParameters['followUpId']!;
+                      return PageTransition.fadeSlide(
+                        FollowUpFormPage(followUpId: id),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+      _buildRoute('/settings', const SettingsPage()),
+    ],
+  );
+});
+
 GoRoute _buildRoute(String path, Widget page) {
   return GoRoute(
     path: path,
@@ -22,126 +175,17 @@ GoRoute _buildRoute(String path, Widget page) {
   );
 }
 
-final _router = GoRouter(
-  initialLocation: '/',
-  routes: [
-    StatefulShellRoute.indexedStack(
-      builder: (context, state, navigationShell) =>
-          AppScaffold(navigationShell: navigationShell),
-      branches: [
-        StatefulShellBranch(
-          routes: [
-            _buildRoute('/', const DashboardPage()),
-          ],
-        ),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/collections',
-              pageBuilder: (context, state) =>
-                  PageTransition.fadeSlide(const CollectionListPage()),
-              routes: [
-                _buildRoute('add', const CollectionFormPage()),
-                GoRoute(
-                  path: ':targetId',
-                  pageBuilder: (context, state) {
-                    final targetId = state.pathParameters['targetId']!;
-                    return PageTransition.fadeSlide(
-                      CollectionDetailPage(targetId: targetId),
-                    );
-                  },
-                ),
-                GoRoute(
-                  path: ':targetId/edit',
-                  pageBuilder: (context, state) {
-                    final targetId = state.pathParameters['targetId']!;
-                    return PageTransition.fadeSlide(
-                      CollectionFormPage(targetId: targetId),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/daily-collections',
-              pageBuilder: (context, state) =>
-                  PageTransition.fadeSlide(const DailyCollectionListPage()),
-              routes: [
-                _buildRoute('add', const DailyCollectionFormPage()),
-                GoRoute(
-                  path: ':dailyCollectionId/edit',
-                  pageBuilder: (context, state) {
-                    final id = state.pathParameters['dailyCollectionId']!;
-                    return PageTransition.fadeSlide(
-                      DailyCollectionFormPage(dailyCollectionId: id),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/expenses',
-              pageBuilder: (context, state) =>
-                  PageTransition.fadeSlide(const ExpenseListPage()),
-              routes: [
-                _buildRoute('add', const ExpenseFormPage()),
-                GoRoute(
-                  path: ':expenseId/edit',
-                  pageBuilder: (context, state) {
-                    final expenseId = state.pathParameters['expenseId']!;
-                    return PageTransition.fadeSlide(
-                      ExpenseFormPage(expenseId: expenseId),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/followups',
-              pageBuilder: (context, state) =>
-                  PageTransition.fadeSlide(const FollowUpListPage()),
-              routes: [
-                _buildRoute('add', const FollowUpFormPage()),
-                GoRoute(
-                  path: ':followUpId/edit',
-                  pageBuilder: (context, state) {
-                    final id = state.pathParameters['followUpId']!;
-                    return PageTransition.fadeSlide(
-                      FollowUpFormPage(followUpId: id),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ],
-        ),
-      ],
-    ),
-    _buildRoute('/settings', const SettingsPage()),
-  ],
-);
-
-class GaneshaApp extends StatelessWidget {
+class GaneshaApp extends ConsumerWidget {
   const GaneshaApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(routerProvider);
+
     return MaterialApp.router(
       title: 'Sri Gowri Ganesha Geleyara Balaga',
       theme: AppTheme.light,
-      routerConfig: _router,
+      routerConfig: router,
       debugShowCheckedModeBanner: false,
     );
   }

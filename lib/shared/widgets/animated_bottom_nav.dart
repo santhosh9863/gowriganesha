@@ -87,6 +87,7 @@ class _NavBarItemState extends State<_NavBarItem>
   @override
   void initState() {
     super.initState();
+    debugPrint('[LIFECYCLE] _NavBarItem.initState label=${widget.item.label} isSelected=${widget.isSelected}');
     _controller = AnimationController(
       duration: const Duration(milliseconds: 200),
       vsync: this,
@@ -109,6 +110,7 @@ class _NavBarItemState extends State<_NavBarItem>
   @override
   void didUpdateWidget(_NavBarItem oldWidget) {
     super.didUpdateWidget(oldWidget);
+    debugPrint('[LIFECYCLE] _NavBarItem.didUpdateWidget label=${widget.item.label} was=${oldWidget.isSelected} now=${widget.isSelected}');
     if (widget.isSelected != oldWidget.isSelected) {
       if (widget.isSelected) {
         _controller.forward();
@@ -120,6 +122,8 @@ class _NavBarItemState extends State<_NavBarItem>
 
   @override
   void dispose() {
+    debugPrint('[LIFECYCLE] _NavBarItem.dispose label=${widget.item.label}');
+    _controller.stop();
     _controller.removeListener(_onTick);
     _controller.dispose();
     super.dispose();

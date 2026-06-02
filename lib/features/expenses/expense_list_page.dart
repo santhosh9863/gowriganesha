@@ -6,9 +6,9 @@ import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/core/design/app_colors.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/expense.dart';
-import 'package:ganesha_2026/core/providers/budget_provider.dart';
 import 'package:ganesha_2026/core/providers/expense_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
+import 'package:ganesha_2026/core/providers/financial_metrics_provider.dart';
 import 'package:ganesha_2026/features/expenses/expense_tile.dart';
 import 'package:ganesha_2026/shared/widgets/app_empty_state.dart';
 import 'package:ganesha_2026/shared/widgets/app_metric_card.dart';
@@ -23,8 +23,9 @@ class ExpenseListPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    debugPrint('[BUILD] ExpenseListPage.build');
     final expensesAsync = ref.watch(expensesStreamProvider);
-    final budgetAsync = ref.watch(budgetProvider);
+    final metrics = ref.watch(financialMetricsProvider);
 
     return AppPageScaffold(
       festivalName: 'Expenses',
@@ -32,7 +33,7 @@ class ExpenseListPage extends ConsumerWidget {
       onAdd: () => context.push('/expenses/add'),
       bottomNavHeight: 56,
       child: expensesAsync.when(
-        data: (expenses) => _buildContent(context, ref, expenses, budgetAsync),
+        data: (expenses) => _buildContent(context, ref, expenses, metrics),
         loading: () => const AppSkeletonList(),
         error: (e, _) => Center(child: Text('Error: $e')),
       ),
@@ -43,11 +44,11 @@ class ExpenseListPage extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     List<Expense> expenses,
-    AsyncValue<int> budgetAsync,
+    FinancialMetrics metrics,
   ) {
     if (expenses.isEmpty) {
       return ListView(
-        padding: const EdgeInsets.only(top: AppSpacing.lg),
+        padding: const EdgeInsets.fromLTRB(0, AppSpacing.lg, 0, 72),
         children: [
           AppEmptyState(
             icon: Icons.receipt_long_rounded,
@@ -63,10 +64,9 @@ class ExpenseListPage extends ConsumerWidget {
       );
     }
 
-    final totalExpenses = expenses.fold<int>(0, (s, e) => s + e.amount);
+    final totalExpenses = metrics.totalExpenses;
     final largestExpense = expenses.fold<int>(0, (s, e) => s > e.amount ? s : e.amount);
-    final budget = budgetAsync.valueOrNull ?? 0;
-    final remaining = budget - totalExpenses;
+    final remaining = metrics.remainingBudget;
     final isOverBudget = remaining < 0;
 
     // Group by month
@@ -86,7 +86,7 @@ class ExpenseListPage extends ConsumerWidget {
     });
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(0, 0, 0, AppSpacing.xxxl),
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 72),
       children: [
         // Summary 2x2
         Padding(
@@ -116,7 +116,7 @@ class ExpenseListPage extends ConsumerWidget {
                   SizedBox(
                     width: w,
                     child: AppMetricCard(
-                      label: isOverBudget ? 'Over Budget' : 'Remaining Balance',
+                      label: isOverBudget ? 'Over Budget' : 'Remaining Budget',
                       value: isOverBudget
                           ? '-${AppConstants.currencySymbol}${fmtAmount(remaining.abs())}'
                           : '${AppConstants.currencySymbol}${fmtAmount(remaining)}',

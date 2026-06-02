@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:ganesha_2026/core/providers/auth_provider.dart';
+import 'package:ganesha_2026/core/utils/permissions.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
@@ -33,7 +35,20 @@ class CollectionDetailPage extends ConsumerStatefulWidget {
 }
 
 class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
+  @override
+  void initState() {
+    super.initState();
+    debugPrint('[LIFECYCLE] CollectionDetailPage.initState targetId=${widget.targetId}');
+  }
+
+  @override
+  void dispose() {
+    debugPrint('[LIFECYCLE] CollectionDetailPage.dispose targetId=${widget.targetId}');
+    super.dispose();
+  }
+
   Future<void> _handleReceiveAmount(Target target) async {
+    debugPrint('[ACTION] CollectionDetailPage._handleReceiveAmount target=${target.name}');
     final amountCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
     final result = await showModalBottomSheet<Map<String, dynamic>>(
@@ -114,10 +129,11 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
                       onPressed: () {
                         final v = tryParseAmount(amountCtrl.text.trim());
                         if (v != null && v > 0) {
-                          Navigator.pop(ctx, {
+                          final data = {
                             'amount': v,
                             'note': noteCtrl.text.trim(),
-                          });
+                          };
+                          Navigator.pop(ctx, data);
                         }
                       },
                       child: const Text('Save'),
@@ -131,9 +147,6 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
       },
     );
 
-    amountCtrl.dispose();
-    noteCtrl.dispose();
-
     if (result == null) return;
 
     final amount = result['amount'] as int;
@@ -146,6 +159,7 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
         amount: amount,
         note: noteTxt,
       );
+      debugPrint('[ACTION] CollectionDetailPage: Firestore write complete, triggering cascade');
       service.addActivity(Activity(
         id: service.generateId(),
         festivalId: AppConstants.festivalId,
@@ -157,9 +171,173 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
         recordId: target.id,
         entityType: 'target',
       ));
+      debugPrint('[ACTION] CollectionDetailPage: Activity written, mounted=$mounted');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${AppConstants.currencySymbol}${fmtAmount(amount)} recorded')),
+        );
+      }
+    } on Exception catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleAdjustCollection(Target target) async {
+    debugPrint('[ACTION] CollectionDetailPage._handleAdjustCollection target=${target.name} givenAmount=${target.givenAmount}');
+    final amountCtrl = TextEditingController();
+    final reasonCtrl = TextEditingController();
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppRadius.bottomSheet),
+        ),
+      ),
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return Padding(
+          padding: EdgeInsets.only(
+            left: AppSpacing.xxl,
+            right: AppSpacing.xxl,
+            top: AppSpacing.xxl,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + AppSpacing.xxl,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Adjust Collection',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                target.name,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Current: ${AppConstants.currencySymbol}${_fmt(target.givenAmount)}',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              TextField(
+                controller: amountCtrl,
+                keyboardType: TextInputType.number,
+                inputFormatters: const [IndianAmountInputFormatter()],
+                decoration: const InputDecoration(
+                  labelText: 'New Total',
+                  prefixText: '₹ ',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Enter new total amount. Use a lower value to record a refund.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextField(
+                controller: reasonCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Reason (required)',
+                  hintText: 'e.g. Refund, correction, adjustment',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.notes_rounded),
+                ),
+                textCapitalization: TextCapitalization.sentences,
+              ),
+              const SizedBox(height: AppSpacing.xxl),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton(
+                      onPressed: () {
+                        final v = tryParseAmount(amountCtrl.text.trim());
+                        final reason = reasonCtrl.text.trim();
+                        if (v != null && v >= 0 && reason.isNotEmpty) {
+                          final data = {'newTotal': v, 'reason': reason};
+                          Navigator.pop(ctx, data);
+                        }
+                      },
+                      child: const Text('Apply'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (result == null) return;
+
+    final newTotal = result['newTotal'] as int;
+    final reason = result['reason'] as String;
+
+    try {
+      final service = ref.read(firestoreProvider);
+      await service.recordCorrection(
+        targetId: target.id,
+        currentTotal: target.givenAmount,
+        newTotal: newTotal,
+        note: reason,
+      );
+      final delta = newTotal - target.givenAmount;
+      service.addActivity(Activity(
+        id: service.generateId(),
+        festivalId: AppConstants.festivalId,
+        type: 'collection_corrected',
+        title: 'Collection Adjusted',
+        description:
+            '${target.name} — ${delta >= 0 ? '+' : ''}${AppConstants.currencySymbol}${fmtAmount(delta)}: $reason',
+        createdAt: Timestamp.now(),
+        recordId: target.id,
+        entityType: 'target',
+      ));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${AppConstants.currencySymbol}${fmtAmount(target.givenAmount)} → ${AppConstants.currencySymbol}${fmtAmount(newTotal)} ($reason)',
+            ),
+          ),
         );
       }
     } on Exception catch (e) {
@@ -181,7 +359,11 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
     try {
       final service = ref.read(firestoreProvider);
       await service.deleteTarget(target.id);
-      if (mounted) context.pop();
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) context.pop();
+        });
+      }
     } on Exception catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -197,6 +379,7 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('[BUILD] CollectionDetailPage.build targetId=${widget.targetId}');
     final target = ref.watch(targetByIdProvider(widget.targetId));
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -260,17 +443,19 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
                     '/followups/add?sponsorId=${target.id}&sponsorName=${Uri.encodeComponent(target.name)}',
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.edit_rounded),
-                  tooltip: 'Edit Sponsor',
-                  onPressed: () =>
-                      context.push('/collections/${target.id}/edit'),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete_rounded),
-                  tooltip: 'Delete Sponsor',
-                  onPressed: () => _deleteTarget(target),
-                ),
+                if (canEditRecords(ref.watch(roleProvider)))
+                  IconButton(
+                    icon: const Icon(Icons.edit_rounded),
+                    tooltip: 'Edit Sponsor',
+                    onPressed: () =>
+                        context.push('/collections/${target.id}/edit'),
+                  ),
+                if (canDelete(ref.watch(roleProvider)))
+                  IconButton(
+                    icon: const Icon(Icons.delete_rounded),
+                    tooltip: 'Delete Sponsor',
+                    onPressed: () => _deleteTarget(target),
+                  ),
               ],
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -331,13 +516,24 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
               ),
             ),
             const SizedBox(height: AppSpacing.xl),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: () => _handleReceiveAmount(target),
-                icon: const Icon(Icons.payments_rounded, size: 18),
-                label: const Text('Record Contribution'),
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () => _handleReceiveAmount(target),
+                    icon: const Icon(Icons.payments_rounded, size: 18),
+                    label: const Text('Record Contribution'),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _handleAdjustCollection(target),
+                    icon: const Icon(Icons.tune_rounded, size: 18),
+                    label: const Text('Adjust Collection'),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: AppSpacing.xxl),
             _ContributionList(targetId: target.id),

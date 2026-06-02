@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ganesha_2026/core/design/app_colors.dart';
 import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/expense.dart';
+import 'package:ganesha_2026/core/providers/auth_provider.dart';
+import 'package:ganesha_2026/core/utils/permissions.dart';
 import 'package:ganesha_2026/shared/widgets/amount_text.dart';
 
-class ExpenseTile extends StatelessWidget {
+class ExpenseTile extends ConsumerWidget {
   final Expense expense;
   final VoidCallback onDelete;
 
@@ -28,8 +31,9 @@ class ExpenseTile extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final role = ref.watch(roleProvider);
     final date = expense.date.toDate();
     final dateStr = DateFormat('dd MMM yyyy').format(date);
 
@@ -117,37 +121,38 @@ class ExpenseTile extends StatelessWidget {
                   color: AppColors.charcoal,
                 ),
               ),
-              PopupMenuButton<String>(
-                onSelected: (value) {
-                  if (value == 'edit') {
-                    context.push('/expenses/${expense.id}/edit');
-                  } else if (value == 'delete') {
-                    onDelete();
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit_rounded, size: 20),
-                        SizedBox(width: 8),
-                        Text('Edit'),
-                      ],
+              if (canManageExpenses(role))
+                PopupMenuButton<String>(
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      context.push('/expenses/${expense.id}/edit');
+                    } else if (value == 'delete') {
+                      onDelete();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit_rounded, size: 20),
+                          SizedBox(width: 8),
+                          Text('Edit'),
+                        ],
+                      ),
                     ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete_rounded, size: 20),
-                        SizedBox(width: 8),
-                        Text('Delete'),
-                      ],
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_rounded, size: 20),
+                          SizedBox(width: 8),
+                          Text('Delete'),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
             ],
           ),
         ),

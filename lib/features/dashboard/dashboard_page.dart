@@ -18,6 +18,8 @@ import 'package:ganesha_2026/core/providers/expense_provider.dart';
 import 'package:ganesha_2026/core/providers/followup_provider.dart';
 import 'package:ganesha_2026/core/providers/target_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
+import 'package:ganesha_2026/core/providers/auth_provider.dart';
+import 'package:ganesha_2026/core/utils/permissions.dart';
 import 'package:ganesha_2026/shared/services/festival_countdown_service.dart';
 import 'package:ganesha_2026/shared/utils/amount_format.dart';
 import 'package:ganesha_2026/shared/widgets/app_page_header.dart';
@@ -53,6 +55,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
   @override
   void initState() {
     super.initState();
+    debugPrint('[LIFECYCLE] DashboardPage.initState');
     _fadeCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
@@ -60,13 +63,22 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    debugPrint('[LIFECYCLE] DashboardPage.didChangeDependencies');
+  }
+
+  @override
   void dispose() {
+    debugPrint('[LIFECYCLE] DashboardPage.dispose');
+    _fadeCtrl.stop();
     _fadeCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('[BUILD] DashboardPage.build');
     final targetsAsync = ref.watch(targetsStreamProvider);
     final expensesAsync = ref.watch(expensesStreamProvider);
     final collectionsAsync = ref.watch(dailyCollectionsStreamProvider);
@@ -425,6 +437,7 @@ class _FestivalMission extends ConsumerWidget {
               _Metric(label: 'Balance', value: AppConstants.currencySymbol + _shortFmt(db.balance)),
             ],
           ),
+          const SizedBox(height: AppSpacing.sm),
         ],
       ),
     );
@@ -579,9 +592,9 @@ class _KpiGrid extends ConsumerWidget {
               color: AppColors.success, fmtCurrency: true,
             )),
             SizedBox(width: w, child: _KpiCard(
-              icon: Icons.people_rounded, label: 'Active Sponsors',
+              icon: Icons.people_rounded, label: 'Pending Sponsors',
               value: db.pendingSponsorCount,
-              trend: '${AppConstants.currencySymbol}${_shortFmt(db.pendingRemainingTotal)} still to reach',
+              trend: '${AppConstants.currencySymbol}${_shortFmt(db.pendingRemainingTotal)} Sponsor Commitments Pending',
               color: AppColors.warning, fmtCurrency: false,
             )),
             SizedBox(width: w, child: _KpiCard(
@@ -657,6 +670,14 @@ class _KpiCard extends StatelessWidget {
               color: AppColors.warmGray500,
             ),
           ),
+          const SizedBox(height: 4),
+          Text(
+            trend,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: AppColors.warmGray400,
+              height: 1.2,
+            ),
+          ),
         ],
       ),
     );
@@ -711,32 +732,32 @@ class _QrStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Material(
-      color: AppColors.card,
-      borderRadius: AppRadius.largeBorder,
-      child: InkWell(
-        onTap: () => showPaymentQrSheet(context, festival),
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        color: AppColors.card,
         borderRadius: AppRadius.largeBorder,
-        child: Container(
-          height: 52,
-          decoration: BoxDecoration(
-            borderRadius: AppRadius.largeBorder,
-            border: Border.all(color: AppColors.outline),
-          ),
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: AppRadius.largeBorder,
+        child: InkWell(
+          onTap: () => showPaymentQrSheet(context, festival),
+          borderRadius: AppRadius.largeBorder,
           child: Row(
             children: [
               Container(
-                width: 52,
+                width: 48,
+                height: 48,
+                margin: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   color: AppColors.primaryBg,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(AppRadius.large),
-                    bottomLeft: Radius.circular(AppRadius.large),
-                  ),
+                  borderRadius: AppRadius.mediumBorder,
                 ),
                 child: const Icon(Icons.qr_code_rounded, size: 22, color: AppColors.primary),
               ),
-              const SizedBox(width: AppSpacing.md),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
                   'Show Payment QR',
@@ -956,6 +977,7 @@ class _ChartSkeletonState extends State<_ChartSkeleton>
 
   @override
   void dispose() {
+    _ctrl.stop();
     _ctrl.removeListener(_onTick);
     _ctrl.dispose();
     super.dispose();
@@ -1067,6 +1089,7 @@ class _ActivityTimeline extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final items = ref.watch(activitiesStreamProvider).valueOrNull ?? [];
+    final role = ref.watch(roleProvider);
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -1077,11 +1100,22 @@ class _ActivityTimeline extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Text('Activity Feed', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.warmGray500)),
-              Spacer(),
-              Text('Timeline', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w400, color: AppColors.warmGray400)),
+              const Text('Activity Feed', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.warmGray500)),
+              const Spacer(),
+              if (items.isNotEmpty && canClearFeed(role))
+                TextButton.icon(
+                  onPressed: () => _handleClearFeed(context, ref),
+                  icon: const Icon(Icons.delete_outline_rounded, size: 14),
+                  label: Text('Clear (${items.length})', style: const TextStyle(fontSize: 11)),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.warmGray400,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -1097,6 +1131,49 @@ class _ActivityTimeline extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  void _handleClearFeed(BuildContext context, WidgetRef ref) async {
+    debugPrint('[CLEAR] Clear Feed button pressed');
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear Activity Feed?'),
+        content: const Text('This will permanently remove all activity records.\nThis action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Clear Feed'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) {
+      debugPrint('[CLEAR] User cancelled');
+      return;
+    }
+    debugPrint('[CLEAR] User confirmed — proceeding');
+    if (!context.mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      messenger..clearSnackBars()..showSnackBar(const SnackBar(content: Text('Clearing activity feed...')));
+      final service = ref.read(firestoreProvider);
+      debugPrint('[CLEAR] Calling clearActivityFeed()...');
+      await service.clearActivityFeed(festivalId: AppConstants.festivalId);
+      debugPrint('[CLEAR] clearActivityFeed() completed successfully');
+      ref.invalidate(activitiesStreamProvider);
+      debugPrint('[CLEAR] activitiesStreamProvider invalidated');
+      messenger..clearSnackBars()..showSnackBar(const SnackBar(content: Text('Activity feed cleared')));
+      debugPrint('[CLEAR] Success snackbar shown');
+    } on Exception catch (e) {
+      debugPrint('[CLEAR] Caught exception: $e');
+      messenger..clearSnackBars()..showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
   }
 
   void _navigateToActivity(BuildContext context, Activity a) {

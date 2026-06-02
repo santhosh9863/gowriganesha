@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:ganesha_2026/core/providers/auth_provider.dart';
+import 'package:ganesha_2026/core/utils/permissions.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
@@ -31,7 +33,20 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
   int _tabIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+    debugPrint('[LIFECYCLE] FollowUpListPage.initState');
+  }
+
+  @override
+  void dispose() {
+    debugPrint('[LIFECYCLE] FollowUpListPage.dispose');
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    debugPrint('[BUILD] FollowUpListPage.build');
     final allAsync = ref.watch(allFollowUpsStreamProvider);
     final theme = Theme.of(context);
 
@@ -60,6 +75,8 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
     List<SponsorFollowup> allItems,
     ThemeData theme,
   ) {
+    final role = ref.watch(roleProvider);
+    final showAdminActions = canEditRecords(role) || canDelete(role);
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
@@ -91,7 +108,7 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
     final hasAny = allItems.isNotEmpty;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(0, 0, 0, AppSpacing.xxxl),
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 72),
       children: [
         // Summary metrics 2x2
         Padding(
@@ -202,6 +219,7 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
                   onDelete: () => _handleDelete(context, ref, f),
                   onCollected: () => _handleCollected(context, ref, f),
                   theme: theme,
+                  showAdminActions: showAdminActions,
                 )),
           ],
           if (dueToday.isNotEmpty) ...[
@@ -223,6 +241,7 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
                   onDelete: () => _handleDelete(context, ref, f),
                   onCollected: () => _handleCollected(context, ref, f),
                   theme: theme,
+                  showAdminActions: showAdminActions,
                 )),
           ],
           if (upcoming.isNotEmpty) ...[
@@ -244,6 +263,7 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
                   onDelete: () => _handleDelete(context, ref, f),
                   onCollected: () => _handleCollected(context, ref, f),
                   theme: theme,
+                  showAdminActions: showAdminActions,
                 )),
           ],
         ],
@@ -254,6 +274,7 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
                 onEdit: () => context.push('/followups/${f.id}/edit'),
                 onDelete: () => _handleDelete(context, ref, f),
                 theme: theme,
+                showAdminActions: showAdminActions,
               )),
         ],
         // Empty state
@@ -404,6 +425,7 @@ class _FollowUpCard extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback? onCollected;
   final ThemeData theme;
+  final bool showAdminActions;
 
   const _FollowUpCard({
     required this.item,
@@ -411,6 +433,7 @@ class _FollowUpCard extends StatelessWidget {
     required this.onDelete,
     this.onCollected,
     required this.theme,
+    this.showAdminActions = false,
   });
 
   String _relDate(DateTime d) {
@@ -600,21 +623,23 @@ class _FollowUpCard extends StatelessWidget {
                             ),
                           if (item.status == 'active' && onCollected != null)
                             const SizedBox(width: AppSpacing.sm),
-                          _ActionButton(
-                            label: 'Edit',
-                            icon: Icons.edit_rounded,
-                            color: AppColors.warmGray500,
-                            onTap: onEdit,
-                            theme: theme,
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          _ActionButton(
-                            label: 'Delete',
-                            icon: Icons.delete_rounded,
-                            color: AppColors.warmGray400,
-                            onTap: onDelete,
-                            theme: theme,
-                          ),
+                          if (showAdminActions) ...[
+                            _ActionButton(
+                              label: 'Edit',
+                              icon: Icons.edit_rounded,
+                              color: AppColors.warmGray500,
+                              onTap: onEdit,
+                              theme: theme,
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            _ActionButton(
+                              label: 'Delete',
+                              icon: Icons.delete_rounded,
+                              color: AppColors.warmGray400,
+                              onTap: onDelete,
+                              theme: theme,
+                            ),
+                          ],
                         ],
                       ),
                     ],

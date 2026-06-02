@@ -139,6 +139,7 @@ class _PressScaleState extends State<_PressScale>
 
   @override
   void dispose() {
+    _ctrl.stop();
     _ctrl.dispose();
     super.dispose();
   }

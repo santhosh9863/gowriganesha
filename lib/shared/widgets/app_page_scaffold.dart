@@ -5,7 +5,7 @@ import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/shared/widgets/app_page_header.dart';
 
-class AppPageScaffold extends ConsumerWidget {
+class AppPageScaffold extends ConsumerStatefulWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
   final bool showHeader;
@@ -52,12 +52,36 @@ class AppPageScaffold extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AppPageScaffold> createState() => _AppPageScaffoldState();
+}
+
+class _AppPageScaffoldState extends ConsumerState<AppPageScaffold> {
+  @override
+  void initState() {
+    super.initState();
+    debugPrint('[DIAG:AppPageScaffold] initState key=${widget.key}');
+  }
+
+  @override
+  void deactivate() {
+    super.deactivate();
+    debugPrint('[DIAG:AppPageScaffold] deactivate key=${widget.key}');
+  }
+
+  @override
+  void dispose() {
+    debugPrint('[DIAG:AppPageScaffold] dispose key=${widget.key}');
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    debugPrint('[DIAG:AppPageScaffold] build key=${widget.key}');
     final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
-    final showFab = onAdd != null && !keyboardOpen;
+    final showFab = widget.onAdd != null && !keyboardOpen;
     final fab = showFab
         ? FloatingActionButton(
-            onPressed: onAdd,
+            onPressed: widget.onAdd,
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
             elevation: 4,
@@ -69,6 +93,7 @@ class AppPageScaffold extends ConsumerWidget {
         : null;
 
     final page = Scaffold(
+      key: const ValueKey('app_page_scaffold'),
       backgroundColor: AppColors.surface,
       floatingActionButton: fab,
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
@@ -76,7 +101,7 @@ class AppPageScaffold extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (showHeader)
+            if (widget.showHeader)
               Padding(
                 padding: EdgeInsets.fromLTRB(
                   _horizontalPad(context),
@@ -86,12 +111,12 @@ class AppPageScaffold extends ConsumerWidget {
                 ),
                 child: Row(
                   children: [
-                    if (showBack)
+                    if (widget.showBack)
                       Padding(
                         padding: const EdgeInsets.only(right: AppSpacing.sm),
                         child: IconButton(
                           icon: const Icon(Icons.arrow_back_rounded),
-                          onPressed: onBack ?? () => Navigator.of(context).pop(),
+                          onPressed: widget.onBack ?? () => Navigator.of(context).pop(),
                           tooltip: 'Back',
                           style: IconButton.styleFrom(
                             backgroundColor: AppColors.card,
@@ -108,23 +133,23 @@ class AppPageScaffold extends ConsumerWidget {
                         ),
                       ),
                     Expanded(
-                      child: header ??
-                          (showGreeting
+                      child: widget.header ??
+                          (widget.showGreeting
                               ? AppPageHeader(
-                                  greeting: greeting,
-                                  festivalName: festivalName,
-                                  date: date,
-                                  onSettings: onSettings,
-                                  onAdd: onAdd,
-                                  onFilter: onFilter,
-                                  onSearch: onSearch,
-                                  showSettings: showSettings,
-                                  showAdd: showAdd,
-                                  showFilter: showFilter,
-                                  showSearch: showSearch,
+                                  greeting: widget.greeting,
+                                  festivalName: widget.festivalName,
+                                  date: widget.date,
+                                  onSettings: widget.onSettings,
+                                  onAdd: widget.onAdd,
+                                  onFilter: widget.onFilter,
+                                  onSearch: widget.onSearch,
+                                  showSettings: widget.showSettings,
+                                  showAdd: widget.showAdd,
+                                  showFilter: widget.showFilter,
+                                  showSearch: widget.showSearch,
                                 )
                               : Text(
-                                  festivalName ?? '',
+                                  widget.festivalName ?? '',
                                   style: Theme.of(context)
                                       .textTheme
                                       .headlineSmall
@@ -134,8 +159,8 @@ class AppPageScaffold extends ConsumerWidget {
                   ],
                 ),
               ),
-            if (showHeader) const SizedBox(height: AppSpacing.lg),
-            Expanded(child: _buildBody(showFab)),
+            if (widget.showHeader) const SizedBox(height: AppSpacing.lg),
+            Expanded(child: _buildBody()),
           ],
         ),
       ),
@@ -144,21 +169,14 @@ class AppPageScaffold extends ConsumerWidget {
     return page;
   }
 
-  Widget _buildBody(bool showFab) {
-    var body = padding != null
-        ? Padding(padding: padding!, child: child)
-        : child;
+  Widget _buildBody() {
+    var body = widget.padding != null
+        ? Padding(padding: widget.padding!, child: widget.child)
+        : widget.child;
 
-    if (showFab) {
-      body = Padding(
-        padding: const EdgeInsets.only(bottom: 80.0),
-        child: body,
-      );
-    }
-
-    if (onRefresh != null) {
+    if (widget.onRefresh != null) {
       return RefreshIndicator(
-        onRefresh: () async => onRefresh?.call(),
+        onRefresh: () async => widget.onRefresh?.call(),
         child: body,
       );
     }

@@ -228,7 +228,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         ));
       }
 
-      if (mounted) context.pop();
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) context.pop();
+        });
+      }
     } on Exception catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);

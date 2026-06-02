@@ -94,33 +94,26 @@ class CollectionEntry {
 Future<void> exportAllData(BuildContext context, FirestoreService service) async {
   final messenger = ScaffoldMessenger.of(context);
   final festivalId = AppConstants.festivalId;
+  final warnings = <String>[];
+
+  Future<T?> tryLoad<T>(String label, Future<T> Function() loader) async {
+    try {
+      final data = await loader();
+      debugPrint('[EXPORT] Loaded ${data is List ? data.length : '?'} records from $label');
+      return data;
+    } on Exception catch (e) {
+      debugPrint('[EXPORT] Failed to load $label: $e');
+      warnings.add('$label could not be loaded');
+      return null;
+    }
+  }
 
   try {
-    final results = await Future.wait([
-      service.getAllTargets(festivalId),
-      service.getAllExpenses(festivalId),
-      service.getAllDailyCollections(festivalId),
-      service.getAllFollowUps(festivalId),
-      service.getAllActivities(festivalId),
-    ]);
-
-    final targets = results[0] as List<Target>;
-    final expenses = results[1] as List<Expense>;
-    final dailyCollections = results[2] as List<DailyCollection>;
-    final followUps = results[3] as List<SponsorFollowup>;
-    final activities = results[4] as List<Activity>;
-
-    // Build collection entries from targets (each contribution is a collection)
-    final collectionEntries = <CollectionEntry>[];
-    for (final t in targets) {
-      if (t.givenAmount > 0) {
-        collectionEntries.add(CollectionEntry(
-          amount: t.givenAmount,
-          sponsorName: t.name,
-          createdAt: t.updatedAt,
-        ));
-      }
-    }
+    final targets = await tryLoad<List<Target>>('targets', () => service.getAllTargets(festivalId));
+    final expenses = await tryLoad<List<Expense>>('expenses', () => service.getAllExpenses(festivalId));
+    final dailyCollections = await tryLoad<List<DailyCollection>>('daily_collections', () => service.getAllDailyCollections(festivalId));
+    final followUps = await tryLoad<List<SponsorFollowup>>('followups', () => service.getAllFollowUps(festivalId));
+    final activities = await tryLoad<List<Activity>>('activities', () => service.getAllActivities(festivalId));
 
     final tmpDir = await getTemporaryDirectory();
     final exportDir = Directory('${tmpDir.path}/ganesha_export');
@@ -129,16 +122,55 @@ Future<void> exportAllData(BuildContext context, FirestoreService service) async
     }
     await exportDir.create();
 
-    final files = <XFile>[
-      await _writeFile(exportDir, 'sponsors.csv', _buildSponsorsCsv(targets)),
-      await _writeFile(exportDir, 'collections.csv', _buildCollectionsCsv(collectionEntries)),
-      await _writeFile(exportDir, 'daily_collections.csv', _buildDailyCollectionsCsv(dailyCollections)),
-      await _writeFile(exportDir, 'expenses.csv', _buildExpensesCsv(expenses)),
-      await _writeFile(exportDir, 'visits.csv', _buildVisitsCsv(followUps)),
-      await _writeFile(exportDir, 'activity.csv', _buildActivityCsv(activities)),
-    ];
+    final files = <XFile>[];
+
+    if (targets != null) {
+      files.add(await _writeFile(exportDir, 'sponsors.csv', _buildSponsorsCsv(targets)));
+
+      final collectionEntries = <CollectionEntry>[];
+      for (final t in targets) {
+        if (t.givenAmount > 0) {
+          collectionEntries.add(CollectionEntry(
+            amount: t.givenAmount,
+            sponsorName: t.name,
+            createdAt: t.updatedAt,
+          ));
+        }
+      }
+      files.add(await _writeFile(exportDir, 'collections.csv', _buildCollectionsCsv(collectionEntries)));
+    }
+
+    if (expenses != null) {
+      files.add(await _writeFile(exportDir, 'expenses.csv', _buildExpensesCsv(expenses)));
+    }
+
+    if (dailyCollections != null) {
+      files.add(await _writeFile(exportDir, 'daily_collections.csv', _buildDailyCollectionsCsv(dailyCollections)));
+    }
+
+    if (followUps != null) {
+      files.add(await _writeFile(exportDir, 'visits.csv', _buildVisitsCsv(followUps)));
+    }
+
+    if (activities != null) {
+      files.add(await _writeFile(exportDir, 'activity.csv', _buildActivityCsv(activities)));
+    }
+
+    if (files.isEmpty) {
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(const SnackBar(content: Text('No data to export')));
+      return;
+    }
 
     await Share.shareXFiles(files, text: 'Ganesha Festival Data Export');
+
+    final msg = warnings.isEmpty
+        ? 'Export completed'
+        : 'Export completed. ${warnings.join('; ')}.';
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(msg)));
   } on Exception catch (e) {
     messenger
       ..clearSnackBars()

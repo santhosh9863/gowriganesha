@@ -33,6 +33,7 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
   @override
   void initState() {
     super.initState();
+    debugPrint('[LIFECYCLE] FollowUpFormPage.initState followUpId=${widget.followUpId}');
     _sponsorNameController = TextEditingController();
     _amountController = TextEditingController();
     _noteController = TextEditingController();
@@ -46,6 +47,7 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    debugPrint('[LIFECYCLE] FollowUpFormPage.didChangeDependencies initialized=$_initialized');
     if (!_initialized && widget.followUpId == null) {
       _initialized = true;
       final queryParams = GoRouterState.of(context).uri.queryParameters;
@@ -59,6 +61,7 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
   }
 
   Future<void> _loadFollowUp() async {
+    debugPrint('[LIFECYCLE] FollowUpFormPage._loadFollowUp');
     final service = ref.read(firestoreProvider);
     final item = await service.getFollowUp(widget.followUpId!);
     if (item != null && mounted) {
@@ -66,12 +69,14 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
       _amountController.text = item.amount != null ? fmtAmount(item.amount!) : '';
       _noteController.text = item.note;
       _followUpDate = item.followUpDate.toDate();
+      if (item.sponsorId.isNotEmpty) _sponsorId = item.sponsorId;
     }
     if (mounted) setState(() => _isLoading = false);
   }
 
   @override
   void dispose() {
+    debugPrint('[LIFECYCLE] FollowUpFormPage.dispose');
     _sponsorNameController.dispose();
     _amountController.dispose();
     _noteController.dispose();
@@ -236,6 +241,7 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
         final item = SponsorFollowup(
           id: widget.followUpId!,
           festivalId: AppConstants.festivalId,
+          sponsorId: _sponsorId,
           sponsorName: _sponsorNameController.text.trim(),
           followUpDate: Timestamp.fromDate(_followUpDate!),
           amount: amount,
@@ -266,7 +272,11 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
           entityType: 'sponsor_followup',
         ));
       }
-      if (mounted) context.pop();
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) context.pop();
+        });
+      }
     } on Exception catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
