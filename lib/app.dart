@@ -183,7 +183,7 @@ class GaneshaApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: 'Sri Gowri Ganesha Geleyara Balaga',
+      title: 'Sankalpa',
       theme: AppTheme.light,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
