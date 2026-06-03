@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ganesha_2026/core/models/user_role.dart';
@@ -76,8 +77,33 @@ class RoleNotifier extends StateNotifier<UserRole> {
     return false;
   }
 
+  Future<bool> loginAsVolunteer(String password, {String? userName}) async {
+    debugPrint('[VOLUNTEER_AUTH] Fetching password from Firestore');
+    final service = _ref.read(firestoreProvider);
+    final storedPassword = await service.getVolunteerPassword();
+    debugPrint('[VOLUNTEER_AUTH] Firestore fetch complete: ${storedPassword != null ? "found" : "null"}');
+    if (storedPassword == null) {
+      debugPrint('[VOLUNTEER_AUTH] No volunteerPassword document in Firestore — denying');
+      return false;
+    }
+    if (password == storedPassword) {
+      debugPrint('[VOLUNTEER_AUTH] Password match — granting access');
+      if (userName != null) await setUserName(userName);
+      await setRole(UserRole.volunteer);
+      debugPrint('[VOLUNTEER_AUTH] Role set to volunteer');
+      return true;
+    }
+    debugPrint('[VOLUNTEER_AUTH] Password mismatch — denying');
+    return false;
+  }
+
   Future<void> logout() async {
     state = UserRole.volunteer;
     await _prefs.setString('role', 'volunteer');
+  }
+
+  Future<void> clearSession() async {
+    state = UserRole.none;
+    await _prefs.setString('role', 'none');
   }
 }

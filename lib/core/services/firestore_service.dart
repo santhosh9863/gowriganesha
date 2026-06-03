@@ -63,6 +63,15 @@ class FirestoreService {
     });
   }
 
+  Future<String?> getVolunteerPassword() async {
+    final doc = await _config.doc('security').get();
+    debugPrint('[FIRESTORE] Document config/security exists: ${doc.exists}');
+    debugPrint('[FIRESTORE] Document data: ${doc.data()}');
+    if (!doc.exists || doc.data() == null) return null;
+    debugPrint('[FIRESTORE] volunteerPassword field value: "${doc.data()!['volunteerPassword']}"');
+    return doc.data()!['volunteerPassword'] as String?;
+  }
+
   Future<int> getBudget(String settingsId) async {
     try {
       final doc = await _settings.doc(settingsId).get();

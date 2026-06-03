@@ -92,11 +92,12 @@ class _NavBarItemState extends State<_NavBarItem>
       duration: const Duration(milliseconds: 200),
       vsync: this,
     )..addListener(_onTick);
-    _scale = Tween<double>(begin: 1.0, end: 1.15).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    final curve = CurveTween(curve: Curves.easeInOut);
+    _scale = _controller.drive(
+      Tween<double>(begin: 1.0, end: 1.15).chain(curve),
     );
-    _pillOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    _pillOpacity = _controller.drive(
+      Tween<double>(begin: 0.0, end: 1.0).chain(curve),
     );
     if (widget.isSelected) {
       _controller.value = 1.0;

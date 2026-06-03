@@ -1303,13 +1303,29 @@ class _AccountCard extends ConsumerWidget {
                     ),
                   )
                 else
-                  TextButton.icon(
-                    onPressed: () => _showSwitchToAdmin(context, ref),
-                    icon: const Icon(Icons.arrow_forward_rounded, size: 16),
-                    label: const Text('Switch to Admin'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () => _showSwitchToAdmin(context, ref),
+                        icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                        label: const Text('Switch to Admin'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () async {
+                          await ref.read(roleProvider.notifier).clearSession();
+                          if (context.mounted) context.go('/entry');
+                        },
+                        icon: const Icon(Icons.logout_rounded, size: 16),
+                        label: const Text('Logout'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.error,
+                        ),
+                      ),
+                    ],
                   ),
               ],
             ),
