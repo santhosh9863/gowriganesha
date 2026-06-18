@@ -306,9 +306,10 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
 
   Future<void> _handleQuickUpdate(
       BuildContext context, WidgetRef ref, Target target) async {
-    final newTotalCtrl = TextEditingController();
-    final reasonCtrl = TextEditingController();
-    int? newTotal;
+    final amountCtrl = TextEditingController();
+    final noteCtrl = TextEditingController();
+    bool isFullCollection = true;
+    final remaining = target.expectedAmount - target.givenAmount;
 
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -316,12 +317,13 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
         final theme = Theme.of(ctx);
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            final delta = newTotal != null ? newTotal! - target.givenAmount : 0;
-            final isValid = newTotal != null && newTotal! >= 0;
-            final hasReason = reasonCtrl.text.trim().isNotEmpty;
+            final amount = tryParseAmount(amountCtrl.text.trim());
+            final isValid = isFullCollection
+                ? remaining > 0
+                : (amount != null && amount > 0 && amount <= remaining);
 
             return AlertDialog(
-              title: const Text('Adjust Total'),
+              title: const Text('Record Collection'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -339,66 +341,103 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
                       color: theme.colorScheme.primary,
                     ),
                   ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Raised: ₹${_fmt(target.givenAmount)}',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.tertiary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Remaining: ₹${_fmt(remaining)}',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: remaining > 0
+                          ? theme.colorScheme.error
+                          : theme.colorScheme.tertiary,
+                    ),
+                  ),
                   const SizedBox(height: 16),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'Current Total: ₹${_fmt(target.givenAmount)}',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
+                  SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(
+                        value: true,
+                        label: Text('Full Collection'),
+                        icon: Icon(Icons.check_circle_outline_rounded),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: newTotalCtrl,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: const [IndianAmountInputFormatter()],
-                    decoration: const InputDecoration(
-                      labelText: 'New Total',
-                      prefixText: '₹ ',
-                      border: OutlineInputBorder(),
-                    ),
-                    autofocus: true,
-                    onChanged: (v) {
-                      setDialogState(() {
-                        newTotal = tryParseAmount(v.trim());
-                      });
+                      ButtonSegment(
+                        value: false,
+                        label: Text('Partial'),
+                        icon: Icon(Icons.edit_rounded),
+                      ),
+                    ],
+                    selected: {isFullCollection},
+                    onSelectionChanged: (v) {
+                      setDialogState(() => isFullCollection = v.first);
                     },
+                    style: ButtonStyle(
+                      visualDensity: VisualDensity.compact,
+                    ),
                   ),
-                  if (newTotal != null && newTotal != target.givenAmount) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      delta > 0
-                          ? 'Correction: +₹${_fmt(delta)}'
-                          : 'Correction: -₹${_fmt(-delta)}',
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: delta > 0
-                            ? Colors.green
-                            : theme.colorScheme.error,
-                        fontWeight: FontWeight.w600,
+                  const SizedBox(height: 16),
+                  if (isFullCollection)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer
+                            .withAlpha(80),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        remaining > 0
+                            ? 'Will record ₹${_fmt(remaining)} as full collection'
+                            : 'This sponsor has already fulfilled their commitment',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: remaining > 0
+                              ? theme.colorScheme.onPrimaryContainer
+                              : theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    )
+                  else ...[
+                    TextField(
+                      controller: amountCtrl,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: const [IndianAmountInputFormatter()],
+                      decoration: const InputDecoration(
+                        labelText: 'Amount',
+                        prefixText: '₹ ',
+                        border: OutlineInputBorder(),
+                      ),
+                      autofocus: true,
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                    if (amount != null && amount > remaining)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          'Amount cannot exceed remaining ₹${_fmt(remaining)}',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.error,
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: noteCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Notes (optional)',
+                        hintText: 'e.g. Received from Chikthayappa',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: Icon(
+                          Icons.notes_rounded,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   ],
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: reasonCtrl,
-                    decoration: InputDecoration(
-                      labelText: 'Correction reason',
-                      hintText: 'e.g. Missed entry from last visit',
-                      border: const OutlineInputBorder(),
-                      prefixIcon: Icon(
-                        Icons.notes_rounded,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    onChanged: (_) => setDialogState(() {}),
-                  ),
                 ],
               ),
               actions: [
@@ -407,16 +446,20 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
                   child: const Text('Cancel'),
                 ),
                 FilledButton(
-                  onPressed: (isValid && hasReason)
+                  onPressed: isValid
                       ? () {
                           final data = {
-                            'newTotal': newTotal!,
-                            'reason': reasonCtrl.text.trim(),
+                            'amount': isFullCollection
+                                ? remaining
+                                : tryParseAmount(amountCtrl.text.trim()),
+                            'note': isFullCollection
+                                ? 'Full collection'
+                                : noteCtrl.text.trim(),
                           };
                           Navigator.pop(ctx, data);
                         }
                       : null,
-                  child: const Text('Apply Correction'),
+                  child: const Text('Record Collection'),
                 ),
               ],
             );
@@ -427,33 +470,35 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
 
     if (result == null) return;
 
+    final collectionAmount = result['amount'] as int;
+    final collectionNote = result['note'] as String;
+
     try {
       final service = ref.read(firestoreProvider);
-      await service.recordCorrection(
+      await service.recordContribution(
         targetId: target.id,
-        currentTotal: target.givenAmount,
-        newTotal: result['newTotal'] as int,
-        note: result['reason'] as String,
+        amount: collectionAmount,
+        note: collectionNote,
       );
       service.addActivity(Activity(
         id: service.generateId(),
         festivalId: AppConstants.festivalId,
-        type: 'collection_corrected',
-        title: 'Collection Corrected',
-        description: 'Correction applied to ${target.name} — total adjusted by ${AppConstants.currencySymbol}${fmtAmount((result['newTotal'] as int) - target.givenAmount)}',
+        type: 'collection_recorded',
+        title: 'Collection Recorded',
+        description: 'Collection of ${AppConstants.currencySymbol}${fmtAmount(collectionAmount)} received from ${target.name}${collectionNote.isNotEmpty ? ' — $collectionNote' : ''}',
         createdAt: Timestamp.now(),
         recordId: target.id,
         entityType: 'target',
       ));
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Correction applied')),
+          const SnackBar(content: Text('Collection recorded successfully')),
         );
       }
-    } on Exception {
+    } on Exception catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to apply correction')),
+          SnackBar(content: Text('Error: $e')),
         );
       }
     }

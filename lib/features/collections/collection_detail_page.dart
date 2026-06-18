@@ -15,6 +15,7 @@ import 'package:ganesha_2026/core/providers/target_provider.dart';
 import 'package:ganesha_2026/core/providers/followup_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/core/providers/contribution_provider.dart';
+import 'package:ganesha_2026/shared/widgets/adjust_collection_sheet.dart';
 import 'package:ganesha_2026/core/models/contribution.dart';
 import 'package:ganesha_2026/shared/utils/amount_format.dart';
 import 'package:ganesha_2026/shared/widgets/amount_text.dart';
@@ -188,165 +189,7 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
 
   Future<void> _handleAdjustCollection(Target target) async {
     debugPrint('[ACTION] CollectionDetailPage._handleAdjustCollection target=${target.name} givenAmount=${target.givenAmount}');
-    final amountCtrl = TextEditingController();
-    final reasonCtrl = TextEditingController();
-    final result = await showModalBottomSheet<Map<String, dynamic>>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(AppRadius.bottomSheet),
-        ),
-      ),
-      builder: (ctx) {
-        final theme = Theme.of(ctx);
-        return Padding(
-          padding: EdgeInsets.only(
-            left: AppSpacing.xxl,
-            right: AppSpacing.xxl,
-            top: AppSpacing.xxl,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + AppSpacing.xxl,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Adjust Collection',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                target.name,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'Current: ${AppConstants.currencySymbol}${_fmt(target.givenAmount)}',
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              TextField(
-                controller: amountCtrl,
-                keyboardType: TextInputType.number,
-                inputFormatters: const [IndianAmountInputFormatter()],
-                decoration: const InputDecoration(
-                  labelText: 'New Total',
-                  prefixText: '₹ ',
-                  border: OutlineInputBorder(),
-                ),
-                autofocus: true,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Enter new total amount. Use a lower value to record a refund.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                controller: reasonCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Reason (optional)',
-                  hintText: 'e.g. Refund, correction, adjustment',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.notes_rounded),
-                ),
-                textCapitalization: TextCapitalization.sentences,
-              ),
-              const SizedBox(height: AppSpacing.xxl),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    flex: 2,
-                    child: FilledButton(
-                      onPressed: () {
-                        final v = tryParseAmount(amountCtrl.text.trim());
-                        final reason = reasonCtrl.text.trim();
-                        if (v != null && v >= 0) {
-                          final data = {'newTotal': v, 'reason': reason};
-                          Navigator.pop(ctx, data);
-                        }
-                      },
-                      child: const Text('Apply'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
-
-    if (result == null) return;
-
-    final newTotal = result['newTotal'] as int;
-    final reason = result['reason'] as String;
-
-    try {
-      final service = ref.read(firestoreProvider);
-      await service.recordCorrection(
-        targetId: target.id,
-        currentTotal: target.givenAmount,
-        newTotal: newTotal,
-        note: reason,
-      );
-      final delta = newTotal - target.givenAmount;
-      service.addActivity(Activity(
-        id: service.generateId(),
-        festivalId: AppConstants.festivalId,
-        type: 'collection_corrected',
-        title: 'Collection Adjusted',
-        description:
-            '${target.name} — ${delta >= 0 ? '+' : ''}${AppConstants.currencySymbol}${fmtAmount(delta)}: $reason',
-        createdAt: Timestamp.now(),
-        recordId: target.id,
-        entityType: 'target',
-      ));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${AppConstants.currencySymbol}${fmtAmount(target.givenAmount)} → ${AppConstants.currencySymbol}${fmtAmount(newTotal)} ($reason)',
-            ),
-          ),
-        );
-      }
-    } on Exception catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
-    }
+    await showAdjustCollectionSheet(context, ref, target);
   }
 
   Future<void> _deleteTarget(Target target) async {
@@ -525,14 +368,16 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
                     label: const Text('Record Contribution'),
                   ),
                 ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _handleAdjustCollection(target),
-                    icon: const Icon(Icons.tune_rounded, size: 18),
-                    label: const Text('Adjust Collection'),
+                if (canEditRecords(ref.watch(roleProvider))) ...[
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _handleAdjustCollection(target),
+                      icon: const Icon(Icons.tune_rounded, size: 18),
+                      label: const Text('Adjust Collection'),
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
             const SizedBox(height: AppSpacing.xxl),

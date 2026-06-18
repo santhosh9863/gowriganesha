@@ -7,8 +7,11 @@ import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/target.dart';
 import 'package:ganesha_2026/core/models/activity.dart';
+import 'package:ganesha_2026/core/models/user_role.dart';
+import 'package:ganesha_2026/core/providers/auth_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/shared/utils/amount_format.dart';
+import 'package:ganesha_2026/shared/widgets/adjust_collection_sheet.dart';
 
 class CollectionFormPage extends ConsumerStatefulWidget {
   final String? targetId;
@@ -75,6 +78,16 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isEditing = widget.targetId != null;
+    final role = ref.watch(roleProvider);
+
+    if (isEditing && role != UserRole.admin) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) context.go('/collections');
+      });
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -127,42 +140,54 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
                       },
                     ),
                     if (isEditing && _loadedTarget != null)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(AppSpacing.lg),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest,
-                          borderRadius: AppRadius.mediumBorder,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.info_outline_rounded,
-                              size: 20,
-                              color: colorScheme.primary,
+                      Column(
+                        children: [
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(AppSpacing.lg),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainerHighest,
+                              borderRadius: AppRadius.mediumBorder,
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Total Collected',
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline_rounded,
+                                  size: 20,
+                                  color: colorScheme.primary,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Total Collected',
+                                        style: theme.textTheme.labelSmall?.copyWith(
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
                     Text(
-                                      '${AppConstants.currencySymbol}${_fmt(_loadedTarget!.givenAmount)}',
-                                    style: theme.textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                        '${AppConstants.currencySymbol}${_fmt(_loadedTarget!.givenAmount)}',
+                                        style: theme.textTheme.titleMedium?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              showAdjustCollectionSheet(context, ref, _loadedTarget!);
+                            },
+                            icon: const Icon(Icons.tune_rounded, size: 16),
+                            label: const Text('Adjust Collection'),
+                          ),
+                        ],
                       )
                     else
                       TextFormField(
@@ -223,6 +248,13 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
     if (_isSaving) return;
+    if (!mounted) return;
+    if (widget.targetId != null && ref.read(roleProvider) != UserRole.admin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Access Denied')),
+      );
+      return;
+    }
     setState(() => _isSaving = true);
 
     final service = ref.read(firestoreProvider);

@@ -8,6 +8,8 @@ import 'package:ganesha_2026/shared/utils/amount_format.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/expense.dart';
 import 'package:ganesha_2026/core/models/activity.dart';
+import 'package:ganesha_2026/core/models/user_role.dart';
+import 'package:ganesha_2026/core/providers/auth_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 
 class ExpenseFormPage extends ConsumerStatefulWidget {
@@ -78,6 +80,16 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     final dateStr = _selectedDate != null
         ? DateFormat('dd MMM yyyy').format(_selectedDate!)
         : null;
+    final role = ref.watch(roleProvider);
+
+    if (role != UserRole.admin) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) context.go('/expenses');
+      });
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -191,6 +203,13 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       return;
     }
     if (_isSaving) return;
+    if (!mounted) return;
+    if (ref.read(roleProvider) != UserRole.admin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Access Denied')),
+      );
+      return;
+    }
     setState(() => _isSaving = true);
 
     final service = ref.read(firestoreProvider);

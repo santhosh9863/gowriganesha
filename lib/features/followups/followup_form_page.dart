@@ -7,6 +7,8 @@ import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/sponsor_followup.dart';
 import 'package:ganesha_2026/core/models/activity.dart';
+import 'package:ganesha_2026/core/models/user_role.dart';
+import 'package:ganesha_2026/core/providers/auth_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/shared/utils/amount_format.dart';
 
@@ -103,6 +105,16 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
     final dateStr = _followUpDate != null
         ? DateFormat('dd MMM yyyy').format(_followUpDate!)
         : null;
+    final role = ref.watch(roleProvider);
+
+    if (role != UserRole.admin) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) context.go('/followups');
+      });
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -228,6 +240,13 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
       return;
     }
     if (_isSaving) return;
+    if (!mounted) return;
+    if (ref.read(roleProvider) != UserRole.admin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Access Denied')),
+      );
+      return;
+    }
     setState(() => _isSaving = true);
 
     final service = ref.read(firestoreProvider);

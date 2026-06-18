@@ -45,9 +45,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       if (role == UserRole.volunteer) {
-        if (RegExp(r'^/expenses/[^/]+/edit$').hasMatch(location)) {
-          return '/';
-        }
+        final blocked = <RegExp>[
+          RegExp(r'^/expenses/add$'),
+          RegExp(r'^/expenses/[^/]+/edit$'),
+          RegExp(r'^/collections/[^/]+/edit$'),
+          RegExp(r'^/daily-collections/[^/]+/edit$'),
+          RegExp(r'^/followups/add$'),
+          RegExp(r'^/followups/[^/]+/edit$'),
+        ];
+        if (blocked.any((r) => r.hasMatch(location))) return '/';
       }
 
       if (location == '/entry') return '/';

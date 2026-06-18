@@ -786,6 +786,8 @@ class _FestivalInfoCardState extends ConsumerState<_FestivalInfoCard> {
   Widget build(BuildContext context) {
     debugPrint('[DIAG:_FestivalInfoCard] build');
     final theme = Theme.of(context);
+    final role = ref.watch(roleProvider);
+    final canEdit = role == UserRole.admin;
     final dateStr = widget.festival.festivalDate != null
         ? DateFormat('d MMMM yyyy').format(widget.festival.festivalDate!)
         : 'Not set';
@@ -819,34 +821,55 @@ class _FestivalInfoCardState extends ConsumerState<_FestivalInfoCard> {
               theme: theme,
             ),
             const SizedBox(height: AppSpacing.md),
-            _DateRow(
-              label: 'Festival Date',
-              value: dateStr,
-              icon: Icons.event_rounded,
-              theme: theme,
-              onTap: () => _pickDate(context),
-            ),
+            canEdit
+                ? _DateRow(
+                    label: 'Festival Date',
+                    value: dateStr,
+                    icon: Icons.event_rounded,
+                    theme: theme,
+                    onTap: () => _pickDate(context),
+                  )
+                : _InfoRow(
+                    label: 'Festival Date',
+                    value: dateStr,
+                    icon: Icons.event_rounded,
+                    theme: theme,
+                  ),
             const SizedBox(height: AppSpacing.md),
-            _EditRow(
-              label: 'UPI ID',
-              value: upiDisplay,
-              icon: Icons.payments_rounded,
-              theme: theme,
-              onTap: () => _editText(context, 'UPI ID', widget.festival.upiId, isUpi: true),
-            ),
+            canEdit
+                ? _EditRow(
+                    label: 'UPI ID',
+                    value: upiDisplay,
+                    icon: Icons.payments_rounded,
+                    theme: theme,
+                    onTap: () => _editText(context, 'UPI ID', widget.festival.upiId, isUpi: true),
+                  )
+                : _InfoRow(
+                    label: 'UPI ID',
+                    value: upiDisplay,
+                    icon: Icons.payments_rounded,
+                    theme: theme,
+                  ),
             const SizedBox(height: AppSpacing.md),
-            _EditRow(
-              label: 'Account Name',
-              value: accountDisplay,
-              icon: Icons.badge_rounded,
-              theme: theme,
-              onTap: () => _editText(context, 'Account Name', widget.festival.accountName, isUpi: false),
-            ),
+            canEdit
+                ? _EditRow(
+                    label: 'Account Name',
+                    value: accountDisplay,
+                    icon: Icons.badge_rounded,
+                    theme: theme,
+                    onTap: () => _editText(context, 'Account Name', widget.festival.accountName, isUpi: false),
+                  )
+                : _InfoRow(
+                    label: 'Account Name',
+                    value: accountDisplay,
+                    icon: Icons.badge_rounded,
+                    theme: theme,
+                  ),
             const SizedBox(height: AppSpacing.md),
             _QrPreviewRow(
               qrImageUrl: widget.festival.qrImageUrl,
-              onUpload: () => _uploadQrImage(context),
-              onReplace: () => _uploadQrImage(context),
+              onUpload: canEdit ? () => _uploadQrImage(context) : null,
+              onReplace: canEdit ? () => _uploadQrImage(context) : null,
               theme: theme,
             ),
           ],
@@ -1016,20 +1039,21 @@ class _InfoRow extends StatelessWidget {
 // ──────────────────────────────────────────────
 class _QrPreviewRow extends StatelessWidget {
   final String? qrImageUrl;
-  final VoidCallback onUpload;
-  final VoidCallback onReplace;
+  final VoidCallback? onUpload;
+  final VoidCallback? onReplace;
   final ThemeData theme;
 
   const _QrPreviewRow({
     required this.qrImageUrl,
-    required this.onUpload,
-    required this.onReplace,
     required this.theme,
+    this.onUpload,
+    this.onReplace,
   });
 
   @override
   Widget build(BuildContext context) {
     final hasImage = qrImageUrl != null && qrImageUrl!.isNotEmpty;
+    final showButton = hasImage ? onReplace != null : onUpload != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1058,11 +1082,12 @@ class _QrPreviewRow extends StatelessWidget {
                 ],
               ),
             ),
-            TextButton.icon(
-              onPressed: hasImage ? onReplace : onUpload,
-              icon: Icon(hasImage ? Icons.swap_horiz_rounded : Icons.upload_rounded, size: 14),
-              label: Text(hasImage ? 'Replace' : 'Upload'),
-            ),
+            if (showButton)
+              TextButton.icon(
+                onPressed: hasImage ? onReplace! : onUpload!,
+                icon: Icon(hasImage ? Icons.swap_horiz_rounded : Icons.upload_rounded, size: 14),
+                label: Text(hasImage ? 'Replace' : 'Upload'),
+              ),
           ],
         ),
         if (hasImage) ...[
@@ -1279,6 +1304,8 @@ class _AccountCard extends ConsumerWidget {
                           color: AppColors.charcoal,
                           fontWeight: FontWeight.w600,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         isAdmin ? 'Admin' : 'Volunteer',
@@ -1286,14 +1313,45 @@ class _AccountCard extends ConsumerWidget {
                           color: isAdmin ? AppColors.warning : AppColors.warmGray500,
                           fontWeight: FontWeight.w600,
                         ),
+                        maxLines: 1,
                       ),
                     ],
                   ),
                 ),
-                if (isAdmin)
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            if (isAdmin)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () async {
+                    await ref.read(roleProvider.notifier).clearSession();
+                    if (context.mounted) context.go('/entry');
+                  },
+                  icon: const Icon(Icons.logout_rounded, size: 16),
+                  label: const Text('Logout'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.error,
+                  ),
+                ),
+              )
+            else
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton.icon(
+                    onPressed: () => _showSwitchToAdmin(context, ref),
+                    icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                    label: const Text('Switch to Admin'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
                   TextButton.icon(
                     onPressed: () async {
-                      await ref.read(roleProvider.notifier).logout();
+                      await ref.read(roleProvider.notifier).clearSession();
                       if (context.mounted) context.go('/entry');
                     },
                     icon: const Icon(Icons.logout_rounded, size: 16),
@@ -1301,34 +1359,9 @@ class _AccountCard extends ConsumerWidget {
                     style: TextButton.styleFrom(
                       foregroundColor: AppColors.error,
                     ),
-                  )
-                else
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextButton.icon(
-                        onPressed: () => _showSwitchToAdmin(context, ref),
-                        icon: const Icon(Icons.arrow_forward_rounded, size: 16),
-                        label: const Text('Switch to Admin'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.primary,
-                        ),
-                      ),
-                      TextButton.icon(
-                        onPressed: () async {
-                          await ref.read(roleProvider.notifier).clearSession();
-                          if (context.mounted) context.go('/entry');
-                        },
-                        icon: const Icon(Icons.logout_rounded, size: 16),
-                        label: const Text('Logout'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.error,
-                        ),
-                      ),
-                    ],
                   ),
-              ],
-            ),
+                ],
+              ),
           ],
         ),
       ),
