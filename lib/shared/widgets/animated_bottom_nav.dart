@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:ganesha_2026/core/design/app_colors.dart';
+import 'package:ganesha_2026/core/design/app_radius.dart';
+import 'package:ganesha_2026/core/design/app_spacing.dart';
+import 'package:ganesha_2026/shared/widgets/sankalpa_glass.dart';
 
 class _NavItem {
   final IconData icon;
@@ -30,32 +34,38 @@ class AnimatedBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(26),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        0,
+        AppSpacing.lg,
+        AppSpacing.lg,
       ),
       child: SafeArea(
         top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(2, 2, 2, 0),
-          child: Row(
-            children: List.generate(_navItems.length, (index) {
-              return Expanded(
-                child: _NavBarItem(
-                  item: _navItems[index],
-                  isSelected: index == currentIndex,
-                  onTap: () => onTap(index),
-                ),
-              );
-            }),
+        child: SankalpaGlass(
+          sigma: 14,
+          opacity: 0.94,
+          borderRadius: BorderRadius.circular(AppRadius.hero),
+          borderColor: AppColors.outline,
+          tintColor: AppColors.card,
+          padding: const EdgeInsets.symmetric(
+            vertical: AppSpacing.sm,
+            horizontal: AppSpacing.xs,
+          ),
+          child: SizedBox(
+            height: 58,
+            child: Row(
+              children: List.generate(_navItems.length, (index) {
+                return Expanded(
+                  child: _NavBarItem(
+                    item: _navItems[index],
+                    isSelected: index == currentIndex,
+                    onTap: () => onTap(index),
+                  ),
+                );
+              }),
+            ),
           ),
         ),
       ),
@@ -63,7 +73,7 @@ class AnimatedBottomNav extends StatelessWidget {
   }
 }
 
-class _NavBarItem extends StatefulWidget {
+class _NavBarItem extends StatelessWidget {
   final _NavItem item;
   final bool isSelected;
   final VoidCallback onTap;
@@ -75,112 +85,52 @@ class _NavBarItem extends StatefulWidget {
   });
 
   @override
-  State<_NavBarItem> createState() => _NavBarItemState();
-}
-
-class _NavBarItemState extends State<_NavBarItem>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scale;
-  late Animation<double> _pillOpacity;
-
-  @override
-  void initState() {
-    super.initState();
-    debugPrint('[LIFECYCLE] _NavBarItem.initState label=${widget.item.label} isSelected=${widget.isSelected}');
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 200),
-      vsync: this,
-    )..addListener(_onTick);
-    final curve = CurveTween(curve: Curves.easeInOut);
-    _scale = _controller.drive(
-      Tween<double>(begin: 1.0, end: 1.15).chain(curve),
-    );
-    _pillOpacity = _controller.drive(
-      Tween<double>(begin: 0.0, end: 1.0).chain(curve),
-    );
-    if (widget.isSelected) {
-      _controller.value = 1.0;
-    }
-  }
-
-  void _onTick() {
-    if (mounted) setState(() {});
-  }
-
-  @override
-  void didUpdateWidget(_NavBarItem oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    debugPrint('[LIFECYCLE] _NavBarItem.didUpdateWidget label=${widget.item.label} was=${oldWidget.isSelected} now=${widget.isSelected}');
-    if (widget.isSelected != oldWidget.isSelected) {
-      if (widget.isSelected) {
-        _controller.forward();
-      } else {
-        _controller.reverse();
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    debugPrint('[LIFECYCLE] _NavBarItem.dispose label=${widget.item.label}');
-    _controller.stop();
-    _controller.removeListener(_onTick);
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return GestureDetector(
-      onTap: widget.onTap,
+      onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        height: 52,
-        child: Stack(
-          alignment: Alignment.center,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+        height: 58,
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primaryBg : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.medium),
+        ),
+        padding: const EdgeInsets.symmetric(
+          vertical: AppSpacing.xs,
+          horizontal: AppSpacing.xs,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Positioned.fill(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: Opacity(
-                  opacity: _pillOpacity.value,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withAlpha(26),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
+            AnimatedScale(
+              scale: isSelected ? 1.18 : 1.0,
+              duration: const Duration(milliseconds: 280),
+              curve: Curves.easeOutCubic,
+              child: AnimatedOpacity(
+                opacity: isSelected ? 1.0 : 0.55,
+                duration: const Duration(milliseconds: 280),
+                curve: Curves.easeOutCubic,
+                child: Icon(
+                  item.icon,
+                  size: 22,
+                  color: isSelected ? AppColors.primary : AppColors.warmGray500,
                 ),
               ),
             ),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Transform.scale(
-                  scale: _scale.value,
-                  child: Icon(
-                    widget.item.icon,
-                    size: 22,
-                    color: widget.isSelected
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurface.withAlpha(128),
-                  ),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  widget.item.label,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: widget.isSelected ? FontWeight.w600 : FontWeight.w400,
-                    color: widget.isSelected
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurface.withAlpha(128),
-                  ),
-                ),
-              ],
+            const SizedBox(height: 2),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 280),
+              curve: Curves.easeOutCubic,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: isSelected ? AppColors.primary : AppColors.warmGray500,
+                height: 1.2,
+              ),
+              child: Text(item.label),
             ),
           ],
         ),
