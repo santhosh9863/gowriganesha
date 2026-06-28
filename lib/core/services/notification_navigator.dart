@@ -21,4 +21,11 @@ class NotificationNavigator {
     }
     return null;
   }
+
+  String? resolveRouteFor({required String entityType, String? entityId}) {
+    final template = _routeTemplates[entityType];
+    if (template == null) return null;
+    if (entityId != null) return template.replaceAll('{entityId}', entityId);
+    return template;
+  }
 }

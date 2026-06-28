@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:ganesha_2026/core/theme.dart';
 import 'package:ganesha_2026/core/models/user_role.dart';
 import 'package:ganesha_2026/core/providers/auth_provider.dart';
+import 'package:ganesha_2026/core/providers/notification_provider.dart';
+import 'package:ganesha_2026/core/services/notification_navigator.dart';
 import 'package:ganesha_2026/shared/widgets/app_scaffold.dart';
 import 'package:ganesha_2026/shared/widgets/page_transitions.dart';
 import 'package:ganesha_2026/features/auth/entry_page.dart';
@@ -190,6 +192,33 @@ class GaneshaApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+
+    ref.watch(pushNotificationInitProvider);
+
+    ref.listen(userIdProvider, (prev, next) {
+      if (next.isNotEmpty && next != prev) {
+        ref.read(pushNotificationServiceProvider).updateUserId(next);
+      }
+    });
+
+    ref.listen(pendingNotificationTapProvider, (prev, next) {
+      if (next == null) return;
+      final navigator = NotificationNavigator();
+      final route = navigator.resolveRouteFor(
+        entityType: next.entityType,
+        entityId: next.entityId,
+      );
+      ref.read(pendingNotificationTapProvider.notifier).state = null;
+      if (route != null && context.mounted) {
+        context.push(route);
+      }
+    });
+
+    ref.listen(roleProvider, (prev, next) {
+      if (next == UserRole.none && prev != UserRole.none) {
+        ref.read(pushNotificationServiceProvider).removeCurrentToken();
+      }
+    });
 
     return MaterialApp.router(
       title: 'Sankalpa',

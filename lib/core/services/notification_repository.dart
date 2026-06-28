@@ -227,6 +227,38 @@ class NotificationRepository {
     return notificationRole == null || notificationRole == targetRole;
   }
 
+  /// Saves a device token for push notifications.
+  Future<void> saveDeviceToken(
+    String token, {
+    required String userId,
+    required String platform,
+  }) async {
+    try {
+      await _firestore.collection('device_tokens').doc(token).set({
+        'token': token,
+        'userId': userId,
+        'platform': platform,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      debugPrint('[NOTIFICATION_REPO] Device token saved for user $userId');
+    } on FirebaseException catch (e) {
+      debugPrint('[NOTIFICATION_REPO] Error saving device token: $e');
+      throw FirestoreException('Failed to save device token', originalError: e);
+    }
+  }
+
+  /// Removes a device token.
+  Future<void> removeDeviceToken(String token) async {
+    try {
+      await _firestore.collection('device_tokens').doc(token).delete();
+      debugPrint('[NOTIFICATION_REPO] Device token removed');
+    } on FirebaseException catch (e) {
+      debugPrint('[NOTIFICATION_REPO] Error removing device token: $e');
+      throw FirestoreException('Failed to remove device token', originalError: e);
+    }
+  }
+
   /// Retrieves raw notification preferences for the given user.
   ///
   /// NOTE: Returns raw Map. A typed NotificationPreferences model will replace

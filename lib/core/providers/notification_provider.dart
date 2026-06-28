@@ -9,6 +9,7 @@ import 'package:ganesha_2026/core/services/notification_service.dart';
 import 'package:ganesha_2026/core/services/notification_navigator.dart';
 import 'package:ganesha_2026/core/services/notification_permission_service.dart';
 import 'package:ganesha_2026/core/services/local_notification_service.dart';
+import 'package:ganesha_2026/core/services/push_notification_service.dart';
 import 'package:ganesha_2026/core/services/activity_service.dart';
 
 final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
@@ -60,4 +61,26 @@ final unreadNotificationsCountProvider = Provider<int>((ref) {
           ?.where((n) => n.isUnreadBy(userId))
           .length ??
       0;
+});
+
+final pendingNotificationTapProvider =
+    StateProvider<({String entityType, String? entityId})?>((ref) => null);
+
+final pushNotificationServiceProvider = Provider<PushNotificationService>((ref) {
+  final repo = ref.watch(notificationRepositoryProvider);
+  return PushNotificationService(
+    repository: repo,
+    onNavigate: ({required entityType, entityId}) {
+      ref.read(pendingNotificationTapProvider.notifier).state = (
+        entityType: entityType,
+        entityId: entityId,
+      );
+    },
+  );
+});
+
+final pushNotificationInitProvider = FutureProvider<void>((ref) async {
+  final service = ref.watch(pushNotificationServiceProvider);
+  final userId = ref.watch(userIdProvider);
+  await service.initialize(userId: userId);
 });
