@@ -1,6 +1,14 @@
 {
   "firestore": {
-    "rules": "firestore.rules"
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "functions": {
+    "source": "functions",
+    "ignore": [
+      "**/node_modules/**",
+      "lib/node_modules/**"
+    ]
   },
   "storage": {
     "rules": "storage.rules"
