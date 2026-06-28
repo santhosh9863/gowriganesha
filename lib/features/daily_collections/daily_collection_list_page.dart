@@ -9,6 +9,8 @@ import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/daily_collection.dart';
 import 'package:ganesha_2026/shared/utils/amount_format.dart';
+import 'package:ganesha_2026/core/models/user_role.dart';
+import 'package:ganesha_2026/core/providers/auth_provider.dart';
 import 'package:ganesha_2026/core/providers/daily_collection_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/features/daily_collections/daily_collection_tile.dart';
@@ -51,19 +53,21 @@ class _DailyCollectionListPageState
   Widget build(BuildContext context) {
     debugPrint('[BUILD] DailyCollectionListPage.build');
     final dailyCollectionAsync = ref.watch(dailyCollectionsStreamProvider);
+    final role = ref.watch(roleProvider);
     final theme = Theme.of(context);
+    final showAdd = role == UserRole.admin;
 
     return AppPageScaffold(
       festivalName: 'Daily Collections',
       onSettings: () => context.push('/settings'),
-      onAdd: () => context.push('/daily-collections/add'),
+      onAdd: showAdd ? () => context.push('/daily-collections/add') : null,
       bottomNavHeight: 56,
       child: dailyCollectionAsync.when(
         data: (collections) => RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(dailyCollectionsStreamProvider);
           },
-          child: _buildContent(context, ref, collections, theme),
+          child: _buildContent(context, ref, collections, theme, role),
         ),
         loading: () => const AppSkeletonList(),
         error: (e, _) => Center(child: Text('Error: $e')),
@@ -77,7 +81,7 @@ class _DailyCollectionListPageState
     final end = start.add(const Duration(days: 1));
     return all.where((dc) {
       final d = dc.date.toDate();
-      return d.isAfter(start) && d.isBefore(end);
+      return !d.isBefore(start) && d.isBefore(end);
     }).toList();
   }
 
@@ -88,7 +92,7 @@ class _DailyCollectionListPageState
     final end = today;
     return all.where((dc) {
       final d = dc.date.toDate();
-      return d.isAfter(start) && d.isBefore(end);
+      return !d.isBefore(start) && d.isBefore(end);
     }).toList();
   }
 
@@ -98,7 +102,7 @@ class _DailyCollectionListPageState
     final yesterday = today.subtract(const Duration(days: 1));
     return all.where((dc) {
       final d = dc.date.toDate();
-      return !d.isAfter(yesterday);
+      return d.isBefore(yesterday);
     }).toList();
   }
 
@@ -107,7 +111,9 @@ class _DailyCollectionListPageState
     WidgetRef ref,
     List<DailyCollection> collections,
     ThemeData theme,
+    UserRole role,
   ) {
+    final now = DateTime.now();
     final todayItems = _todayItems(collections);
     final yesterdayItems = _yesterdayItems(collections);
     final earlierItems = _earlierItems(collections);
@@ -121,6 +127,18 @@ class _DailyCollectionListPageState
     final hasYesterday = yesterdayItems.isNotEmpty;
     final hasEarlier = earlierItems.isNotEmpty;
     final hasAny = collections.isNotEmpty;
+
+    if (hasAny) {
+      for (final dc in collections) {
+        final d = dc.date.toDate();
+        final inToday = !d.isBefore(DateTime(now.year, now.month, now.day)) &&
+            d.isBefore(DateTime(now.year, now.month, now.day).add(const Duration(days: 1)));
+        final inYesterday = !d.isBefore(DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1))) &&
+            d.isBefore(DateTime(now.year, now.month, now.day));
+        final inEarlier = d.isBefore(DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1)));
+        debugPrint('[DATE_BUCKET] amount=${dc.amount} date=$d → today=$inToday yesterday=$inYesterday earlier=$inEarlier');
+      }
+    }
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(0, 0, 0, 72),
@@ -185,8 +203,9 @@ class _DailyCollectionListPageState
             },
           ),
         ),
-        // Quick add
-        Padding(
+        if (role == UserRole.admin)
+          // Quick add
+          Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.lg,
             0,

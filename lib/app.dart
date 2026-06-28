@@ -49,6 +49,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           RegExp(r'^/expenses/add$'),
           RegExp(r'^/expenses/[^/]+/edit$'),
           RegExp(r'^/collections/[^/]+/edit$'),
+          RegExp(r'^/daily-collections/add$'),
           RegExp(r'^/daily-collections/[^/]+/edit$'),
           RegExp(r'^/followups/add$'),
           RegExp(r'^/followups/[^/]+/edit$'),

@@ -83,7 +83,7 @@ class _DailyCollectionFormPageState
         : null;
     final role = ref.watch(roleProvider);
 
-    if (isEditing && role != UserRole.admin) {
+    if (role != UserRole.admin) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) context.go('/daily-collections');
       });
@@ -209,7 +209,7 @@ class _DailyCollectionFormPageState
     }
     if (_isSaving) return;
     if (!mounted) return;
-    if (widget.dailyCollectionId != null && ref.read(roleProvider) != UserRole.admin) {
+    if (ref.read(roleProvider) != UserRole.admin) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Access Denied')),
       );
