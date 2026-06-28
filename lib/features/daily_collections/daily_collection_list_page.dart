@@ -12,6 +12,7 @@ import 'package:ganesha_2026/shared/utils/amount_format.dart';
 import 'package:ganesha_2026/core/models/user_role.dart';
 import 'package:ganesha_2026/core/providers/auth_provider.dart';
 import 'package:ganesha_2026/core/providers/daily_collection_provider.dart';
+import 'package:ganesha_2026/core/providers/notification_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/features/daily_collections/daily_collection_tile.dart';
 import 'package:ganesha_2026/shared/widgets/app_empty_state.dart';
@@ -396,6 +397,10 @@ class _DailyCollectionListPageState
         createdAt: now,
       );
       await service.addDailyCollection(dc);
+      final activityService = ref.read(activityServiceProvider);
+      final userId = ref.read(userIdProvider);
+      final userName = ref.read(userNameProvider);
+      activityService.recordDailyCollectionRecorded(dc, userId: userId, userName: userName);
 
       _amountController.clear();
     } on Exception catch (e) {

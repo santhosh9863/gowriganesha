@@ -25,6 +25,11 @@ final userNameProvider = StateProvider<String>((ref) {
   return prefs.getString('userName') ?? '';
 });
 
+final userIdProvider = StateProvider<String>((ref) {
+  final prefs = ref.read(sharedPreferencesProvider);
+  return prefs.getString('userId') ?? '';
+});
+
 class RoleNotifier extends StateNotifier<UserRole> {
   final SharedPreferences _prefs;
   final Ref _ref;

@@ -8,6 +8,7 @@ import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/daily_collection.dart';
 import 'package:ganesha_2026/core/models/user_role.dart';
 import 'package:ganesha_2026/core/providers/auth_provider.dart';
+import 'package:ganesha_2026/core/providers/notification_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/shared/utils/amount_format.dart';
 
@@ -240,6 +241,10 @@ class _DailyCollectionFormPageState
           createdAt: Timestamp.now(),
         );
         await service.addDailyCollection(dc);
+        final activityService = ref.read(activityServiceProvider);
+        final userId = ref.read(userIdProvider);
+        final userName = ref.read(userNameProvider);
+        activityService.recordDailyCollectionRecorded(dc, userId: userId, userName: userName);
       }
 
       if (mounted) {

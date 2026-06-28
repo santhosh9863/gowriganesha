@@ -10,6 +10,7 @@ import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/models/user_role.dart';
 import 'package:ganesha_2026/core/providers/auth_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
+import 'package:ganesha_2026/core/providers/notification_provider.dart';
 import 'package:ganesha_2026/shared/utils/amount_format.dart';
 import 'package:ganesha_2026/shared/widgets/adjust_collection_sheet.dart';
 
@@ -300,16 +301,10 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
           updatedAt: now,
         );
         await service.addTarget(target);
-        service.addActivity(Activity(
-          id: service.generateId(),
-          festivalId: AppConstants.festivalId,
-          type: 'sponsor_added',
-          title: 'Sponsor Added',
-          description: '${target.name} added — commitment of ${AppConstants.currencySymbol}${fmtAmount(target.expectedAmount)}',
-          createdAt: Timestamp.now(),
-          recordId: target.id,
-          entityType: 'target',
-        ));
+        final activityService = ref.read(activityServiceProvider);
+        final userId = ref.read(userIdProvider);
+        final userName = ref.read(userNameProvider);
+        activityService.recordSponsorAdded(target, userId: userId, userName: userName);
       }
 
       if (mounted) {

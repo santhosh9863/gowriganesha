@@ -26,6 +26,7 @@ class AppPageScaffold extends ConsumerStatefulWidget {
   final VoidCallback? onBack;
   final double bottomNavHeight;
   final bool showGreeting;
+  final bool showNotifications;
 
   const AppPageScaffold({
     super.key,
@@ -49,6 +50,7 @@ class AppPageScaffold extends ConsumerStatefulWidget {
     this.onBack,
     this.bottomNavHeight = 0,
     this.showGreeting = false,
+    this.showNotifications = true,
   });
 
   @override
@@ -147,6 +149,7 @@ class _AppPageScaffoldState extends ConsumerState<AppPageScaffold> {
                                   showAdd: widget.showAdd,
                                   showFilter: widget.showFilter,
                                   showSearch: widget.showSearch,
+                                  showNotifications: widget.showNotifications,
                                 )
                               : Text(
                                   widget.festivalName ?? '',

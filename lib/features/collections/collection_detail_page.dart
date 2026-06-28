@@ -9,11 +9,11 @@ import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/models/target.dart';
-import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/models/sponsor_followup.dart';
 import 'package:ganesha_2026/core/providers/target_provider.dart';
 import 'package:ganesha_2026/core/providers/followup_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
+import 'package:ganesha_2026/core/providers/notification_provider.dart';
 import 'package:ganesha_2026/core/providers/contribution_provider.dart';
 import 'package:ganesha_2026/shared/widgets/adjust_collection_sheet.dart';
 import 'package:ganesha_2026/core/models/contribution.dart';
@@ -161,17 +161,10 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
         note: noteTxt,
       );
       debugPrint('[ACTION] CollectionDetailPage: Firestore write complete, triggering cascade');
-      service.addActivity(Activity(
-        id: service.generateId(),
-        festivalId: AppConstants.festivalId,
-        type: 'collection_recorded',
-        title: 'Collection Recorded',
-        description:
-            'Collection of ${AppConstants.currencySymbol}${fmtAmount(amount)} received from ${target.name}${noteTxt.isNotEmpty ? ' — $noteTxt' : ''}',
-        createdAt: Timestamp.now(),
-        recordId: target.id,
-        entityType: 'target',
-      ));
+      final activityService = ref.read(activityServiceProvider);
+      final userId = ref.read(userIdProvider);
+      final userName = ref.read(userNameProvider);
+      activityService.recordContributionRecorded(target, amount, userId: userId, userName: userName);
       debugPrint('[ACTION] CollectionDetailPage: Activity written, mounted=$mounted');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ganesha_2026/core/design/app_colors.dart';
 import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
+import 'package:ganesha_2026/shared/widgets/app_bell_icon.dart';
 
-class AppPageActions extends StatelessWidget {
+class AppPageActions extends ConsumerWidget {
   final VoidCallback? onSettings;
   final VoidCallback? onAdd;
   final VoidCallback? onFilter;
@@ -12,6 +14,7 @@ class AppPageActions extends StatelessWidget {
   final bool showAdd;
   final bool showFilter;
   final bool showSearch;
+  final bool showNotifications;
 
   const AppPageActions({
     super.key,
@@ -23,15 +26,20 @@ class AppPageActions extends StatelessWidget {
     this.showAdd = false,
     this.showFilter = false,
     this.showSearch = false,
+    this.showNotifications = true,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final canSeeSettings = showSettings && onSettings != null;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (showNotifications) ...[
+          const AppBellIcon(),
+          const SizedBox(width: AppSpacing.sm),
+        ],
         if (showAdd && onAdd != null) ...[
           _ActionButton(
             icon: Icons.add_rounded,

@@ -12,6 +12,7 @@ import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/sponsor_followup.dart';
 import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/providers/followup_provider.dart';
+import 'package:ganesha_2026/core/providers/notification_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/shared/utils/amount_format.dart';
 import 'package:ganesha_2026/shared/widgets/app_empty_state.dart';
@@ -339,16 +340,10 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
         completedAt: Timestamp.now(),
       );
       await service.updateFollowUp(updated);
-      service.addActivity(Activity(
-        id: service.generateId(),
-        festivalId: AppConstants.festivalId,
-        type: 'followup_completed',
-        title: 'Visit Completed',
-        description: 'Visit completed for ${item.sponsorName}',
-        createdAt: Timestamp.now(),
-        recordId: item.id,
-        entityType: 'sponsor_followup',
-      ));
+      final activityService = ref.read(activityServiceProvider);
+      final userId = ref.read(userIdProvider);
+      final userName = ref.read(userNameProvider);
+      activityService.recordFollowUpCompleted(updated, userId: userId, userName: userName);
 
       if (!context.mounted) return;
 

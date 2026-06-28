@@ -17,6 +17,7 @@ import 'package:ganesha_2026/features/daily_collections/daily_collection_list_pa
 import 'package:ganesha_2026/features/daily_collections/daily_collection_form_page.dart';
 import 'package:ganesha_2026/features/followups/followup_list_page.dart';
 import 'package:ganesha_2026/features/followups/followup_form_page.dart';
+import 'package:ganesha_2026/features/notifications/notification_center_page.dart';
 import 'package:ganesha_2026/features/settings/settings_page.dart';
 
 class _RouterRefreshNotifier extends ChangeNotifier {
@@ -171,6 +172,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       _buildRoute('/settings', const SettingsPage()),
+      _buildRoute('/notifications', const NotificationCenterPage()),
     ],
   );
 });

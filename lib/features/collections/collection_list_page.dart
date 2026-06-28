@@ -5,11 +5,11 @@ import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/core/design/app_colors.dart';
 import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ganesha_2026/core/models/target.dart';
 import 'package:ganesha_2026/shared/utils/amount_format.dart';
-import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/providers/target_provider.dart';
+import 'package:ganesha_2026/core/providers/auth_provider.dart';
+import 'package:ganesha_2026/core/providers/notification_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/core/providers/financial_metrics_provider.dart';
 import 'package:ganesha_2026/features/collections/collection_tile.dart';
@@ -480,16 +480,10 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
         amount: collectionAmount,
         note: collectionNote,
       );
-      service.addActivity(Activity(
-        id: service.generateId(),
-        festivalId: AppConstants.festivalId,
-        type: 'collection_recorded',
-        title: 'Collection Recorded',
-        description: 'Collection of ${AppConstants.currencySymbol}${fmtAmount(collectionAmount)} received from ${target.name}${collectionNote.isNotEmpty ? ' — $collectionNote' : ''}',
-        createdAt: Timestamp.now(),
-        recordId: target.id,
-        entityType: 'target',
-      ));
+      final activityService = ref.read(activityServiceProvider);
+      final userId = ref.read(userIdProvider);
+      final userName = ref.read(userNameProvider);
+      activityService.recordContributionRecorded(target, collectionAmount, userId: userId, userName: userName);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Collection recorded successfully')),

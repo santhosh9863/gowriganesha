@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
@@ -10,7 +9,6 @@ import 'package:ganesha_2026/core/design/app_colors.dart';
 import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/design/app_shadows.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
-import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/models/festival.dart';
 import 'package:ganesha_2026/core/models/expense.dart';
 import 'package:ganesha_2026/core/models/user_role.dart';
@@ -18,6 +16,7 @@ import 'package:ganesha_2026/core/providers/budget_provider.dart';
 import 'package:ganesha_2026/core/providers/expense_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart'; // exports firestoreProvider
 import 'package:ganesha_2026/core/providers/auth_provider.dart';
+import 'package:ganesha_2026/core/providers/notification_provider.dart';
 import 'package:ganesha_2026/core/utils/permissions.dart';
 import 'package:ganesha_2026/shared/utils/amount_format.dart';
 import 'package:ganesha_2026/shared/utils/export_data.dart';
@@ -333,6 +332,10 @@ class _BudgetCardState extends ConsumerState<_BudgetCard> {
     debugPrint('[DIAG:_editBudget] BEFORE firestore write result=$result');
     final service = ref.read(firestoreProvider);
     await service.setBudget(AppConstants.festivalId, result);
+    final activityService = ref.read(activityServiceProvider);
+    final userId = ref.read(userIdProvider);
+    final userName = ref.read(userNameProvider);
+    activityService.recordSettingsUpdated(userId: userId, userName: userName);
     debugPrint('[DIAG:_editBudget] AFTER firestore write');
     if (!context.mounted) {
       debugPrint('[DIAG:_editBudget] NOT MOUNTED after firestore write');
@@ -607,16 +610,10 @@ class _FestivalInfoCardState extends ConsumerState<_FestivalInfoCard> {
     debugPrint('[DIAG:_editText] BEFORE firestore write label=$label result=$result');
     final service = ref.read(firestoreProvider);
     await service.setFestival(updated);
-    service.addActivity(Activity(
-      id: service.generateId(),
-      festivalId: AppConstants.festivalId,
-      type: 'festival_updated',
-      title: 'Festival Setting Updated',
-      description: '$label updated',
-      createdAt: Timestamp.now(),
-      recordId: widget.festival.id,
-      entityType: 'festival',
-    ));
+    final activityService = ref.read(activityServiceProvider);
+    final userId = ref.read(userIdProvider);
+    final userName = ref.read(userNameProvider);
+    activityService.recordSettingsUpdated(userId: userId, userName: userName);
     debugPrint('[DIAG:_editText] AFTER firestore write');
     if (!context.mounted) {
       debugPrint('[DIAG:_editText] NOT MOUNTED after firestore write');
@@ -661,16 +658,10 @@ class _FestivalInfoCardState extends ConsumerState<_FestivalInfoCard> {
     debugPrint('[DIAG:_pickDate] BEFORE firestore write picked=${DateFormat('d MMMM yyyy').format(picked)}');
     final service = ref.read(firestoreProvider);
     await service.setFestival(updated);
-    service.addActivity(Activity(
-      id: service.generateId(),
-      festivalId: AppConstants.festivalId,
-      type: 'festival_updated',
-      title: 'Festival Date Updated',
-      description: 'Festival date set to ${DateFormat('d MMMM yyyy').format(picked)}',
-      createdAt: Timestamp.now(),
-      recordId: widget.festival.id,
-      entityType: 'festival',
-    ));
+    final activityService = ref.read(activityServiceProvider);
+    final userId = ref.read(userIdProvider);
+    final userName = ref.read(userNameProvider);
+    activityService.recordSettingsUpdated(userId: userId, userName: userName);
     debugPrint('[DIAG:_pickDate] AFTER firestore write');
     if (!context.mounted) {
       debugPrint('[DIAG:_pickDate] NOT MOUNTED after firestore write');
@@ -736,16 +727,10 @@ class _FestivalInfoCardState extends ConsumerState<_FestivalInfoCard> {
           : await service.uploadQrImage(File(picked.path));
       final updated = widget.festival.copyWith(qrImageUrl: url);
       await service.setFestival(updated);
-      service.addActivity(Activity(
-        id: service.generateId(),
-        festivalId: AppConstants.festivalId,
-        type: 'qr_updated',
-        title: 'QR Code Updated',
-        description: 'Payment QR code updated',
-        createdAt: Timestamp.now(),
-        recordId: widget.festival.id,
-        entityType: 'festival',
-      ));
+      final activityService = ref.read(activityServiceProvider);
+      final userId = ref.read(userIdProvider);
+      final userName = ref.read(userNameProvider);
+      activityService.recordSettingsUpdated(userId: userId, userName: userName);
       debugPrint('[DIAG:_uploadQrImage] AFTER firestore upload');
       if (!context.mounted) {
         debugPrint('[DIAG:_uploadQrImage] NOT MOUNTED after upload');

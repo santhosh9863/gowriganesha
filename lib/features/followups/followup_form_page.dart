@@ -6,9 +6,9 @@ import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/sponsor_followup.dart';
-import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/models/user_role.dart';
 import 'package:ganesha_2026/core/providers/auth_provider.dart';
+import 'package:ganesha_2026/core/providers/notification_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/shared/utils/amount_format.dart';
 
@@ -280,16 +280,10 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
           createdAt: now,
         );
         await service.addFollowUp(item);
-        service.addActivity(Activity(
-          id: service.generateId(),
-          festivalId: AppConstants.festivalId,
-          type: 'followup_added',
-          title: 'Visit Added',
-          description: 'Visit scheduled for ${item.sponsorName}',
-          createdAt: Timestamp.now(),
-          recordId: item.id,
-          entityType: 'sponsor_followup',
-        ));
+        final activityService = ref.read(activityServiceProvider);
+        final userId = ref.read(userIdProvider);
+        final userName = ref.read(userNameProvider);
+        activityService.recordFollowUpAdded(item, userId: userId, userName: userName);
       }
       if (mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {

@@ -16,6 +16,7 @@ class AppPageHeader extends StatelessWidget {
   final bool showAdd;
   final bool showFilter;
   final bool showSearch;
+  final bool showNotifications;
 
   const AppPageHeader({
     super.key,
@@ -31,6 +32,7 @@ class AppPageHeader extends StatelessWidget {
     this.showAdd = false,
     this.showFilter = false,
     this.showSearch = false,
+    this.showNotifications = true,
   });
 
   @override
@@ -57,6 +59,7 @@ class AppPageHeader extends StatelessWidget {
               showAdd: showAdd,
               showFilter: showFilter,
               showSearch: showSearch,
+              showNotifications: showNotifications,
             ),
       ],
     );

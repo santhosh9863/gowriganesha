@@ -7,9 +7,9 @@ import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/shared/utils/amount_format.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/expense.dart';
-import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/models/user_role.dart';
 import 'package:ganesha_2026/core/providers/auth_provider.dart';
+import 'package:ganesha_2026/core/providers/notification_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 
 class ExpenseFormPage extends ConsumerStatefulWidget {
@@ -235,16 +235,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           createdAt: Timestamp.now(),
         );
         await service.addExpense(expense);
-        service.addActivity(Activity(
-          id: service.generateId(),
-          festivalId: AppConstants.festivalId,
-          type: 'expense_added',
-          title: 'Expense Added',
-          description: 'Expense of ${AppConstants.currencySymbol}${fmtAmount(expense.amount)} recorded${expense.note.isNotEmpty ? ' — ${expense.note}' : ''}',
-          createdAt: Timestamp.now(),
-          recordId: expense.id,
-          entityType: 'expense',
-        ));
+        final activityService = ref.read(activityServiceProvider);
+        final userId = ref.read(userIdProvider);
+        final userName = ref.read(userNameProvider);
+        activityService.recordExpenseAdded(expense, userId: userId, userName: userName);
       }
 
       if (mounted) {
