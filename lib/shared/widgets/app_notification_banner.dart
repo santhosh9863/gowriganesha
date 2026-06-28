@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ganesha_2026/core/design/app_colors.dart';
 import 'package:ganesha_2026/core/design/app_radius.dart';
-import 'package:ganesha_2026/core/design/app_shadows.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
+import 'package:ganesha_2026/shared/widgets/sankalpa_glass.dart';
 
 class InAppBannerData {
   final String title;
@@ -23,9 +23,6 @@ class InAppBannerData {
 }
 
 class InAppBannerNotifier extends StateNotifier<InAppBannerData?> {
-  final List<InAppBannerData> _queue = [];
-  Timer? _timer;
-
   InAppBannerNotifier() : super(null);
 
   void show(InAppBannerData banner) {
@@ -43,6 +40,9 @@ class InAppBannerNotifier extends StateNotifier<InAppBannerData?> {
     state = null;
     _showNext();
   }
+
+  final List<InAppBannerData> _queue = [];
+  Timer? _timer;
 
   void _showNext() {
     if (_queue.isNotEmpty) {
@@ -69,24 +69,69 @@ final inAppBannerProvider =
   return InAppBannerNotifier();
 });
 
-class AppNotificationBanner extends ConsumerWidget {
+class AppNotificationBanner extends ConsumerStatefulWidget {
   const AppNotificationBanner({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AppNotificationBanner> createState() =>
+      _AppNotificationBannerState();
+}
+
+class _AppNotificationBannerState extends ConsumerState<AppNotificationBanner>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _slideCtrl;
+  late Animation<Offset> _slideAnim;
+  late Animation<double> _fadeAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _slideCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, -1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _slideCtrl,
+      curve: Curves.easeOutCubic,
+    ));
+    _fadeAnim = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _slideCtrl, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _slideCtrl.stop();
+    _slideCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final banner = ref.watch(inAppBannerProvider);
 
-    return AnimatedSize(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      alignment: Alignment.topCenter,
-      child: banner == null
-          ? const SizedBox.shrink()
-          : _BannerContent(
-              data: banner,
-              onDismiss: () =>
-                  ref.read(inAppBannerProvider.notifier).dismiss(),
-            ),
+    if (banner == null) {
+      _slideCtrl.reverse();
+      return const SizedBox.shrink();
+    }
+
+    if (!_slideCtrl.isAnimating && _slideCtrl.value == 0) {
+      _slideCtrl.forward();
+    }
+
+    return FadeTransition(
+      opacity: _fadeAnim,
+      child: SlideTransition(
+        position: _slideAnim,
+        child: _BannerContent(
+          data: banner,
+          onDismiss: () =>
+              ref.read(inAppBannerProvider.notifier).dismiss(),
+        ),
+      ),
     );
   }
 }
@@ -113,80 +158,89 @@ class _BannerContent extends StatelessWidget {
       ),
       child: GestureDetector(
         onTap: data.onTap,
-        child: Container(
-          height: 72,
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: AppRadius.largeBorder,
-            boxShadow: AppShadows.elevated,
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 5,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: data.accentColor,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(AppRadius.large),
-                    bottomLeft: Radius.circular(AppRadius.large),
+        onHorizontalDragEnd: (details) {
+          if (details.primaryVelocity != null &&
+              details.primaryVelocity!.abs() > 200) {
+            onDismiss();
+          }
+        },
+        child: SankalpaGlass(
+          sigma: 12,
+          opacity: 0.88,
+          borderRadius: AppRadius.largeBorder,
+          borderColor: AppColors.outline,
+          tintColor: AppColors.card,
+          padding: EdgeInsets.zero,
+          child: SizedBox(
+            height: 72,
+            child: Row(
+              children: [
+                Container(
+                  width: 5,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: data.accentColor,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(AppRadius.large),
+                      bottomLeft: Radius.circular(AppRadius.large),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: data.accentColor.withValues(alpha: 0.1),
-                  borderRadius: AppRadius.mediumBorder,
+                const SizedBox(width: AppSpacing.md),
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: data.accentColor.withValues(alpha: 0.12),
+                    borderRadius: AppRadius.mediumBorder,
+                  ),
+                  child: Icon(data.icon, size: 18, color: data.accentColor),
                 ),
-                child: Icon(data.icon, size: 18, color: data.accentColor),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      data.title,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: AppColors.charcoal,
-                        fontWeight: FontWeight.w600,
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        data.title,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: AppColors.charcoal,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 1),
-                    Text(
-                      data.body,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.warmGray600,
+                      const SizedBox(height: 1),
+                      Text(
+                        data.body,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.warmGray600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              IconButton(
-                icon: Icon(
-                  Icons.close_rounded,
-                  size: 18,
-                  color: AppColors.warmGray400,
+                IconButton(
+                  icon: Icon(
+                    Icons.close_rounded,
+                    size: 18,
+                    color: AppColors.warmGray400,
+                  ),
+                  onPressed: onDismiss,
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
+                  splashRadius: 18,
+                  tooltip: 'Dismiss',
                 ),
-                onPressed: onDismiss,
-                padding: const EdgeInsets.all(AppSpacing.sm),
-                constraints: const BoxConstraints(
-                  minWidth: 36,
-                  minHeight: 36,
-                ),
-                splashRadius: 18,
-                tooltip: 'Dismiss',
-              ),
-              const SizedBox(width: AppSpacing.xs),
-            ],
+                const SizedBox(width: AppSpacing.xs),
+              ],
+            ),
           ),
         ),
       ),

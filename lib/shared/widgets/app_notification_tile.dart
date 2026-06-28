@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ganesha_2026/core/design/app_colors.dart';
 import 'package:ganesha_2026/core/design/app_radius.dart';
+import 'package:ganesha_2026/core/design/app_shadows.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/app_notification.dart';
 import 'package:ganesha_2026/core/models/notification_type.dart';
@@ -62,57 +63,67 @@ class AppNotificationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final config = _categoryConfig[notification.category] ?? _categoryConfig[NotificationCategory.system]!;
+    final config = _categoryConfig[notification.category] ??
+        _categoryConfig[NotificationCategory.system]!;
 
     final tile = Semantics(
       label: 'Notification: ${notification.title}',
       hint: _isUnread ? 'Unread notification' : 'Read notification',
       child: InkWell(
         onTap: onTap,
-        borderRadius: AppRadius.mediumBorder,
+        borderRadius: AppRadius.largeBorder,
         child: Container(
-          padding: const EdgeInsets.all(AppSpacing.md),
+          height: 76,
           decoration: BoxDecoration(
             color: AppColors.card,
-            borderRadius: AppRadius.mediumBorder,
+            borderRadius: AppRadius.largeBorder,
             border: Border.all(color: AppColors.outline),
+            boxShadow: AppShadows.subtle,
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Semantics(
-                label: _isUnread ? 'Unread indicator' : '',
-                child: _isUnread
-                    ? Container(
-                        width: 8,
-                        height: 8,
-                        margin: const EdgeInsets.only(top: 6, right: AppSpacing.sm),
-                        decoration: const BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                        ),
-                      )
-                    : const SizedBox(width: AppSpacing.lg + 8),
-              ),
-              Semantics(
-                label: '${notification.category.label} notification',
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: config.color.withValues(alpha: 0.1),
-                    borderRadius: AppRadius.mediumBorder,
+              Container(
+                width: 4,
+                height: 76,
+                decoration: BoxDecoration(
+                  color: config.color,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(AppRadius.large),
+                    bottomLeft: Radius.circular(AppRadius.large),
                   ),
-                  child: Icon(config.icon, size: 18, color: config.color),
                 ),
+              ),
+              const SizedBox(width: AppSpacing.xs + 2),
+              if (_isUnread)
+                Container(
+                  width: 6,
+                  height: 6,
+                  margin: const EdgeInsets.only(top: 30),
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                )
+              else
+                const SizedBox(width: AppSpacing.sm - 2),
+              const SizedBox(width: AppSpacing.sm),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: config.color.withValues(alpha: 0.1),
+                  borderRadius: AppRadius.mediumBorder,
+                ),
+                child: Icon(config.icon, size: 16, color: config.color),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Expanded(
                           child: Text(
@@ -121,32 +132,36 @@ class AppNotificationTile extends StatelessWidget {
                               color: AppColors.charcoal,
                               fontWeight:
                                   _isUnread ? FontWeight.w600 : FontWeight.w500,
+                              height: 1.3,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(width: AppSpacing.sm),
+                        const SizedBox(width: AppSpacing.xs),
                         Text(
                           _formatTimestamp(notification.createdAt),
                           style: theme.textTheme.labelMedium?.copyWith(
                             color: AppColors.warmGray400,
+                            height: 1.3,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 1),
                     Text(
                       notification.body,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: AppColors.warmGray600,
+                        height: 1.3,
                       ),
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: AppSpacing.md),
             ],
           ),
         ),
@@ -172,26 +187,34 @@ class AppNotificationTile extends StatelessWidget {
           margin: const EdgeInsets.symmetric(vertical: 1),
           decoration: BoxDecoration(
             color: AppColors.success,
-            borderRadius: AppRadius.mediumBorder,
+            borderRadius: AppRadius.largeBorder,
           ),
           alignment: Alignment.centerLeft,
           padding: const EdgeInsets.only(left: AppSpacing.xl),
           child: Semantics(
             label: 'Mark as read',
-            child: const Icon(Icons.check_rounded, color: Colors.white, size: 24),
+            child: const Icon(
+              Icons.check_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
           ),
         ),
         secondaryBackground: Container(
           margin: const EdgeInsets.symmetric(vertical: 1),
           decoration: BoxDecoration(
             color: AppColors.warmGray500,
-            borderRadius: AppRadius.mediumBorder,
+            borderRadius: AppRadius.largeBorder,
           ),
           alignment: Alignment.centerRight,
           padding: const EdgeInsets.only(right: AppSpacing.xl),
           child: Semantics(
             label: 'Archive',
-            child: const Icon(Icons.archive_rounded, color: Colors.white, size: 24),
+            child: const Icon(
+              Icons.archive_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
           ),
         ),
         child: tile,
@@ -205,11 +228,11 @@ class AppNotificationTile extends StatelessWidget {
     final diff = now.difference(dt);
 
     if (diff.inMinutes < 1) return 'now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays == 1) return 'Yesterday';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
-    if (diff.inDays < 30) return '${diff.inDays ~/ 7}w ago';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
+    if (diff.inHours < 24) return '${diff.inHours}h';
+    if (diff.inDays == 1) return 'yesterday';
+    if (diff.inDays < 7) return '${diff.inDays}d';
+    if (diff.inDays < 30) return '${diff.inDays ~/ 7}w';
     return DateFormat('d MMM').format(dt);
   }
 }

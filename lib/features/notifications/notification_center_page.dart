@@ -22,10 +22,28 @@ class NotificationCenterPage extends ConsumerStatefulWidget {
 }
 
 class _NotificationCenterPageState
-    extends ConsumerState<NotificationCenterPage> {
+    extends ConsumerState<NotificationCenterPage>
+    with SingleTickerProviderStateMixin {
   bool _loadingAction = false;
   NotificationCategory? _categoryFilter;
   bool _showArchived = false;
+  late final AnimationController _fadeCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _fadeCtrl.stop();
+    _fadeCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -85,21 +103,24 @@ class _NotificationCenterPageState
             ),
         ],
       ),
-      body: notificationsAsync.when(
-        loading: () => const AppSkeletonList(itemCount: 6),
-        error: (e, _) => _buildErrorState(theme),
-        data: (notifications) {
-          final filtered = _applyFilters(notifications);
-          if (filtered.isEmpty) {
-            return _buildEmptyState(theme);
-          }
-          return _buildContent(filtered, userId, theme);
-        },
+      body: FadeTransition(
+        opacity: _fadeCtrl,
+        child: notificationsAsync.when(
+          loading: () => const AppSkeletonList(itemCount: 6),
+          error: (e, _) => _buildErrorState(),
+          data: (notifications) {
+            final filtered = _applyFilters(notifications);
+            if (filtered.isEmpty) {
+              return _buildEmptyState();
+            }
+            return _buildContent(filtered, userId);
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildErrorState(ThemeData theme) {
+  Widget _buildErrorState() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.xl),
@@ -117,9 +138,9 @@ class _NotificationCenterPageState
             const SizedBox(height: AppSpacing.sm),
             Text(
               'Failed to load notifications',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.warmGray500,
-              ),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.warmGray500,
+                  ),
             ),
             const SizedBox(height: AppSpacing.lg),
             Semantics(
@@ -136,14 +157,14 @@ class _NotificationCenterPageState
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme) {
+  Widget _buildEmptyState() {
     final hasActiveFilter = _categoryFilter != null || _showArchived;
     final message = hasActiveFilter
         ? 'No notifications match your filters'
         : "You're all caught up!";
     return Column(
       children: [
-        _buildFilterBar(theme),
+        _buildFilterBar(),
         Expanded(
           child: AppEmptyState(
             icon: Icons.notifications_none_rounded,
@@ -158,17 +179,16 @@ class _NotificationCenterPageState
   Widget _buildContent(
     List<AppNotification> notifications,
     String userId,
-    ThemeData theme,
   ) {
     return Column(
       children: [
-        _buildFilterBar(theme),
-        Expanded(child: _buildGroupedList(notifications, userId, theme)),
+        _buildFilterBar(),
+        Expanded(child: _buildGroupedList(notifications, userId)),
       ],
     );
   }
 
-  Widget _buildFilterBar(ThemeData theme) {
+  Widget _buildFilterBar() {
     final categories = NotificationCategory.values;
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -187,56 +207,28 @@ class _NotificationCenterPageState
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              Semantics(
-                label: 'Show all notifications',
+              _FilterChip(
+                label: 'All',
                 selected: _categoryFilter == null,
-                child: FilterChip(
-                  label: const Text('All'),
-                  selected: _categoryFilter == null,
-                  onSelected: (_) => setState(() => _categoryFilter = null),
-                ),
+                onTap: () => setState(() => _categoryFilter = null),
               ),
               const SizedBox(width: AppSpacing.sm),
-              for (final category in categories)
-                Padding(
-                  padding: const EdgeInsets.only(right: AppSpacing.sm),
-                  child: Semantics(
-                    label: 'Filter by ${category.name}',
-                    selected: _categoryFilter == category,
-                    child: FilterChip(
-                      label: Text(category.label),
-                      selected: _categoryFilter == category,
-                      onSelected: (selected) {
-                        setState(() =>
-                            _categoryFilter = selected ? category : null);
-                      },
-                    ),
+              for (final category in categories) ...[
+                _FilterChip(
+                  label: category.label,
+                  selected: _categoryFilter == category,
+                  onTap: () => setState(
+                    () => _categoryFilter =
+                        _categoryFilter == category ? null : category,
                   ),
                 ),
-              const Spacer(),
-              Semantics(
-                label: _showArchived
-                    ? 'Hide archived notifications'
-                    : 'Show archived notifications',
-                child: FilterChip(
-                  label: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.archive_rounded,
-                        size: 14,
-                        color: _showArchived
-                            ? AppColors.primary
-                            : AppColors.warmGray500,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(_showArchived ? 'Hide archived' : 'Archived'),
-                    ],
-                  ),
-                  selected: _showArchived,
-                  onSelected: (selected) =>
-                      setState(() => _showArchived = selected),
-                ),
+                const SizedBox(width: AppSpacing.sm),
+              ],
+              _FilterChip(
+                label: _showArchived ? 'Hide archived' : 'Archived',
+                selected: _showArchived,
+                icon: Icons.archive_rounded,
+                onTap: () => setState(() => _showArchived = !_showArchived),
               ),
             ],
           ),
@@ -263,8 +255,8 @@ class _NotificationCenterPageState
   Widget _buildGroupedList(
     List<AppNotification> notifications,
     String userId,
-    ThemeData theme,
   ) {
+    final theme = Theme.of(context);
     final grouped = _groupNotifications(notifications);
     final sectionOrder = ['Today', 'Yesterday', 'This Week', 'Earlier'];
 
@@ -287,7 +279,8 @@ class _NotificationCenterPageState
                 section,
                 style: theme.textTheme.labelLarge?.copyWith(
                   color: AppColors.warmGray400,
-                  letterSpacing: 0.5,
+                  letterSpacing: 0.3,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -368,5 +361,61 @@ class _NotificationCenterPageState
     } finally {
       if (mounted) setState(() => _loadingAction = false);
     }
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final IconData? icon;
+  final VoidCallback onTap;
+
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs + 2,
+        ),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : AppColors.card,
+          borderRadius: BorderRadius.circular(AppRadius.chip),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.outline,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 14,
+                color: selected ? Colors.white : AppColors.warmGray500,
+              ),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: selected ? Colors.white : AppColors.warmGray700,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
