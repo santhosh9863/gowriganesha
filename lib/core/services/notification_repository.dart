@@ -190,6 +190,30 @@ class NotificationRepository {
     }
   }
 
+  Future<void> archiveNotification(String id) async {
+    try {
+      await _notifications.doc(id).update({
+        'archivedAt': FieldValue.serverTimestamp(),
+      });
+      debugPrint('[NOTIFICATION_REPO] Archived: $id');
+    } on FirebaseException catch (e) {
+      debugPrint('[NOTIFICATION_REPO] Error archiving: $e');
+      throw FirestoreException('Failed to archive notification', originalError: e);
+    }
+  }
+
+  Future<void> unarchiveNotification(String id) async {
+    try {
+      await _notifications.doc(id).update({
+        'archivedAt': FieldValue.delete(),
+      });
+      debugPrint('[NOTIFICATION_REPO] Unarchived: $id');
+    } on FirebaseException catch (e) {
+      debugPrint('[NOTIFICATION_REPO] Error unarchiving: $e');
+      throw FirestoreException('Failed to unarchive notification', originalError: e);
+    }
+  }
+
   Future<int> archiveOldNotifications({int olderThanDays = 90}) async {
     try {
       final cutoff = Timestamp.fromDate(

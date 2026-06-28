@@ -5,6 +5,7 @@ import 'package:ganesha_2026/core/design/app_colors.dart';
 import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/app_notification.dart';
+import 'package:ganesha_2026/core/models/notification_type.dart';
 import 'package:ganesha_2026/core/models/user_role.dart';
 import 'package:ganesha_2026/core/providers/auth_provider.dart';
 import 'package:ganesha_2026/core/providers/notification_provider.dart';
@@ -23,6 +24,8 @@ class NotificationCenterPage extends ConsumerStatefulWidget {
 class _NotificationCenterPageState
     extends ConsumerState<NotificationCenterPage> {
   bool _loadingAction = false;
+  NotificationCategory? _categoryFilter;
+  bool _showArchived = false;
 
   @override
   Widget build(BuildContext context) {
@@ -84,37 +87,177 @@ class _NotificationCenterPageState
       ),
       body: notificationsAsync.when(
         loading: () => const AppSkeletonList(itemCount: 6),
-        error: (e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.xl),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.cloud_off_rounded,
-                    size: 48, color: AppColors.warmGray300),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  'Failed to load notifications',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: AppColors.warmGray500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+        error: (e, _) => _buildErrorState(theme),
         data: (notifications) {
-          if (notifications.isEmpty) {
-            return const AppEmptyState(
-              icon: Icons.notifications_none_rounded,
-              title: 'No notifications yet',
-              subtitle: "You're all caught up!",
-            );
+          final filtered = _applyFilters(notifications);
+          if (filtered.isEmpty) {
+            return _buildEmptyState(theme);
           }
-          return _buildGroupedList(notifications, userId, theme);
+          return _buildContent(filtered, userId, theme);
         },
       ),
     );
+  }
+
+  Widget _buildErrorState(ThemeData theme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Semantics(
+              label: 'Error loading notifications',
+              child: Icon(
+                Icons.cloud_off_rounded,
+                size: 48,
+                color: AppColors.warmGray300,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'Failed to load notifications',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppColors.warmGray500,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Semantics(
+              label: 'Retry loading notifications',
+              child: FilledButton.tonalIcon(
+                onPressed: () => ref.invalidate(notificationsStreamProvider),
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Retry'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(ThemeData theme) {
+    final hasActiveFilter = _categoryFilter != null || _showArchived;
+    final message = hasActiveFilter
+        ? 'No notifications match your filters'
+        : "You're all caught up!";
+    return Column(
+      children: [
+        _buildFilterBar(theme),
+        Expanded(
+          child: AppEmptyState(
+            icon: Icons.notifications_none_rounded,
+            title: 'No notifications yet',
+            subtitle: message,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContent(
+    List<AppNotification> notifications,
+    String userId,
+    ThemeData theme,
+  ) {
+    return Column(
+      children: [
+        _buildFilterBar(theme),
+        Expanded(child: _buildGroupedList(notifications, userId, theme)),
+      ],
+    );
+  }
+
+  Widget _buildFilterBar(ThemeData theme) {
+    final categories = NotificationCategory.values;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border(
+          bottom: BorderSide(color: AppColors.outline.withValues(alpha: 0.5)),
+        ),
+      ),
+      child: Semantics(
+        label: 'Notification filters',
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              Semantics(
+                label: 'Show all notifications',
+                selected: _categoryFilter == null,
+                child: FilterChip(
+                  label: const Text('All'),
+                  selected: _categoryFilter == null,
+                  onSelected: (_) => setState(() => _categoryFilter = null),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              for (final category in categories)
+                Padding(
+                  padding: const EdgeInsets.only(right: AppSpacing.sm),
+                  child: Semantics(
+                    label: 'Filter by ${category.name}',
+                    selected: _categoryFilter == category,
+                    child: FilterChip(
+                      label: Text(category.label),
+                      selected: _categoryFilter == category,
+                      onSelected: (selected) {
+                        setState(() =>
+                            _categoryFilter = selected ? category : null);
+                      },
+                    ),
+                  ),
+                ),
+              const Spacer(),
+              Semantics(
+                label: _showArchived
+                    ? 'Hide archived notifications'
+                    : 'Show archived notifications',
+                child: FilterChip(
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.archive_rounded,
+                        size: 14,
+                        color: _showArchived
+                            ? AppColors.primary
+                            : AppColors.warmGray500,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(_showArchived ? 'Hide archived' : 'Archived'),
+                    ],
+                  ),
+                  selected: _showArchived,
+                  onSelected: (selected) =>
+                      setState(() => _showArchived = selected),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<AppNotification> _applyFilters(List<AppNotification> notifications) {
+    var filtered = notifications;
+
+    if (_categoryFilter != null) {
+      filtered =
+          filtered.where((n) => n.category == _categoryFilter).toList();
+    }
+
+    if (!_showArchived) {
+      filtered = filtered.where((n) => n.archivedAt == null).toList();
+    }
+
+    return filtered;
   }
 
   Widget _buildGroupedList(
@@ -157,6 +300,9 @@ class _NotificationCenterPageState
                   onTap: () => _onTapNotification(notification),
                   onMarkAsRead: notification.isUnreadBy(userId)
                       ? () => _markAsRead(notification.id)
+                      : null,
+                  onArchive: notification.archivedAt == null
+                      ? () => _archiveNotification(notification.id)
                       : null,
                 ),
               ),
@@ -203,6 +349,11 @@ class _NotificationCenterPageState
     final service = ref.read(notificationServiceProvider);
     final userId = ref.read(userIdProvider);
     service.markAsRead(notificationId, userId);
+  }
+
+  void _archiveNotification(String notificationId) {
+    final service = ref.read(notificationServiceProvider);
+    service.archiveNotification(notificationId);
   }
 
   Future<void> _markAllAsRead() async {

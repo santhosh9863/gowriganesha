@@ -45,6 +45,7 @@ class AppNotificationTile extends StatelessWidget {
   final String currentUserId;
   final VoidCallback? onTap;
   final VoidCallback? onMarkAsRead;
+  final VoidCallback? onArchive;
 
   const AppNotificationTile({
     super.key,
@@ -52,115 +53,149 @@ class AppNotificationTile extends StatelessWidget {
     required this.currentUserId,
     this.onTap,
     this.onMarkAsRead,
+    this.onArchive,
   });
 
   bool get _isUnread => notification.isUnreadBy(currentUserId);
+  bool get _hasActions => onMarkAsRead != null || onArchive != null;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final config = _categoryConfig[notification.category] ?? _categoryConfig[NotificationCategory.system]!;
 
-    final tile = InkWell(
-      onTap: onTap,
-      borderRadius: AppRadius.mediumBorder,
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: AppRadius.mediumBorder,
-          border: Border.all(color: AppColors.outline),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_isUnread)
-              Container(
-                width: 8,
-                height: 8,
-                margin: const EdgeInsets.only(top: 6, right: AppSpacing.sm),
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
+    final tile = Semantics(
+      label: 'Notification: ${notification.title}',
+      hint: _isUnread ? 'Unread notification' : 'Read notification',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.mediumBorder,
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: AppRadius.mediumBorder,
+            border: Border.all(color: AppColors.outline),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Semantics(
+                label: _isUnread ? 'Unread indicator' : '',
+                child: _isUnread
+                    ? Container(
+                        width: 8,
+                        height: 8,
+                        margin: const EdgeInsets.only(top: 6, right: AppSpacing.sm),
+                        decoration: const BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      )
+                    : const SizedBox(width: AppSpacing.lg + 8),
+              ),
+              Semantics(
+                label: '${notification.category.label} notification',
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: config.color.withValues(alpha: 0.1),
+                    borderRadius: AppRadius.mediumBorder,
+                  ),
+                  child: Icon(config.icon, size: 18, color: config.color),
                 ),
-              )
-            else
-              const SizedBox(width: AppSpacing.lg + 8),
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: config.color.withValues(alpha: 0.1),
-                borderRadius: AppRadius.mediumBorder,
               ),
-              child: Icon(config.icon, size: 18, color: config.color),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          notification.title,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            color: AppColors.charcoal,
-                            fontWeight:
-                                _isUnread ? FontWeight.w600 : FontWeight.w500,
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            notification.title,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              color: AppColors.charcoal,
+                              fontWeight:
+                                  _isUnread ? FontWeight.w600 : FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Text(
-                        _formatTimestamp(notification.createdAt),
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: AppColors.warmGray400,
+                        const SizedBox(width: AppSpacing.sm),
+                        Text(
+                          _formatTimestamp(notification.createdAt),
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: AppColors.warmGray400,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    notification.body,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppColors.warmGray600,
+                      ],
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                    const SizedBox(height: 2),
+                    Text(
+                      notification.body,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.warmGray600,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
 
-    if (!_isUnread || onMarkAsRead == null) return tile;
+    if (!_hasActions) return tile;
 
-    return Dismissible(
-      key: ValueKey(notification.id),
-      direction: DismissDirection.startToEnd,
-      confirmDismiss: (_) async {
-        onMarkAsRead?.call();
-        return false;
-      },
-      background: Container(
-        margin: const EdgeInsets.symmetric(vertical: 1),
-        decoration: BoxDecoration(
-          color: AppColors.success,
-          borderRadius: AppRadius.mediumBorder,
+    return Semantics(
+      label: 'Swipe right to mark as read, swipe left to archive',
+      child: Dismissible(
+        key: ValueKey('${notification.id}_dismiss'),
+        direction: DismissDirection.horizontal,
+        confirmDismiss: (direction) async {
+          if (direction == DismissDirection.startToEnd) {
+            onMarkAsRead?.call();
+          } else {
+            onArchive?.call();
+          }
+          return false;
+        },
+        background: Container(
+          margin: const EdgeInsets.symmetric(vertical: 1),
+          decoration: BoxDecoration(
+            color: AppColors.success,
+            borderRadius: AppRadius.mediumBorder,
+          ),
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.only(left: AppSpacing.xl),
+          child: Semantics(
+            label: 'Mark as read',
+            child: const Icon(Icons.check_rounded, color: Colors.white, size: 24),
+          ),
         ),
-        alignment: Alignment.centerLeft,
-        padding: const EdgeInsets.only(left: AppSpacing.xl),
-        child: const Icon(Icons.check_rounded, color: Colors.white, size: 24),
+        secondaryBackground: Container(
+          margin: const EdgeInsets.symmetric(vertical: 1),
+          decoration: BoxDecoration(
+            color: AppColors.warmGray500,
+            borderRadius: AppRadius.mediumBorder,
+          ),
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: AppSpacing.xl),
+          child: Semantics(
+            label: 'Archive',
+            child: const Icon(Icons.archive_rounded, color: Colors.white, size: 24),
+          ),
+        ),
+        child: tile,
       ),
-      child: tile,
     );
   }
 

@@ -41,4 +41,14 @@ class NotificationService {
   Future<int> getUnreadCount(String userId, {String? targetRole}) async {
     return _repository.getUnreadCount(userId, targetRole: targetRole);
   }
+
+  Future<void> archiveNotification(String id) async {
+    await _repository.archiveNotification(id);
+    debugPrint('[NOTIFICATION_SVC] Archived: $id');
+  }
+
+  Future<void> unarchiveNotification(String id) async {
+    await _repository.unarchiveNotification(id);
+    debugPrint('[NOTIFICATION_SVC] Unarchived: $id');
+  }
 }

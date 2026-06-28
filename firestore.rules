@@ -1,11 +1,38 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Anonymous authentication required for all read/write operations.
-    // Prevents direct Firestore REST API access.
-    // Deployed: June 2026
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // All collections require authentication
+    match /activities/{document} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Notifications: authenticated users can read; only server processes can write
+    match /notifications/{notification} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // Notification preferences: each user manages their own
+    match /notification_preferences/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Device tokens: each user manages their own
+    match /device_tokens/{token} {
+      allow read: if isAuthenticated();
+      allow create, update: if request.resource.data.userId == request.auth.uid;
+      allow delete: if resource.data.userId == request.auth.uid;
     }
   }
 }

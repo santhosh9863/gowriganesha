@@ -51,7 +51,6 @@ class PushNotificationService {
 
     FirebaseMessaging.onBackgroundMessage(_backgroundMessageHandler);
 
-    debugPrint('[FCM] Initialized. Token: ${_currentToken?.substring(0, 20)}...');
   }
 
   Future<void> removeCurrentToken() async {
@@ -89,9 +88,7 @@ class PushNotificationService {
         'description': 'Notifications from the Sankalpa app',
         'importance': 4,
       });
-      debugPrint('[FCM] Notification channel created');
-    } catch (e) {
-      debugPrint('[FCM] Channel creation skipped: $e');
+    } catch (_) {
     }
   }
   // MIGRATION NOTE: When flutter_local_notifications is added in a future phase,
@@ -99,19 +96,17 @@ class PushNotificationService {
   // No changes to NotificationRepository, NotificationService, or features needed.
 
   Future<void> _requestPermissions() async {
-    final settings = await _messaging.requestPermission(
+    await _messaging.requestPermission(
       alert: true,
       badge: true,
       sound: true,
       provisional: false,
       criticalAlert: false,
     );
-    debugPrint('[FCM] Authorization: ${settings.authorizationStatus}');
   }
 
   Future<void> _onTokenRefresh(String newToken) async {
     _currentToken = newToken;
-    debugPrint('[FCM] Token refreshed');
     if (_userId != null && _userId!.isNotEmpty) {
       await _repository.saveDeviceToken(
         newToken,
@@ -121,9 +116,7 @@ class PushNotificationService {
     }
   }
 
-  void _onForegroundMessage(RemoteMessage message) {
-    debugPrint('[FCM] Foreground: ${message.messageId}');
-  }
+  void _onForegroundMessage(RemoteMessage message) {}
 
   void _onNotificationTap(RemoteMessage message) {
     final data = message.data;
@@ -135,7 +128,5 @@ class PushNotificationService {
   }
 
   @pragma('vm:entry-point')
-  static Future<void> _backgroundMessageHandler(RemoteMessage message) async {
-    debugPrint('[FCM] Background: ${message.messageId}');
-  }
+  static Future<void> _backgroundMessageHandler(RemoteMessage message) async {}
 }
