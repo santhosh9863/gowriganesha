@@ -10,6 +10,7 @@ class SankalpaGlass extends StatelessWidget {
   final BorderRadiusGeometry? borderRadius;
   final Color? borderColor;
   final Color? tintColor;
+  final List<BoxShadow>? boxShadow;
 
   const SankalpaGlass({
     super.key,
@@ -20,6 +21,7 @@ class SankalpaGlass extends StatelessWidget {
     this.borderRadius,
     this.borderColor,
     this.tintColor,
+    this.boxShadow,
   });
 
   @override
@@ -36,6 +38,7 @@ class SankalpaGlass extends StatelessWidget {
             border: borderColor != null
                 ? Border.all(color: borderColor!)
                 : null,
+            boxShadow: boxShadow,
           ),
           child: child,
         ),

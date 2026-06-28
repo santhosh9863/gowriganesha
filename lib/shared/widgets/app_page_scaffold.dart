@@ -82,15 +82,25 @@ class _AppPageScaffoldState extends ConsumerState<AppPageScaffold> {
     final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
     final showFab = widget.onAdd != null && !keyboardOpen;
     final fab = showFab
-        ? FloatingActionButton(
-            onPressed: widget.onAdd,
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            elevation: 4,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+        ? AnimatedScale(
+            scale: 1.0,
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeOutCubic,
+            child: AnimatedOpacity(
+              opacity: 1.0,
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeOutCubic,
+              child: FloatingActionButton(
+                onPressed: widget.onAdd,
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(28),
+                ),
+                child: const Icon(Icons.add_rounded, size: 28),
+              ),
             ),
-            child: const Icon(Icons.add_rounded, size: 28),
           )
         : null;
 

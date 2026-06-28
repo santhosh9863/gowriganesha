@@ -17,7 +17,45 @@ class AppScaffold extends ConsumerStatefulWidget {
   ConsumerState<AppScaffold> createState() => _AppScaffoldState();
 }
 
-class _AppScaffoldState extends ConsumerState<AppScaffold> {
+class _AppScaffoldState extends ConsumerState<AppScaffold>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _tabFadeCtrl;
+  late final Animation<double> _tabFadeAnim;
+  int _currentTab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentTab = widget.navigationShell.currentIndex;
+    _tabFadeCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+    _tabFadeAnim = CurvedAnimation(
+      parent: _tabFadeCtrl,
+      curve: Curves.easeOutCubic,
+    );
+    _tabFadeCtrl.forward();
+  }
+
+  @override
+  void didUpdateWidget(AppScaffold old) {
+    super.didUpdateWidget(old);
+    final newTab = widget.navigationShell.currentIndex;
+    if (newTab != _currentTab) {
+      _currentTab = newTab;
+      _tabFadeCtrl
+        ..reset()
+        ..forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabFadeCtrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen(notificationsStreamProvider, (previous, next) {
@@ -56,7 +94,19 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
     return Scaffold(
       body: Stack(
         children: [
-          widget.navigationShell,
+          AnimatedBuilder(
+            animation: _tabFadeAnim,
+            builder: (context, child) {
+              return Opacity(
+                opacity: 0.92 + _tabFadeAnim.value * 0.08,
+                child: Transform.translate(
+                  offset: Offset(10.0 * (1.0 - _tabFadeAnim.value), 0),
+                  child: child,
+                ),
+              );
+            },
+            child: widget.navigationShell,
+          ),
           const Positioned(
             top: 0,
             left: 0,

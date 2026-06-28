@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/design/app_colors.dart';
+import 'package:ganesha_2026/core/providers/auth_provider.dart';
 
-class AppGreetingSection extends StatelessWidget {
+class AppGreetingSection extends ConsumerWidget {
   final String? greeting;
   final String festivalName;
   final String? date;
@@ -15,9 +17,10 @@ class AppGreetingSection extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final displayGreeting = greeting ?? _defaultGreeting();
+    final userName = ref.watch(userNameProvider);
+    final displayGreeting = greeting ?? _greetingWithName(userName);
     final displayDate = date ?? _todayDate();
 
     return Column(
@@ -48,11 +51,21 @@ class AppGreetingSection extends StatelessWidget {
     );
   }
 
-  static String _defaultGreeting() {
+  String _greetingWithName(String userName) {
     final h = DateTime.now().hour;
-    if (h < 12) return 'Good morning,';
-    if (h < 17) return 'Good afternoon,';
-    return 'Good evening,';
+    String base;
+    if (h < 12) {
+      base = 'Good morning';
+    } else if (h < 17) {
+      base = 'Good afternoon';
+    } else {
+      base = 'Good evening';
+    }
+    if (userName.isNotEmpty) {
+      final capitalized = userName[0].toUpperCase() + userName.substring(1);
+      return '$base, $capitalized';
+    }
+    return '$base,';
   }
 
   static String _todayDate() => DateFormat('d MMMM yyyy').format(DateTime.now());

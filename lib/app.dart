@@ -8,6 +8,7 @@ import 'package:ganesha_2026/core/providers/notification_provider.dart';
 import 'package:ganesha_2026/core/services/notification_navigator.dart';
 import 'package:ganesha_2026/shared/widgets/app_scaffold.dart';
 import 'package:ganesha_2026/shared/widgets/page_transitions.dart';
+import 'package:ganesha_2026/core/design/app_colors.dart';
 import 'package:ganesha_2026/features/auth/entry_page.dart';
 import 'package:ganesha_2026/features/dashboard/dashboard_page.dart';
 import 'package:ganesha_2026/features/collections/collection_list_page.dart';
@@ -186,11 +187,22 @@ GoRoute _buildRoute(String path, Widget page) {
   );
 }
 
-class GaneshaApp extends ConsumerWidget {
+class GaneshaApp extends ConsumerStatefulWidget {
   const GaneshaApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GaneshaApp> createState() => _GaneshaAppState();
+}
+
+class _GaneshaAppState extends ConsumerState<GaneshaApp> {
+  bool _landingDone = false;
+
+  void _onLandingComplete() {
+    setState(() => _landingDone = true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
 
     ref.watch(pushNotificationInitProvider);
@@ -225,6 +237,132 @@ class GaneshaApp extends ConsumerWidget {
       theme: AppTheme.light,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
+      builder: (context, child) {
+        if (_landingDone) return child!;
+        return _LaunchAnimation(
+          onComplete: _onLandingComplete,
+          child: child!,
+        );
+      },
+    );
+  }
+}
+
+class _LaunchAnimation extends StatefulWidget {
+  final VoidCallback onComplete;
+  final Widget child;
+
+  const _LaunchAnimation({
+    required this.onComplete,
+    required this.child,
+  });
+
+  @override
+  State<_LaunchAnimation> createState() => _LaunchAnimationState();
+}
+
+class _LaunchAnimationState extends State<_LaunchAnimation>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  late final Animation<double> _logoFade;
+  late final Animation<double> _logoScale;
+  late final Animation<double> _haloOpacity;
+  late final Animation<double> _exitFade;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    );
+
+    _logoFade = _buildFade(0, 0.182, Curves.easeOut);
+    _logoScale = Tween<double>(begin: 0.95, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0, 0.182, curve: Curves.easeOutCubic),
+      ),
+    );
+    _haloOpacity = _buildFade(0.136, 0.318, Curves.easeOut);
+    _exitFade = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.636, 1.0, curve: Curves.easeOutCubic),
+      ),
+    );
+
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        widget.onComplete();
+      }
+    });
+    _controller.forward();
+  }
+
+  Animation<double> _buildFade(double start, double end, Curve curve) {
+    return Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Interval(start, end, curve: curve),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        widget.child,
+        FadeTransition(
+          opacity: _exitFade,
+          child: Container(
+            color: AppColors.surface,
+            child: Center(
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  FadeTransition(
+                    opacity: _haloOpacity,
+                    child: Container(
+                      width: 150,
+                      height: 150,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            AppColors.accent.withValues(alpha: 0.10),
+                            AppColors.accent.withValues(alpha: 0.03),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  ScaleTransition(
+                    scale: _logoScale,
+                    child: FadeTransition(
+                      opacity: _logoFade,
+                      child: Image.asset(
+                        'assets/branding/sankalpa_logo.png',
+                        width: 110,
+                        height: 110,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
