@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
@@ -22,6 +21,7 @@ class AppSkeleton extends StatefulWidget {
 class _AppSkeletonState extends State<AppSkeleton>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
+  late final Animation<double> _shimmer;
 
   @override
   void initState() {
@@ -29,17 +29,12 @@ class _AppSkeletonState extends State<AppSkeleton>
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
-    )..repeat()..addListener(_onTick);
-  }
-
-  void _onTick() {
-    if (mounted) setState(() {});
+    )..repeat();
+    _shimmer = _ctrl;
   }
 
   @override
   void dispose() {
-    _ctrl.stop();
-    _ctrl.removeListener(_onTick);
     _ctrl.dispose();
     super.dispose();
   }
@@ -47,26 +42,33 @@ class _AppSkeletonState extends State<AppSkeleton>
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      width: widget.width,
-      height: widget.height,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(widget.borderRadius),
-        gradient: LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [
-            colorScheme.surfaceContainerHighest.withAlpha(100),
-            colorScheme.surfaceContainerHighest.withAlpha(200),
-            colorScheme.surfaceContainerHighest.withAlpha(100),
-          ],
-          stops: [
-            max(0.0, _ctrl.value - 0.3),
-            _ctrl.value,
-            min(1.0, _ctrl.value + 0.3),
-          ],
-        ),
-      ),
+    final base = colorScheme.surfaceContainerHighest;
+
+    return AnimatedBuilder(
+      animation: _shimmer,
+      builder: (context, child) {
+        return Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(widget.borderRadius),
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [
+                base.withAlpha(80),
+                base.withAlpha(180),
+                base.withAlpha(80),
+              ],
+              stops: [
+                (_shimmer.value - 0.3).clamp(0.0, 1.0),
+                _shimmer.value,
+                (_shimmer.value + 0.3).clamp(0.0, 1.0),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -309,6 +309,22 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
                 ),
               ),
             ),
+            if (target.building.isNotEmpty || target.area.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.xs),
+                child: Hero(
+                  tag: 'sponsor-location-${target.id}',
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Text(
+                      '${target.building}${target.building.isNotEmpty && target.area.isNotEmpty ? ', ' : ''}${target.area}',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: AppColors.warmGray500,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             const SizedBox(height: AppSpacing.md),
             AppCard(
               padding: const EdgeInsets.all(AppSpacing.xl),
