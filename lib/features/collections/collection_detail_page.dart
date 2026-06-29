@@ -6,6 +6,7 @@ import 'package:ganesha_2026/core/utils/permissions.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
+import 'package:ganesha_2026/core/design/app_colors.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/models/target.dart';
@@ -295,6 +296,20 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
               ],
             ),
             const SizedBox(height: AppSpacing.sm),
+            Hero(
+              tag: 'sponsor-name-${target.id}',
+              child: Material(
+                color: Colors.transparent,
+                child: Text(
+                  target.name,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: AppColors.charcoal,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
             AppCard(
               padding: const EdgeInsets.all(AppSpacing.xl),
               child: Column(

@@ -295,6 +295,7 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
               controller: _staggerCtrl,
               child: SponsorCard(
                 target: target,
+                searchQuery: _searchQuery.isNotEmpty ? _searchQuery : null,
                 onDelete: () => _handleDelete(context, ref, target),
                 onQuickUpdate: () =>
                     _handleQuickUpdate(context, ref, target),

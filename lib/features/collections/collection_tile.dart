@@ -55,12 +55,14 @@ class SponsorCard extends ConsumerWidget {
   final Target target;
   final VoidCallback onDelete;
   final VoidCallback onQuickUpdate;
+  final String? searchQuery;
 
   const SponsorCard({
     super.key,
     required this.target,
     required this.onDelete,
     required this.onQuickUpdate,
+    this.searchQuery,
   });
 
   @override
@@ -127,24 +129,36 @@ class SponsorCard extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            target.name,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              color: AppColors.charcoal,
-                              fontWeight: FontWeight.w600,
+                          Hero(
+                            tag: 'sponsor-name-${target.id}',
+                            child: Material(
+                              color: Colors.transparent,
+                              child: _highlightText(
+                                target.name,
+                                searchQuery,
+                                theme.textTheme.titleMedium?.copyWith(
+                                  color: AppColors.charcoal,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                              ),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
                           if (subtitle != null) ...[
                             const SizedBox(height: 1),
-                            Text(
-                              subtitle,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: AppColors.warmGray400,
+                            Hero(
+                              tag: 'sponsor-location-${target.id}',
+                              child: Material(
+                                color: Colors.transparent,
+                                child: _highlightText(
+                                  subtitle,
+                                  searchQuery,
+                                  theme.textTheme.bodySmall?.copyWith(
+                                    color: AppColors.warmGray400,
+                                  ),
+                                  maxLines: 1,
+                                ),
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ],
@@ -281,6 +295,65 @@ class SponsorCard extends ConsumerWidget {
   }
 
   String get _name => Uri.encodeComponent(target.name);
+
+  Widget _highlightText(
+    String text,
+    String? query,
+    TextStyle? style, {
+    int maxLines = 1,
+  }) {
+    if (query == null || query.isEmpty) {
+      return Text(
+        text,
+        style: style,
+        maxLines: maxLines,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+
+    final lower = text.toLowerCase();
+    final q = query.toLowerCase();
+    final matches = <int>[];
+    int idx = 0;
+    while ((idx = lower.indexOf(q, idx)) != -1) {
+      matches.add(idx);
+      idx += q.length;
+    }
+
+    if (matches.isEmpty) {
+      return Text(
+        text,
+        style: style,
+        maxLines: maxLines,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+
+    final spans = <InlineSpan>[];
+    int last = 0;
+    for (final start in matches) {
+      if (start > last) {
+        spans.add(TextSpan(text: text.substring(last, start)));
+      }
+      spans.add(TextSpan(
+        text: text.substring(start, start + q.length),
+        style: style?.copyWith(
+          color: AppColors.primary,
+          fontWeight: FontWeight.w700,
+        ),
+      ));
+      last = start + q.length;
+    }
+    if (last < text.length) {
+      spans.add(TextSpan(text: text.substring(last)));
+    }
+
+    return RichText(
+      text: TextSpan(children: spans, style: style),
+      maxLines: maxLines,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
 }
 
 class _AmountBlock extends StatelessWidget {
