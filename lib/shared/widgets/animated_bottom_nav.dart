@@ -122,7 +122,7 @@ class _AnimatedBottomNavState extends State<AnimatedBottomNav> {
           ),
           child: SizedBox(
             key: _navKey,
-            height: 58,
+            height: 68,
             child: Stack(
               children: [
                 if (_initialized)
@@ -130,7 +130,7 @@ class _AnimatedBottomNavState extends State<AnimatedBottomNav> {
                     duration: _navDuration,
                     curve: Curves.easeOutCubic,
                     left: _indicatorLeft,
-                    top: 4,
+                    top: 6,
                     width: 22,
                     height: 4,
                     child: Container(
@@ -180,14 +180,13 @@ class _NavBarItem extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        height: 58,
+        height: 68,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            const SizedBox(height: 8),
             SizedBox(
-              width: 22,
-              height: 22,
+              width: 32,
+              height: 32,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
@@ -226,19 +225,29 @@ class _NavBarItem extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 2),
-            AnimatedDefaultTextStyle(
-              duration: _navDuration,
-              curve: Curves.easeOutCubic,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: isSelected
-                    ? AppColors.primary
-                    : AppColors.warmGray500,
-                height: 1.2,
+            const SizedBox(height: 4),
+            SizedBox(
+              height: 24,
+              child: Align(
+                alignment: Alignment.center,
+                child: AnimatedDefaultTextStyle(
+                  duration: _navDuration,
+                  curve: Curves.easeOutCubic,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                    color: isSelected
+                        ? AppColors.primary
+                        : AppColors.warmGray500,
+                    height: 1.2,
+                  ),
+                  child: Text(
+                    item.label,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                  ),
+                ),
               ),
-              child: Text(item.label),
             ),
           ],
         ),
