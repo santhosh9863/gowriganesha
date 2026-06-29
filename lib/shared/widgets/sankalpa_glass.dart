@@ -26,22 +26,40 @@ class SankalpaGlass extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: borderRadius ?? AppRadius.mediumBorder,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            color: (tintColor ?? Colors.white).withValues(alpha: opacity),
-            borderRadius: borderRadius ?? AppRadius.mediumBorder,
-            border: borderColor != null
-                ? Border.all(color: borderColor!)
-                : null,
-            boxShadow: boxShadow,
+    final radius = borderRadius ?? AppRadius.mediumBorder;
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        boxShadow: boxShadow,
+      ),
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: radius,
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+              child: Container(
+                padding: padding,
+                decoration: BoxDecoration(
+                  borderRadius: radius,
+                  color: (tintColor ?? Colors.white).withValues(alpha: opacity),
+                ),
+                child: child,
+              ),
+            ),
           ),
-          child: child,
-        ),
+          if (borderColor != null)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: radius,
+                    border: Border.all(color: borderColor!),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

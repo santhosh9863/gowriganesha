@@ -96,27 +96,29 @@ class _AnimatedBottomNavState extends State<AnimatedBottomNav> {
       ),
       child: SafeArea(
         top: false,
+        left: false,
+        right: false,
         child: SankalpaGlass(
-          sigma: 16,
-          opacity: 0.88,
-          borderRadius: BorderRadius.circular(28),
-          borderColor: AppColors.outline,
+          sigma: 14,
+          opacity: 0.78,
+          borderRadius: BorderRadius.circular(37),
+          borderColor: const Color(0x08000000),
           tintColor: AppColors.card,
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
+              color: AppColors.primary.withValues(alpha: 0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
             BoxShadow(
-              color: const Color(0x06000000),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
+              color: const Color(0x0D000000),
+              blurRadius: 20,
+              offset: const Offset(0, 2),
             ),
           ],
           padding: const EdgeInsets.symmetric(
             vertical: AppSpacing.sm,
-            horizontal: AppSpacing.xs,
+            horizontal: AppSpacing.sm,
           ),
           child: SizedBox(
             key: _navKey,
