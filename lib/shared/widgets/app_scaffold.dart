@@ -92,42 +92,22 @@ class _AppScaffoldState extends ConsumerState<AppScaffold>
       ));
     });
 
-    final bottomInset = MediaQuery.of(context).padding.bottom;
-    const navCardHeight = 58.0;
-    const glassPadding = AppSpacing.sm * 2;
-    const outerBottomPad = AppSpacing.xl;
-    final navHeight = outerBottomPad + bottomInset + glassPadding + navCardHeight;
-
     return Scaffold(
+      backgroundColor: AppColors.surface,
       body: Stack(
         children: [
-          Padding(
-            padding: EdgeInsets.only(bottom: navHeight),
-            child: AnimatedBuilder(
-              animation: _tabFadeAnim,
-              builder: (context, child) {
-                return Opacity(
-                  opacity: 0.92 + _tabFadeAnim.value * 0.08,
-                  child: Transform.translate(
-                    offset: Offset(10.0 * (1.0 - _tabFadeAnim.value), 0),
-                    child: child,
-                  ),
-                );
-              },
-              child: widget.navigationShell,
-            ),
-          ),
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: AnimatedBottomNav(
-              currentIndex: widget.navigationShell.currentIndex,
-              onTap: (index) => widget.navigationShell.goBranch(
-                index,
-                initialLocation: index == widget.navigationShell.currentIndex,
-              ),
-            ),
+          AnimatedBuilder(
+            animation: _tabFadeAnim,
+            builder: (context, child) {
+              return Opacity(
+                opacity: 0.92 + _tabFadeAnim.value * 0.08,
+                child: Transform.translate(
+                  offset: Offset(10.0 * (1.0 - _tabFadeAnim.value), 0),
+                  child: child,
+                ),
+              );
+            },
+            child: widget.navigationShell,
           ),
           const Positioned(
             top: 0,
@@ -136,6 +116,16 @@ class _AppScaffoldState extends ConsumerState<AppScaffold>
             child: AppNotificationBanner(),
           ),
         ],
+      ),
+      bottomNavigationBar: Padding(
+        padding: EdgeInsets.only(top: AppSpacing.sm),
+        child: AnimatedBottomNav(
+          currentIndex: widget.navigationShell.currentIndex,
+          onTap: (index) => widget.navigationShell.goBranch(
+            index,
+            initialLocation: index == widget.navigationShell.currentIndex,
+          ),
+        ),
       ),
     );
   }
