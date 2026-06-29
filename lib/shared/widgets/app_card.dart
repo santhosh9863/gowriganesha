@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ganesha_2026/core/design/app_radius.dart';
+import 'package:ganesha_2026/shared/widgets/press_animator.dart';
 
 class AppCard extends StatelessWidget {
   final Widget child;
@@ -29,7 +30,7 @@ class AppCard extends StatelessWidget {
 
     if (onTap == null) return card;
 
-    return InkWell(
+    return PressAnimator(
       onTap: onTap,
       borderRadius: AppRadius.cardBorder,
       child: card,

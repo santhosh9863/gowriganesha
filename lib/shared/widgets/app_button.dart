@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:ganesha_2026/core/design/app_radius.dart';
 
 class AppButton {
@@ -148,7 +149,10 @@ class _PressScaleState extends State<_PressScale>
   Widget build(BuildContext context) {
     return Listener(
       onPointerDown: (_) {
-        if (widget.onPressed != null) _ctrl.forward();
+        if (widget.onPressed != null) {
+          HapticFeedback.lightImpact();
+          _ctrl.forward();
+        }
       },
       onPointerUp: (_) {
         if (widget.onPressed != null) _ctrl.reverse();

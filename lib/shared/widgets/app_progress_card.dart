@@ -3,6 +3,7 @@ import 'package:ganesha_2026/core/design/app_colors.dart';
 import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/design/app_shadows.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
+import 'package:ganesha_2026/shared/widgets/press_animator.dart';
 
 class AppProgressCard extends StatelessWidget {
   final String title;
@@ -106,7 +107,7 @@ class AppProgressCard extends StatelessWidget {
 
     if (onTap == null) return card;
 
-    return InkWell(
+    return PressAnimator(
       onTap: onTap,
       borderRadius: AppRadius.largeBorder,
       child: card,

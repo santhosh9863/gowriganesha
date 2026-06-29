@@ -264,7 +264,14 @@ class _CountUp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(format(target), style: style);
+    return TweenAnimationBuilder<int>(
+      tween: IntTween(begin: 0, end: target),
+      duration: const Duration(milliseconds: 800),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, _) {
+        return Text(format(value), style: style);
+      },
+    );
   }
 }
 
@@ -1169,13 +1176,11 @@ class _ActivityTimeline extends ConsumerWidget {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    a.description.isNotEmpty ? a.description : a.title,
+                  child: _HighlightedText(
+                    text: a.description.isNotEmpty ? a.description : a.title,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: AppColors.charcoal,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 Text(
@@ -1190,6 +1195,62 @@ class _ActivityTimeline extends ConsumerWidget {
         ));
       }
     }
+    widgets.add(Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.sm),
+      child: Align(
+        alignment: Alignment.center,
+        child: TextButton(
+          onPressed: () => context.push('/notifications'),
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.primary,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+          ),
+          child: const Text('View All Activity'),
+        ),
+      ),
+    ));
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: widgets);
+  }
+}
+
+class _HighlightedText extends StatelessWidget {
+  final String text;
+  final TextStyle? style;
+
+  const _HighlightedText({required this.text, this.style});
+
+  @override
+  Widget build(BuildContext context) {
+    final amountPattern = RegExp(r'₹[\d,]+');
+    final matches = amountPattern.allMatches(text).toList();
+
+    if (matches.isEmpty) {
+      return Text(text, style: style, maxLines: 2);
+    }
+
+    final spans = <InlineSpan>[];
+    int lastEnd = 0;
+    for (final m in matches) {
+      if (m.start > lastEnd) {
+        spans.add(TextSpan(text: text.substring(lastEnd, m.start)));
+      }
+      spans.add(TextSpan(
+        text: m.group(0),
+        style: (style ?? const TextStyle()).copyWith(
+          fontWeight: FontWeight.w700,
+          color: AppColors.charcoal,
+        ),
+      ));
+      lastEnd = m.end;
+    }
+    if (lastEnd < text.length) {
+      spans.add(TextSpan(text: text.substring(lastEnd)));
+    }
+
+    return RichText(
+      text: TextSpan(children: spans, style: style),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+    );
   }
 }

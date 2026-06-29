@@ -103,6 +103,7 @@ class _DailyCollectionFormPageState
               padding: const EdgeInsets.all(AppSpacing.lg),
               child: Form(
                 key: _formKey,
+                autovalidateMode: AutovalidateMode.always,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
