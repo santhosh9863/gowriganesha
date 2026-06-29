@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/core/models/app_notification.dart';
+import 'package:ganesha_2026/core/models/notification_preferences.dart';
 import 'package:ganesha_2026/core/services/firestore_service.dart';
 
 class NotificationRepository {
@@ -352,31 +353,25 @@ class NotificationRepository {
     }
   }
 
-  /// Retrieves raw notification preferences for the given user.
-  ///
-  /// NOTE: Returns raw Map. A typed NotificationPreferences model will replace
-  /// this in a later phase. Do not pass this raw map beyond the repository boundary.
-  Future<Map<String, dynamic>?> getPreferences(String userId) async {
+  Future<NotificationPreferences?> getPreferences(String userId) async {
     try {
       final doc = await _preferences.doc(userId).get();
       if (!doc.exists || doc.data() == null) return null;
-      return doc.data();
+      return NotificationPreferences.fromMap(doc.data()!);
     } on FirebaseException catch (e) {
       debugPrint('[NOTIFICATION_REPO] Error fetching preferences: $e');
       throw FirestoreException('Failed to load notification preferences', originalError: e);
     }
   }
 
-  /// Saves raw notification preferences for the given user.
-  ///
-  /// NOTE: Accepts raw Map. A typed NotificationPreferences model will replace
-  /// this in a later phase. Do not pass raw maps from outside the repository.
-  Future<void> setPreferences(String userId, Map<String, dynamic> preferences) async {
+  Future<void> setPreferences(
+    String userId,
+    NotificationPreferences preferences,
+  ) async {
     try {
-      await _preferences.doc(userId).set({
-        ...preferences,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      final data = preferences.toMap();
+      data['updatedAt'] = FieldValue.serverTimestamp();
+      await _preferences.doc(userId).set(data);
       debugPrint('[NOTIFICATION_REPO] Preferences saved for $userId');
     } on FirebaseException catch (e) {
       debugPrint('[NOTIFICATION_REPO] Error saving preferences: $e');

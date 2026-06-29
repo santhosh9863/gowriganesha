@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ganesha_2026/core/models/app_notification.dart';
+import 'package:ganesha_2026/core/models/notification_preferences.dart';
 import 'package:ganesha_2026/core/models/user_role.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/core/providers/auth_provider.dart';
@@ -80,6 +81,21 @@ final pushNotificationServiceProvider = Provider<PushNotificationService>((ref) 
     },
   );
 });
+
+final notificationPreferencesProvider =
+    FutureProvider.family<NotificationPreferences?, String>((ref, userId) async {
+  final repo = ref.watch(notificationRepositoryProvider);
+  return repo.getPreferences(userId);
+});
+
+final updateNotificationPreferencesProvider =
+    FutureProvider.family<void, ({String userId, NotificationPreferences prefs})>(
+  (ref, params) async {
+    final repo = ref.watch(notificationRepositoryProvider);
+    await repo.setPreferences(params.userId, params.prefs);
+    ref.invalidate(notificationPreferencesProvider(params.userId));
+  },
+);
 
 final pushNotificationInitProvider = FutureProvider<void>((ref) async {
   final service = ref.watch(pushNotificationServiceProvider);
