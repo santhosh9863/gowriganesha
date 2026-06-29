@@ -32,6 +32,7 @@ class _NotificationCenterPageState
     final notificationsAsync = ref.watch(notificationsStreamProvider);
     final unreadCount = ref.watch(unreadNotificationsCountProvider);
     final userId = ref.watch(userIdProvider);
+    final role = ref.watch(roleProvider);
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -103,7 +104,7 @@ class _NotificationCenterPageState
           loading: () => _buildShimmerList(),
           error: (e, _) => _buildErrorState(e),
           data: (notifications) {
-            final filtered = _applyFilters(notifications);
+            final filtered = _applyFilters(notifications, role);
             if (filtered.isEmpty) {
               final hasActiveFilter = _categoryFilter != null || _showArchived;
               if (hasActiveFilter) {
@@ -409,8 +410,19 @@ class _NotificationCenterPageState
     );
   }
 
-  List<AppNotification> _applyFilters(List<AppNotification> notifications) {
+  List<AppNotification> _applyFilters(
+    List<AppNotification> notifications,
+    UserRole role,
+  ) {
     var filtered = notifications;
+
+    final targetRole =
+        role == UserRole.none || role == UserRole.admin ? null : role.name;
+    if (targetRole != null) {
+      filtered = filtered
+          .where((n) => n.targetRole == null || n.targetRole == targetRole)
+          .toList();
+    }
 
     if (_categoryFilter != null) {
       filtered =

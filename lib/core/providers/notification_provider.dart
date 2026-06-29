@@ -59,17 +59,21 @@ final localNotificationServiceProvider = Provider<LocalNotificationService>((ref
 final notificationsStreamProvider =
     StreamProvider<List<AppNotification>>((ref) {
   final repo = ref.watch(notificationRepositoryProvider);
-  final role = ref.watch(roleProvider);
-  final targetRole =
-      role == UserRole.none || role == UserRole.admin ? null : role.name;
-  return repo.watchNotifications(targetRole: targetRole);
+  return repo.watchNotifications();
 });
 
 final unreadNotificationsCountProvider = Provider<int>((ref) {
   final notifications = ref.watch(notificationsStreamProvider);
   final userId = ref.watch(userIdProvider);
+  final role = ref.watch(roleProvider);
+  final targetRole =
+      role == UserRole.none || role == UserRole.admin ? null : role.name;
   return notifications.valueOrNull
           ?.where((n) => n.isUnreadBy(userId))
+          .where((n) =>
+              targetRole == null ||
+              n.targetRole == null ||
+              n.targetRole == targetRole)
           .length ??
       0;
 });

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ganesha_2026/core/design/app_colors.dart';
+import 'package:ganesha_2026/core/models/user_role.dart';
 import 'package:ganesha_2026/core/models/notification_type.dart';
 import 'package:ganesha_2026/core/providers/auth_provider.dart';
 import 'package:ganesha_2026/core/providers/notification_provider.dart';
@@ -69,7 +70,11 @@ class _AppScaffoldState extends ConsumerState<AppScaffold>
       if (newNotifs.isEmpty) return;
 
       final userId = ref.read(userIdProvider);
+      final role = ref.read(roleProvider);
+      final targetRole = role == UserRole.none || role == UserRole.admin ? null : role.name;
+
       final notif = newNotifs.first;
+      if (targetRole != null && notif.targetRole != null && notif.targetRole != targetRole) return;
       final bannerNotifier = ref.read(inAppBannerProvider.notifier);
       final navigator = ref.read(notificationNavigatorProvider);
 
