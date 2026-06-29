@@ -284,10 +284,25 @@ class NotificationRepository {
     }
   }
 
-  Future<int> archiveOldNotifications({int olderThanDays = 90}) async {
+  Future<int> getRetentionDays() async {
     try {
+      final doc = await _firestore
+          .collection('settings')
+          .doc(AppConstants.festivalId)
+          .get();
+      if (!doc.exists || doc.data() == null) return 90;
+      return (doc.data()!['notificationRetentionDays'] as int?) ?? 90;
+    } on FirebaseException catch (e) {
+      debugPrint('[NOTIFICATION_REPO] Error reading retention: $e');
+      return 90;
+    }
+  }
+
+  Future<int> archiveOldNotifications({int? olderThanDays}) async {
+    try {
+      final days = olderThanDays ?? await getRetentionDays();
       final cutoff = Timestamp.fromDate(
-        DateTime.now().subtract(Duration(days: olderThanDays)),
+        DateTime.now().subtract(Duration(days: days)),
       );
 
       final snapshot = await _notifications

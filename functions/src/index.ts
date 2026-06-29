@@ -1,4 +1,5 @@
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions/v2';
 import * as admin from 'firebase-admin';
 
@@ -209,6 +210,59 @@ export const sendNotificationPush = onDocumentCreated(
     logger.info(
       `[${correlationId}] Sent notification ${notificationId} to ${deliveredCount} devices ` +
         `(${eligibleTokens.length} eligible, ${totalSent} successful)`,
+    );
+  },
+);
+
+const NOTIFICATION_RETENTION_DAYS_KEY = 'notificationRetentionDays';
+const DEFAULT_RETENTION_DAYS = 90;
+
+export const archiveOldNotifications = onSchedule(
+  'every day 03:00',
+  async (event) => {
+    const correlationId = `archive-${Date.now().toString()}`;
+    const db = admin.firestore();
+    const settingsDoc = await db
+      .collection('settings')
+      .doc('ganesha_2026')
+      .get();
+    const retentionDays =
+      (settingsDoc.data()?.[NOTIFICATION_RETENTION_DAYS_KEY] as number) ??
+      DEFAULT_RETENTION_DAYS;
+
+    const cutoff = admin.firestore.Timestamp.fromDate(
+      new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000),
+    );
+
+    const snapshot = await db
+      .collection('notifications')
+      .where('archivedAt', '==', null)
+      .where('createdAt', '<', cutoff)
+      .get();
+
+    if (snapshot.docs.length === 0) {
+      logger.info(`[${correlationId}] No notifications to archive`);
+      return;
+    }
+
+    let archived = 0;
+    const batch = db.batch();
+    for (const doc of snapshot.docs) {
+      batch.update(doc.ref, {
+        archivedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      archived++;
+      if (archived % 500 === 0) {
+        await batch.commit();
+        logger.info(
+          `[${correlationId}] Archived ${archived} / ${snapshot.docs.length} notifications`,
+        );
+      }
+    }
+    await batch.commit();
+
+    logger.info(
+      `[${correlationId}] Archived ${archived} notifications (retention: ${retentionDays}d)`,
     );
   },
 );
