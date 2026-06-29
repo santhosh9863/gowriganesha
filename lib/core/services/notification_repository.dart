@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/core/models/app_notification.dart';
 import 'package:ganesha_2026/core/services/firestore_service.dart';
 
@@ -59,12 +60,10 @@ class NotificationRepository {
 
   Stream<List<AppNotification>> watchNotifications({String? targetRole}) {
     return _notifications
-        .where('archivedAt', isNull: true)
+        .where('festivalId', isEqualTo: AppConstants.festivalId)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .handleError((e) {
-      debugPrint('[NOTIFICATION_REPO] Error watching stream: $e');
-    }).map((snapshot) {
+        .map((snapshot) {
       return snapshot.docs
           .where((doc) => _isTargetedForUser(doc.data(), targetRole))
           .map((doc) => AppNotification.fromMap(doc.id, doc.data()))

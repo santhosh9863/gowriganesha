@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ganesha_2026/core/design/app_colors.dart';
-import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/design/app_shadows.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/app_notification.dart';
@@ -69,53 +68,53 @@ class AppNotificationTile extends StatelessWidget {
     final tile = Semantics(
       label: 'Notification: ${notification.title}',
       hint: _isUnread ? 'Unread notification' : 'Read notification',
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppRadius.largeBorder,
-        child: Container(
-          height: 76,
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: AppRadius.largeBorder,
-            border: Border.all(color: AppColors.outline),
-            boxShadow: AppShadows.subtle,
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 4,
-                height: 76,
-                decoration: BoxDecoration(
-                  color: config.color,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(AppRadius.large),
-                    bottomLeft: Radius.circular(AppRadius.large),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            height: 76,
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.outline),
+              boxShadow: AppShadows.subtle,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 76,
+                  decoration: BoxDecoration(
+                    color: config.color,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      bottomLeft: Radius.circular(20),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.xs + 2),
-              if (_isUnread)
+                const SizedBox(width: AppSpacing.xs + 2),
+                if (_isUnread)
+                  Container(
+                    width: 6,
+                    height: 6,
+                    margin: const EdgeInsets.only(top: 30),
+                    decoration: const BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                  )
+                else
+                  const SizedBox(width: AppSpacing.sm - 2),
+                const SizedBox(width: AppSpacing.sm),
                 Container(
-                  width: 6,
-                  height: 6,
-                  margin: const EdgeInsets.only(top: 30),
-                  decoration: const BoxDecoration(
-                    color: AppColors.primary,
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: config.color.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                )
-              else
-                const SizedBox(width: AppSpacing.sm - 2),
-              const SizedBox(width: AppSpacing.sm),
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: config.color.withValues(alpha: 0.1),
-                  borderRadius: AppRadius.mediumBorder,
+                  child: Icon(config.icon, size: 16, color: config.color),
                 ),
-                child: Icon(config.icon, size: 16, color: config.color),
-              ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
@@ -187,7 +186,7 @@ class AppNotificationTile extends StatelessWidget {
           margin: const EdgeInsets.symmetric(vertical: 1),
           decoration: BoxDecoration(
             color: AppColors.success,
-            borderRadius: AppRadius.largeBorder,
+            borderRadius: BorderRadius.circular(20),
           ),
           alignment: Alignment.centerLeft,
           padding: const EdgeInsets.only(left: AppSpacing.xl),
@@ -204,7 +203,7 @@ class AppNotificationTile extends StatelessWidget {
           margin: const EdgeInsets.symmetric(vertical: 1),
           decoration: BoxDecoration(
             color: AppColors.warmGray500,
-            borderRadius: AppRadius.largeBorder,
+            borderRadius: BorderRadius.circular(20),
           ),
           alignment: Alignment.centerRight,
           padding: const EdgeInsets.only(right: AppSpacing.xl),

@@ -592,7 +592,7 @@ class _KpiGrid extends ConsumerWidget {
             SizedBox(width: w, child: _KpiCard(
               icon: Icons.people_rounded, label: 'Pending Sponsors',
               value: db.pendingSponsorCount,
-              trend: '${AppConstants.currencySymbol}${_shortFmt(db.pendingRemainingTotal)} Sponsor Commitments Pending',
+              trend: '${AppConstants.currencySymbol}${_shortFmt(db.pendingRemainingTotal)} pending',
               color: AppColors.warning, fmtCurrency: false,
             )),
             SizedBox(width: w, child: _KpiCard(
@@ -628,7 +628,7 @@ class _KpiCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: AppRadius.largeBorder,
@@ -637,20 +637,15 @@ class _KpiCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.xs),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: AppRadius.mediumBorder,
-                ),
-                child: Icon(icon, size: 14, color: color),
-              ),
-            ],
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.xs),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: AppRadius.mediumBorder,
+            ),
+            child: Icon(icon, size: 14, color: color),
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: 16),
           _CountUp(
             target: value,
             style: theme.textTheme.titleLarge?.copyWith(
@@ -661,20 +656,22 @@ class _KpiCard extends StatelessWidget {
                 ? (v) => '${AppConstants.currencySymbol}${_shortFmt(v)}'
                 : (v) => '$v',
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 8),
           Text(
             label,
             style: theme.textTheme.labelMedium?.copyWith(
               color: AppColors.warmGray500,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             trend,
             style: theme.textTheme.labelSmall?.copyWith(
               color: AppColors.warmGray400,
-              height: 1.2,
+              height: 1.0,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

@@ -125,6 +125,9 @@ Future<void> showAdjustCollectionSheet(
     },
   );
 
+  amountCtrl.dispose();
+  reasonCtrl.dispose();
+
   if (result == null) return;
 
   final newTotal = result['newTotal'] as int;
@@ -139,7 +142,7 @@ Future<void> showAdjustCollectionSheet(
       note: reason,
     );
     final delta = newTotal - target.givenAmount;
-    service.addActivity(Activity(
+    await service.addActivity(Activity(
       id: service.generateId(),
       festivalId: AppConstants.festivalId,
       type: 'collection_corrected',
@@ -150,21 +153,22 @@ Future<void> showAdjustCollectionSheet(
       recordId: target.id,
       entityType: 'target',
     ));
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '${AppConstants.currencySymbol}${fmtAmount(target.givenAmount)} → ${AppConstants.currencySymbol}${fmtAmount(newTotal)} ($reason)',
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${AppConstants.currencySymbol}${fmtAmount(target.givenAmount)} → ${AppConstants.currencySymbol}${fmtAmount(newTotal)} ($reason)',
+          ),
         ),
-      ),
-    );
+      );
+    });
   } on Exception catch (e) {
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error: $e')),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    });
   }
-
-  amountCtrl.dispose();
-  reasonCtrl.dispose();
 }

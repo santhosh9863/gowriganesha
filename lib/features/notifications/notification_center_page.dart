@@ -11,7 +11,6 @@ import 'package:ganesha_2026/core/providers/auth_provider.dart';
 import 'package:ganesha_2026/core/providers/notification_provider.dart';
 import 'package:ganesha_2026/shared/widgets/app_notification_tile.dart';
 import 'package:ganesha_2026/shared/widgets/app_skeleton.dart';
-import 'package:ganesha_2026/shared/widgets/app_empty_state.dart';
 
 class NotificationCenterPage extends ConsumerStatefulWidget {
   const NotificationCenterPage({super.key});
@@ -22,28 +21,10 @@ class NotificationCenterPage extends ConsumerStatefulWidget {
 }
 
 class _NotificationCenterPageState
-    extends ConsumerState<NotificationCenterPage>
-    with SingleTickerProviderStateMixin {
+    extends ConsumerState<NotificationCenterPage> {
   bool _loadingAction = false;
   NotificationCategory? _categoryFilter;
   bool _showArchived = false;
-  late final AnimationController _fadeCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _fadeCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    )..forward();
-  }
-
-  @override
-  void dispose() {
-    _fadeCtrl.stop();
-    _fadeCtrl.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,7 +59,7 @@ class _NotificationCenterPageState
           ),
         ),
         actions: [
-          if (unreadCount > 0 && !_loadingAction)
+          if (notificationsAsync.hasValue && unreadCount > 0 && !_loadingAction)
             Padding(
               padding: const EdgeInsets.only(right: AppSpacing.sm),
               child: TextButton(
@@ -103,15 +84,32 @@ class _NotificationCenterPageState
             ),
         ],
       ),
-      body: FadeTransition(
-        opacity: _fadeCtrl,
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(
+              scale: Tween(begin: 0.97, end: 1.0).animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+              ),
+              child: child,
+            ),
+          );
+        },
         child: notificationsAsync.when(
-          loading: () => const AppSkeletonList(itemCount: 6),
-          error: (e, _) => _buildErrorState(),
+          loading: () => _buildShimmerList(),
+          error: (e, _) => _buildErrorState(e),
           data: (notifications) {
             final filtered = _applyFilters(notifications);
             if (filtered.isEmpty) {
-              return _buildEmptyState();
+              final hasActiveFilter = _categoryFilter != null || _showArchived;
+              if (hasActiveFilter) {
+                return _buildFilterEmptyState(theme);
+              }
+              return _buildEmptyState(theme);
             }
             return _buildContent(filtered, userId);
           },
@@ -120,8 +118,83 @@ class _NotificationCenterPageState
     );
   }
 
-  Widget _buildErrorState() {
+  Widget _buildShimmerList() {
+    return ListView.builder(
+      key: const ValueKey('loading'),
+      itemCount: 6,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.sm,
+        AppSpacing.lg,
+        AppSpacing.xxxl,
+      ),
+      itemBuilder: (context, index) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+          child: Container(
+            height: 76,
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.outline),
+            ),
+            child: Row(
+              children: [
+                const AppSkeleton(
+                  width: 4,
+                  height: 76,
+                  borderRadius: 20,
+                ),
+                const SizedBox(width: AppSpacing.xs + 2),
+                const SizedBox(width: AppSpacing.sm + 8),
+                const AppSkeleton(
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: AppSkeleton(
+                              height: 12,
+                              borderRadius: 4,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          const AppSkeleton(
+                            width: 36,
+                            height: 10,
+                            borderRadius: 4,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      const AppSkeleton(
+                        height: 10,
+                        borderRadius: 4,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildErrorState(Object error) {
+    debugPrint('[NOTIFICATIONS] Error loading: $error');
     return Center(
+      key: const ValueKey('error'),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
@@ -137,9 +210,16 @@ class _NotificationCenterPageState
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'Failed to load notifications',
+              "Couldn't load notifications",
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppColors.warmGray500,
+                  ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Please try again.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.warmGray400,
                   ),
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -157,22 +237,113 @@ class _NotificationCenterPageState
     );
   }
 
-  Widget _buildEmptyState() {
-    final hasActiveFilter = _categoryFilter != null || _showArchived;
-    final message = hasActiveFilter
-        ? 'No notifications match your filters'
-        : "You're all caught up!";
+  Widget _buildFilterEmptyState(ThemeData theme) {
     return Column(
+      key: const ValueKey('filter_empty'),
       children: [
         _buildFilterBar(),
         Expanded(
-          child: AppEmptyState(
-            icon: Icons.notifications_none_rounded,
-            title: 'No notifications yet',
-            subtitle: message,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.xl),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.search_off_rounded,
+                    size: 48,
+                    color: AppColors.warmGray300,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'No notifications match',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: AppColors.warmGray600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Try changing your filters',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.warmGray400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildEmptyState(ThemeData theme) {
+    return Center(
+      key: const ValueKey('empty'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xxl,
+          vertical: AppSpacing.xxxxl,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Spacer(flex: 2),
+            Container(
+              width: 96,
+              height: 96,
+              decoration: const BoxDecoration(
+                color: AppColors.primaryBg,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.notifications_rounded,
+                size: 48,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xxl),
+            Text(
+              "You're all caught up!",
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: AppColors.charcoal,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+              ),
+              child: Text(
+                'No notifications yet. We\'ll notify you about collections, expenses, sponsor visits, reminders and important festival updates.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppColors.warmGray500,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xxxl),
+            FilledButton.tonal(
+              onPressed: () => context.pop(),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primaryBg,
+                foregroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.xxl,
+                  vertical: AppSpacing.md,
+                ),
+              ),
+              child: const Text('Back to Dashboard'),
+            ),
+            const Spacer(flex: 3),
+          ],
+        ),
+      ),
     );
   }
 
@@ -181,6 +352,7 @@ class _NotificationCenterPageState
     String userId,
   ) {
     return Column(
+      key: const ValueKey('content'),
       children: [
         _buildFilterBar(),
         Expanded(child: _buildGroupedList(notifications, userId)),

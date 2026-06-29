@@ -1,8 +1,5 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/core/design/app_colors.dart';
@@ -688,85 +685,6 @@ class _FestivalInfoCardState extends ConsumerState<_FestivalInfoCard> {
     debugPrint('[DIAG:_pickDate] AFTER addPostFrameCallback scheduled');
   }
 
-  Future<void> _uploadQrImage(BuildContext context) async {
-    debugPrint('[DIAG:_uploadQrImage] BEFORE image picker');
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery);
-    if (picked == null || !context.mounted) {
-      debugPrint('[DIAG:_uploadQrImage] cancelled or not mounted');
-      return;
-    }
-    debugPrint('[DIAG:_uploadQrImage] platform: ${kIsWeb ? "web" : "mobile"}');
-
-    if (!context.mounted) {
-      debugPrint('[DIAG:_uploadQrImage] NOT MOUNTED after pick');
-      return;
-    }
-
-    debugPrint('[DIAG:_uploadQrImage] BEFORE uploading snackbar');
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        const SnackBar(
-          content: Row(children: [
-            SizedBox(
-              width: 18, height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-            ),
-            SizedBox(width: 12),
-            Text('Uploading...'),
-          ]),
-          duration: Duration(seconds: 30),
-        ),
-      );
-    try {
-      debugPrint('[DIAG:_uploadQrImage] BEFORE firestore upload');
-      final service = ref.read(firestoreProvider);
-      final url = kIsWeb
-          ? await service.uploadQrImageBytes(await picked.readAsBytes())
-          : await service.uploadQrImage(File(picked.path));
-      final updated = widget.festival.copyWith(qrImageUrl: url);
-      await service.setFestival(updated);
-      final activityService = ref.read(activityServiceProvider);
-      final userId = ref.read(userIdProvider);
-      final userName = ref.read(userNameProvider);
-      activityService.recordSettingsUpdated(userId: userId, userName: userName);
-      debugPrint('[DIAG:_uploadQrImage] AFTER firestore upload');
-      if (!context.mounted) {
-        debugPrint('[DIAG:_uploadQrImage] NOT MOUNTED after upload');
-        return;
-      }
-
-      debugPrint('[DIAG:_uploadQrImage] BEFORE success snackbar');
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          const SnackBar(content: Text('QR image updated')),
-        );
-      debugPrint('[DIAG:_uploadQrImage] AFTER success snackbar');
-
-      debugPrint('[DIAG:_uploadQrImage] BEFORE addPostFrameCallback');
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        debugPrint('[DIAG:_uploadQrImage] INSIDE addPostFrameCallback');
-        debugPrint('[DIAG:_uploadQrImage] BEFORE ref.invalidate(festivalProvider)');
-        ref.invalidate(festivalProvider);
-        debugPrint('[DIAG:_uploadQrImage] AFTER ref.invalidate(festivalProvider)');
-      });
-      debugPrint('[DIAG:_uploadQrImage] AFTER addPostFrameCallback scheduled');
-    } on Exception catch (e) {
-      debugPrint('[DIAG:_uploadQrImage] EXCEPTION: $e');
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          SnackBar(
-            content: Text('Upload failed: $e'),
-            action: SnackBarAction(label: 'Retry', onPressed: () => _uploadQrImage(context)),
-          ),
-        );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     debugPrint('[DIAG:_FestivalInfoCard] build');
@@ -853,8 +771,6 @@ class _FestivalInfoCardState extends ConsumerState<_FestivalInfoCard> {
             const SizedBox(height: AppSpacing.md),
             _QrPreviewRow(
               qrImageUrl: widget.festival.qrImageUrl,
-              onUpload: canEdit ? () => _uploadQrImage(context) : null,
-              onReplace: canEdit ? () => _uploadQrImage(context) : null,
               theme: theme,
             ),
           ],
@@ -1024,21 +940,16 @@ class _InfoRow extends StatelessWidget {
 // ──────────────────────────────────────────────
 class _QrPreviewRow extends StatelessWidget {
   final String? qrImageUrl;
-  final VoidCallback? onUpload;
-  final VoidCallback? onReplace;
   final ThemeData theme;
 
   const _QrPreviewRow({
     required this.qrImageUrl,
     required this.theme,
-    this.onUpload,
-    this.onReplace,
   });
 
   @override
   Widget build(BuildContext context) {
     final hasImage = qrImageUrl != null && qrImageUrl!.isNotEmpty;
-    final showButton = hasImage ? onReplace != null : onUpload != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1067,12 +978,6 @@ class _QrPreviewRow extends StatelessWidget {
                 ],
               ),
             ),
-            if (showButton)
-              TextButton.icon(
-                onPressed: hasImage ? onReplace! : onUpload!,
-                icon: Icon(hasImage ? Icons.swap_horiz_rounded : Icons.upload_rounded, size: 14),
-                label: Text(hasImage ? 'Replace' : 'Upload'),
-              ),
           ],
         ),
         if (hasImage) ...[
