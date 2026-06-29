@@ -585,6 +585,19 @@ class _KpiGrid extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final db = ref.watch(dashboardProvider);
+    final dcAsync = ref.watch(dailyCollectionsStreamProvider);
+    final dc = dcAsync.valueOrNull ?? [];
+    final now = DateTime.now();
+    final yesterdayStart = DateTime(now.year, now.month, now.day - 1);
+    final yesterdayEnd = yesterdayStart.add(const Duration(days: 1));
+    final yesterdayTotal = dc
+        .where((c) =>
+            c.date.toDate().isAfter(yesterdayStart) &&
+            c.date.toDate().isBefore(yesterdayEnd))
+        .fold<int>(0, (v, c) => v + c.amount);
+    final trendUp = db.todayCollection > yesterdayTotal;
+    final trendFlat = db.todayCollection == yesterdayTotal;
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final w = (constraints.maxWidth - AppSpacing.sm) / 2;
@@ -595,6 +608,7 @@ class _KpiGrid extends ConsumerWidget {
               icon: Icons.today_rounded, label: "Today's Collection",
               value: db.todayCollection, trend: '${db.todayEntryCount} entries',
               color: AppColors.success, fmtCurrency: true,
+              trendUp: trendUp, trendFlat: trendFlat,
             )),
             SizedBox(width: w, child: _KpiCard(
               icon: Icons.people_rounded, label: 'Pending Sponsors',
@@ -629,7 +643,9 @@ class _KpiCard extends StatelessWidget {
   final String trend;
   final Color color;
   final bool fmtCurrency;
-  const _KpiCard({required this.icon, required this.label, required this.value, required this.trend, required this.color, required this.fmtCurrency});
+  final bool trendUp;
+  final bool trendFlat;
+  const _KpiCard({required this.icon, required this.label, required this.value, required this.trend, required this.color, required this.fmtCurrency, this.trendUp = false, this.trendFlat = true});
 
   @override
   Widget build(BuildContext context) {
@@ -671,14 +687,29 @@ class _KpiCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          Text(
-            trend,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: AppColors.warmGray400,
-              height: 1.0,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          Row(
+            children: [
+              if (!trendFlat)
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Icon(
+                    trendUp ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                    size: 12,
+                    color: trendUp ? AppColors.success : AppColors.error,
+                  ),
+                ),
+              Flexible(
+                child: Text(
+                  trend,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: AppColors.warmGray400,
+                    height: 1.0,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1085,12 +1116,79 @@ List<_ActivityGroup> _groupActivities(List<Activity> activities) {
   return groups;
 }
 
-class _ActivityTimeline extends ConsumerWidget {
+enum _ActivityFilter { all, sponsors, expenses, collections }
+
+class _FilterRow extends StatelessWidget {
+  final _ActivityFilter value;
+  final ValueChanged<_ActivityFilter> onChanged;
+  const _FilterRow({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _buildChip(theme, 'All', _ActivityFilter.all),
+          const SizedBox(width: AppSpacing.sm),
+          _buildChip(theme, 'Sponsors', _ActivityFilter.sponsors),
+          const SizedBox(width: AppSpacing.sm),
+          _buildChip(theme, 'Expenses', _ActivityFilter.expenses),
+          const SizedBox(width: AppSpacing.sm),
+          _buildChip(theme, 'Collections', _ActivityFilter.collections),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChip(ThemeData theme, String label, _ActivityFilter f) {
+    final selected = value == f;
+    return GestureDetector(
+      onTap: () => onChanged(f),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs + 2,
+        ),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.1)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.full),
+          border: Border.all(
+            color: selected
+                ? AppColors.primary.withValues(alpha: 0.3)
+                : AppColors.outline,
+          ),
+        ),
+        child: Text(
+          label,
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: selected ? AppColors.primary : AppColors.warmGray500,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActivityTimeline extends ConsumerStatefulWidget {
   const _ActivityTimeline();
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ActivityTimeline> createState() => _ActivityTimelineState();
+}
+
+class _ActivityTimelineState extends ConsumerState<_ActivityTimeline> {
+  _ActivityFilter _filter = _ActivityFilter.all;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final items = ref.watch(activitiesStreamProvider).valueOrNull ?? [];
+    final allItems = ref.watch(activitiesStreamProvider).valueOrNull ?? [];
+    final items = _filtered(allItems);
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -1108,6 +1206,11 @@ class _ActivityTimeline extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
+          _FilterRow(
+            value: _filter,
+            onChanged: (v) => setState(() => _filter = v),
+          ),
+          const SizedBox(height: AppSpacing.sm),
           if (items.isEmpty)
             const SizedBox(
               height: 80,
@@ -1120,6 +1223,18 @@ class _ActivityTimeline extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  List<Activity> _filtered(List<Activity> items) {
+    if (_filter == _ActivityFilter.all) return items;
+    final type = switch (_filter) {
+      _ActivityFilter.sponsors => 'target',
+      _ActivityFilter.expenses => 'expense',
+      _ActivityFilter.collections => 'daily_collection',
+      _ => null,
+    };
+    if (type == null) return items;
+    return items.where((a) => a.entityType == type).toList();
   }
 
   void _navigateToActivity(BuildContext context, Activity a) {

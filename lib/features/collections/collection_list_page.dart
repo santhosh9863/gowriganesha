@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -32,9 +33,17 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
     with SingleTickerProviderStateMixin {
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  Timer? _debounceTimer;
   String _filter = 'all';
   bool _initialized = false;
   late final AnimationController _staggerCtrl;
+
+  void _onSearchChanged(String v) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) setState(() => _searchQuery = v);
+    });
+  }
 
   @override
   void initState() {
@@ -64,6 +73,7 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
   @override
   void dispose() {
     debugPrint('[LIFECYCLE] CollectionListPage.dispose');
+    _debounceTimer?.cancel();
     _staggerCtrl.stop();
     _staggerCtrl.dispose();
     _searchController.dispose();
@@ -199,7 +209,7 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
           ),
           child: TextField(
             controller: _searchController,
-            onChanged: (v) => setState(() => _searchQuery = v),
+            onChanged: _onSearchChanged,
             decoration: InputDecoration(
               hintText: 'Search sponsors...',
               prefixIcon: const Icon(Icons.search_rounded, size: 20),
@@ -207,6 +217,7 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
                   ? IconButton(
                       icon: const Icon(Icons.clear_rounded, size: 18),
                       onPressed: () {
+                        _debounceTimer?.cancel();
                         _searchController.clear();
                         setState(() => _searchQuery = '');
                       },
