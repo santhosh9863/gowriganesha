@@ -92,6 +92,7 @@ class _AppScaffoldState extends ConsumerState<AppScaffold>
     });
 
     return Scaffold(
+      extendBody: true,
       body: Stack(
         children: [
           AnimatedBuilder(
