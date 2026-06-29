@@ -38,53 +38,6 @@ class AnimatedBottomNav extends StatefulWidget {
 }
 
 class _AnimatedBottomNavState extends State<AnimatedBottomNav> {
-  final List<GlobalKey> _itemKeys = List.generate(
-    _navItems.length,
-    (_) => GlobalKey(),
-  );
-  final GlobalKey _navKey = GlobalKey();
-
-  double _indicatorLeft = 0;
-  bool _initialized = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _updateIndicator());
-  }
-
-  @override
-  void didUpdateWidget(AnimatedBottomNav old) {
-    super.didUpdateWidget(old);
-    if (old.currentIndex != widget.currentIndex) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _updateIndicator());
-    }
-  }
-
-  void _updateIndicator() {
-    final itemKey = _itemKeys[widget.currentIndex];
-    final itemRenderBox =
-        itemKey.currentContext?.findRenderObject() as RenderBox?;
-    if (itemRenderBox == null || !itemRenderBox.hasSize) return;
-
-    final navRenderBox =
-        _navKey.currentContext?.findRenderObject() as RenderBox?;
-    if (navRenderBox == null || !navRenderBox.hasSize) return;
-
-    final itemCenter =
-        itemRenderBox.localToGlobal(itemRenderBox.size.center(Offset.zero));
-    final localCenter = navRenderBox.globalToLocal(itemCenter);
-
-    final newLeft = localCenter.dx - 11.0;
-
-    if (!_initialized || _indicatorLeft != newLeft) {
-      setState(() {
-        _indicatorLeft = newLeft;
-        _initialized = true;
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -121,39 +74,18 @@ class _AnimatedBottomNavState extends State<AnimatedBottomNav> {
             horizontal: AppSpacing.sm,
           ),
           child: SizedBox(
-            key: _navKey,
-            height: 68,
-            child: Stack(
-              children: [
-                if (_initialized)
-                  AnimatedPositioned(
-                    duration: _navDuration,
-                    curve: Curves.easeOutCubic,
-                    left: _indicatorLeft,
-                    top: 6,
-                    width: 22,
-                    height: 4,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
+            height: 58,
+            child: Row(
+              children: List.generate(_navItems.length, (index) {
+                final isSelected = index == widget.currentIndex;
+                return Expanded(
+                  child: _NavBarItem(
+                    item: _navItems[index],
+                    isSelected: isSelected,
+                    onTap: () => widget.onTap(index),
                   ),
-                Row(
-                  children: List.generate(_navItems.length, (index) {
-                    final isSelected = index == widget.currentIndex;
-                    return Expanded(
-                      child: _NavBarItem(
-                        key: _itemKeys[index],
-                        item: _navItems[index],
-                        isSelected: isSelected,
-                        onTap: () => widget.onTap(index),
-                      ),
-                    );
-                  }),
-                ),
-              ],
+                );
+              }),
             ),
           ),
         ),
@@ -168,7 +100,6 @@ class _NavBarItem extends StatelessWidget {
   final VoidCallback onTap;
 
   const _NavBarItem({
-    super.key,
     required this.item,
     required this.isSelected,
     required this.onTap,
@@ -180,13 +111,13 @@ class _NavBarItem extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        height: 68,
+        height: 58,
         child: Column(
           children: [
             const SizedBox(height: 8),
             SizedBox(
-              width: 32,
-              height: 32,
+              width: 22,
+              height: 22,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
@@ -225,28 +156,22 @@ class _NavBarItem extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 4),
-            SizedBox(
-              height: 24,
-              child: Align(
-                alignment: Alignment.center,
-                child: AnimatedDefaultTextStyle(
-                  duration: _navDuration,
-                  curve: Curves.easeOutCubic,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                    color: isSelected
-                        ? AppColors.primary
-                        : AppColors.warmGray500,
-                    height: 1.2,
-                  ),
-                  child: Text(
-                    item.label,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                  ),
-                ),
+            const SizedBox(height: 2),
+            AnimatedDefaultTextStyle(
+              duration: _navDuration,
+              curve: Curves.easeOutCubic,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: isSelected
+                    ? AppColors.primary
+                    : AppColors.warmGray500,
+                height: 1.2,
+              ),
+              child: Text(
+                item.label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
               ),
             ),
           ],
