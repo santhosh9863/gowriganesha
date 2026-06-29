@@ -1,13 +1,16 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:ganesha_2026/core/services/local_notification_service.dart';
 import 'package:ganesha_2026/core/services/notification_repository.dart';
+
+final FlutterLocalNotificationsPlugin _backgroundPlugin = FlutterLocalNotificationsPlugin();
 
 class PushNotificationService {
   final NotificationRepository _repository;
+  final LocalNotificationService _localService;
   final FirebaseMessaging _messaging;
   final void Function({required String entityType, String? entityId})? _onNavigate;
-  static const _channel = MethodChannel('sankalpa/notifications');
 
   bool _initialized = false;
   String? _currentToken;
@@ -15,9 +18,11 @@ class PushNotificationService {
 
   PushNotificationService({
     required NotificationRepository repository,
+    required LocalNotificationService localService,
     FirebaseMessaging? messaging,
     void Function({required String entityType, String? entityId})? onNavigate,
   })  : _repository = repository,
+        _localService = localService,
         _messaging = messaging ?? FirebaseMessaging.instance,
         _onNavigate = onNavigate;
 
@@ -26,7 +31,7 @@ class PushNotificationService {
     _initialized = true;
     _userId = userId;
 
-    await _createNotificationChannel();
+    await _localService.initialize();
     await _requestPermissions();
 
     _currentToken = await _messaging.getToken();
@@ -50,7 +55,6 @@ class PushNotificationService {
     }
 
     FirebaseMessaging.onBackgroundMessage(_backgroundMessageHandler);
-
   }
 
   Future<void> removeCurrentToken() async {
@@ -79,22 +83,6 @@ class PushNotificationService {
     return 'web';
   }
 
-  Future<void> _createNotificationChannel() async {
-    if (defaultTargetPlatform != TargetPlatform.android) return;
-    try {
-      await _channel.invokeMethod('createNotificationChannel', {
-        'id': 'sankalpa_notifications',
-        'name': 'Sankalpa Notifications',
-        'description': 'Notifications from the Sankalpa app',
-        'importance': 4,
-      });
-    } catch (_) {
-    }
-  }
-  // MIGRATION NOTE: When flutter_local_notifications is added in a future phase,
-  // replace _createNotificationChannel() to use FlutterLocalNotificationsPlugin.
-  // No changes to NotificationRepository, NotificationService, or features needed.
-
   Future<void> _requestPermissions() async {
     await _messaging.requestPermission(
       alert: true,
@@ -116,7 +104,19 @@ class PushNotificationService {
     }
   }
 
-  void _onForegroundMessage(RemoteMessage message) {}
+  Future<void> _onForegroundMessage(RemoteMessage message) async {
+    final title = message.notification?.title ?? 'Sankalpa';
+    final body = message.notification?.body ?? '';
+    final entityType = message.data['entityType'] as String?;
+
+    await _localService.show(
+      id: message.messageId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      title: title,
+      body: body,
+      payload: message.messageId,
+      channelId: LocalNotificationService.channelFor(entityType),
+    );
+  }
 
   void _onNotificationTap(RemoteMessage message) {
     final data = message.data;
@@ -128,5 +128,30 @@ class PushNotificationService {
   }
 
   @pragma('vm:entry-point')
-  static Future<void> _backgroundMessageHandler(RemoteMessage message) async {}
+  static Future<void> _backgroundMessageHandler(RemoteMessage message) async {
+    final title = message.notification?.title ?? 'Sankalpa';
+    final body = message.notification?.body ?? '';
+    final entityType = message.data['entityType'] as String?;
+
+    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const iosSettings = DarwinInitializationSettings();
+    await _backgroundPlugin.initialize(
+      const InitializationSettings(android: androidSettings, iOS: iosSettings),
+    );
+
+    final channel = LocalNotificationService.channelFor(entityType);
+    await _backgroundPlugin.show(
+      message.messageId?.hashCode ?? 0,
+      title,
+      body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          channel, channel,
+          importance: Importance.defaultImportance,
+        ),
+        iOS: const DarwinNotificationDetails(),
+      ),
+      payload: message.messageId,
+    );
+  }
 }

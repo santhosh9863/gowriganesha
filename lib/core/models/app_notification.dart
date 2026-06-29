@@ -12,10 +12,11 @@ class AppNotification {
   final String senderUserId;
   final String senderUserName;
   final Timestamp createdAt;
+  final Timestamp? lastUpdatedAt;
   final Timestamp? scheduledAt;
   final Timestamp? archivedAt;
-  final Timestamp? readAt;
   final Map<String, Timestamp> readBy;
+  final bool isPinned;
   final String? actionRoute;
   final String? entityType;
   final String? entityId;
@@ -36,10 +37,11 @@ class AppNotification {
     required this.senderUserId,
     required this.senderUserName,
     required this.createdAt,
+    this.lastUpdatedAt,
     this.scheduledAt,
     this.archivedAt,
-    this.readAt,
     this.readBy = const {},
+    this.isPinned = false,
     this.actionRoute,
     this.entityType,
     this.entityId,
@@ -49,10 +51,8 @@ class AppNotification {
   });
 
   NotificationStatus statusFor(String userId) {
-    if (archivedAt != null) return NotificationStatus.archived;
-    if (readBy.containsKey(userId) || readAt != null) {
-      return NotificationStatus.read;
-    }
+    if (archivedAt != null && !isPinned) return NotificationStatus.archived;
+    if (readBy.containsKey(userId)) return NotificationStatus.read;
     return NotificationStatus.unread;
   }
 
@@ -71,10 +71,11 @@ class AppNotification {
       'senderUserId': senderUserId,
       'senderUserName': senderUserName,
       'createdAt': createdAt,
+      if (lastUpdatedAt != null) 'lastUpdatedAt': lastUpdatedAt,
       if (scheduledAt != null) 'scheduledAt': scheduledAt,
       if (archivedAt != null) 'archivedAt': archivedAt,
-      if (readAt != null) 'readAt': readAt,
       'readBy': readBy.map((k, v) => MapEntry(k, v)),
+      'isPinned': isPinned,
       if (actionRoute != null) 'actionRoute': actionRoute,
       if (entityType != null) 'entityType': entityType,
       if (entityId != null) 'entityId': entityId,
@@ -85,6 +86,13 @@ class AppNotification {
   }
 
   factory AppNotification.fromMap(String id, Map<String, dynamic> map) {
+    final readBy = _readReadByMap(map['readBy']);
+    final legacyReadAt = map['readAt'] as Timestamp?;
+
+    if (legacyReadAt != null && readBy.isEmpty) {
+      readBy['_legacy_'] = legacyReadAt;
+    }
+
     return AppNotification(
       id: id,
       festivalId: map['festivalId'] as String?,
@@ -96,10 +104,11 @@ class AppNotification {
       senderUserId: map['senderUserId'] as String? ?? '',
       senderUserName: map['senderUserName'] as String? ?? '',
       createdAt: (map['createdAt'] as Timestamp?) ?? Timestamp.now(),
+      lastUpdatedAt: map['lastUpdatedAt'] as Timestamp?,
       scheduledAt: map['scheduledAt'] as Timestamp?,
       archivedAt: map['archivedAt'] as Timestamp?,
-      readAt: map['readAt'] as Timestamp?,
-      readBy: _readReadByMap(map['readBy']),
+      readBy: readBy,
+      isPinned: map['isPinned'] as bool? ?? false,
       actionRoute: map['actionRoute'] as String?,
       entityType: map['entityType'] as String?,
       entityId: map['entityId'] as String?,
@@ -128,10 +137,11 @@ class AppNotification {
     String? senderUserId,
     String? senderUserName,
     Timestamp? createdAt,
+    Timestamp? lastUpdatedAt,
     Timestamp? scheduledAt,
     Timestamp? archivedAt,
-    Timestamp? readAt,
     Map<String, Timestamp>? readBy,
+    bool? isPinned,
     String? actionRoute,
     String? entityType,
     String? entityId,
@@ -139,9 +149,9 @@ class AppNotification {
     Map<String, dynamic>? metadata,
     String? targetRole,
     bool clearFestivalId = false,
+    bool clearLastUpdatedAt = false,
     bool clearScheduledAt = false,
     bool clearArchivedAt = false,
-    bool clearReadAt = false,
     bool clearReadBy = false,
     bool clearActionRoute = false,
     bool clearEntityType = false,
@@ -161,10 +171,11 @@ class AppNotification {
       senderUserId: senderUserId ?? this.senderUserId,
       senderUserName: senderUserName ?? this.senderUserName,
       createdAt: createdAt ?? this.createdAt,
+      lastUpdatedAt: clearLastUpdatedAt ? null : (lastUpdatedAt ?? this.lastUpdatedAt),
       scheduledAt: clearScheduledAt ? null : (scheduledAt ?? this.scheduledAt),
       archivedAt: clearArchivedAt ? null : (archivedAt ?? this.archivedAt),
-      readAt: clearReadAt ? null : (readAt ?? this.readAt),
       readBy: clearReadBy ? {} : (readBy ?? this.readBy),
+      isPinned: isPinned ?? this.isPinned,
       actionRoute: clearActionRoute ? null : (actionRoute ?? this.actionRoute),
       entityType: clearEntityType ? null : (entityType ?? this.entityType),
       entityId: clearEntityId ? null : (entityId ?? this.entityId),
@@ -186,7 +197,7 @@ class AppNotification {
         other.priority == priority &&
         other.senderUserId == senderUserId &&
         other.createdAt == createdAt &&
-        other.readAt == readAt &&
+        other.isPinned == isPinned &&
         other.archivedAt == archivedAt;
   }
 
@@ -199,7 +210,7 @@ class AppNotification {
         priority,
         senderUserId,
         createdAt,
-        readAt,
+        isPinned,
         archivedAt,
       );
 }

@@ -42,7 +42,7 @@ final notificationPermissionServiceProvider =
 });
 
 final localNotificationServiceProvider = Provider<LocalNotificationService>((ref) {
-  return LocalNotificationServiceStub();
+  return SankalpaLocalNotificationService();
 });
 
 final notificationsStreamProvider =
@@ -68,8 +68,10 @@ final pendingNotificationTapProvider =
 
 final pushNotificationServiceProvider = Provider<PushNotificationService>((ref) {
   final repo = ref.watch(notificationRepositoryProvider);
+  final localService = ref.watch(localNotificationServiceProvider);
   return PushNotificationService(
     repository: repo,
+    localService: localService,
     onNavigate: ({required entityType, entityId}) {
       ref.read(pendingNotificationTapProvider.notifier).state = (
         entityType: entityType,

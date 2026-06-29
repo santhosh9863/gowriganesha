@@ -2,9 +2,9 @@ import 'package:ganesha_2026/core/models/app_notification.dart';
 
 class NotificationNavigator {
   static const Map<String, String> _routeTemplates = {
-    'expense': '/expenses/{entityId}',
+    'expense': '/expenses/{entityId}/edit',
     'target': '/collections/{entityId}',
-    'followup': '/followups/{entityId}',
+    'followup': '/followups/{entityId}/edit',
     'daily_collection': '/daily-collections',
     'settings': '/settings',
   };

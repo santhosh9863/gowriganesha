@@ -62,6 +62,7 @@ class NotificationRepository {
     return _notifications
         .where('festivalId', isEqualTo: AppConstants.festivalId)
         .orderBy('createdAt', descending: true)
+        .limit(100)
         .snapshots()
         .map((snapshot) {
       return snapshot.docs
@@ -86,7 +87,7 @@ class NotificationRepository {
     try {
       await _notifications.doc(notificationId).update({
         'readBy.$userId': FieldValue.serverTimestamp(),
-        'readAt': FieldValue.serverTimestamp(),
+        'lastUpdatedAt': FieldValue.serverTimestamp(),
       });
       debugPrint('[NOTIFICATION_REPO] Marked read: $notificationId for $userId');
     } on FirebaseException catch (e) {
@@ -114,6 +115,8 @@ class NotificationRepository {
   }) async {
     final snapshot = await _notifications
         .where('archivedAt', isNull: true)
+        .orderBy('createdAt', descending: true)
+        .limit(100)
         .get();
 
     final unread = <DocumentSnapshot<Map<String, dynamic>>>[];
@@ -136,7 +139,6 @@ class NotificationRepository {
     for (final doc in docs) {
       batch.update(doc.reference, {
         'readBy.$userId': FieldValue.serverTimestamp(),
-        'readAt': FieldValue.serverTimestamp(),
       });
     }
     await batch.commit();
@@ -146,6 +148,8 @@ class NotificationRepository {
     try {
       final snapshot = await _notifications
           .where('archivedAt', isNull: true)
+          .orderBy('createdAt', descending: true)
+          .limit(100)
           .get();
 
       int count = 0;
