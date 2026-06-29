@@ -27,12 +27,16 @@ class NotificationRepository {
     return '$entityType:$entityId:${notification.type.value}:${notification.senderUserId}';
   }
 
-  Future<void> createNotification(AppNotification notification) async {
+  /// Creates a notification document.
+  ///
+  /// Returns `true` if the notification was deduplicated (merged into an existing
+  /// document), `false` if a new document was created.
+  Future<bool> createNotification(AppNotification notification) async {
     try {
       final dedupKey = _computeDedupKey(notification);
       if (dedupKey != null) {
         final deduped = await _tryDedup(notification, dedupKey);
-        if (deduped) return;
+        if (deduped) return true;
       }
 
       final notificationWithDedupKey = dedupKey != null
@@ -41,6 +45,7 @@ class NotificationRepository {
 
       await _notifications.doc(notification.id).set(notificationWithDedupKey.toMap());
       debugPrint('[NOTIFICATION_REPO] Created: ${notification.id}');
+      return false;
     } on FirebaseException catch (e) {
       debugPrint('[NOTIFICATION_REPO] Error creating: $e');
       throw FirestoreException('Failed to create notification', originalError: e);

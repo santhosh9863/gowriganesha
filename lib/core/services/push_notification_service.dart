@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:ganesha_2026/core/services/local_notification_service.dart';
+import 'package:ganesha_2026/core/services/notification_analytics_service.dart';
 import 'package:ganesha_2026/core/services/notification_repository.dart';
 
 final FlutterLocalNotificationsPlugin _backgroundPlugin = FlutterLocalNotificationsPlugin();
@@ -9,6 +10,7 @@ final FlutterLocalNotificationsPlugin _backgroundPlugin = FlutterLocalNotificati
 class PushNotificationService {
   final NotificationRepository _repository;
   final LocalNotificationService _localService;
+  final NotificationAnalyticsService? _analytics;
   final FirebaseMessaging _messaging;
   final void Function({required String entityType, String? entityId})? _onNavigate;
 
@@ -19,10 +21,12 @@ class PushNotificationService {
   PushNotificationService({
     required NotificationRepository repository,
     required LocalNotificationService localService,
+    NotificationAnalyticsService? analytics,
     FirebaseMessaging? messaging,
     void Function({required String entityType, String? entityId})? onNavigate,
   })  : _repository = repository,
         _localService = localService,
+        _analytics = analytics,
         _messaging = messaging ?? FirebaseMessaging.instance,
         _onNavigate = onNavigate;
 
@@ -122,6 +126,8 @@ class PushNotificationService {
     final data = message.data;
     final entityType = data['entityType'] as String?;
     final entityId = data['entityId'] as String?;
+    final category = data['category'] as String?;
+    _analytics?.trackOpened(category: category);
     if (entityType != null && _onNavigate != null) {
       _onNavigate(entityType: entityType, entityId: entityId);
     }

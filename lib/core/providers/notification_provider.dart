@@ -5,6 +5,7 @@ import 'package:ganesha_2026/core/models/notification_preferences.dart';
 import 'package:ganesha_2026/core/models/user_role.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/core/providers/auth_provider.dart';
+import 'package:ganesha_2026/core/services/notification_analytics_service.dart';
 import 'package:ganesha_2026/core/services/notification_repository.dart';
 import 'package:ganesha_2026/core/services/notification_service.dart';
 import 'package:ganesha_2026/core/services/notification_navigator.dart';
@@ -17,9 +18,18 @@ final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
   return NotificationRepository(FirebaseFirestore.instance);
 });
 
+final notificationAnalyticsServiceProvider =
+    Provider<NotificationAnalyticsService>((ref) {
+  final firestore = FirebaseFirestore.instance;
+  final service = NotificationAnalyticsService(firestore);
+  ref.onDispose(() => service.dispose());
+  return service;
+});
+
 final notificationServiceProvider = Provider<NotificationService>((ref) {
   final repo = ref.watch(notificationRepositoryProvider);
-  return NotificationService(repository: repo);
+  final analytics = ref.watch(notificationAnalyticsServiceProvider);
+  return NotificationService(repository: repo, analytics: analytics);
 });
 
 final activityServiceProvider = Provider<ActivityService>((ref) {
@@ -70,9 +80,11 @@ final pendingNotificationTapProvider =
 final pushNotificationServiceProvider = Provider<PushNotificationService>((ref) {
   final repo = ref.watch(notificationRepositoryProvider);
   final localService = ref.watch(localNotificationServiceProvider);
+  final analytics = ref.watch(notificationAnalyticsServiceProvider);
   return PushNotificationService(
     repository: repo,
     localService: localService,
+    analytics: analytics,
     onNavigate: ({required entityType, entityId}) {
       ref.read(pendingNotificationTapProvider.notifier).state = (
         entityType: entityType,

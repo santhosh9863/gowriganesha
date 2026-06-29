@@ -2,12 +2,17 @@ import 'package:flutter/foundation.dart';
 import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/core/models/app_notification.dart';
 import 'package:ganesha_2026/core/services/notification_repository.dart';
+import 'package:ganesha_2026/core/services/notification_analytics_service.dart';
 
 class NotificationService {
   final NotificationRepository _repository;
+  final NotificationAnalyticsService? _analytics;
 
-  NotificationService({required NotificationRepository repository})
-      : _repository = repository;
+  NotificationService({
+    required NotificationRepository repository,
+    NotificationAnalyticsService? analytics,
+  })  : _repository = repository,
+        _analytics = analytics;
 
   Future<String> createNotification(AppNotification notification) async {
     final enriched = notification.copyWith(
@@ -20,7 +25,18 @@ class NotificationService {
       );
     }
 
-    await _repository.createNotification(enriched);
+    final deduped = await _repository.createNotification(enriched);
+
+    if (deduped) {
+      _analytics?.trackDeduplicated(
+        category: notification.category.value,
+      );
+    } else {
+      _analytics?.trackSent(
+        category: notification.category.value,
+      );
+    }
+
     debugPrint('[NOTIFICATION_SVC] Created: ${enriched.id}');
     return enriched.id;
   }
