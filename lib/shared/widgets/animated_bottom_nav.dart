@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:ganesha_2026/core/design/app_colors.dart';
-import 'package:ganesha_2026/core/design/app_spacing.dart';
-import 'package:ganesha_2026/shared/widgets/sankalpa_glass.dart';
 
 class _NavItem {
   final IconData icon;
@@ -40,53 +38,28 @@ class AnimatedBottomNav extends StatefulWidget {
 class _AnimatedBottomNavState extends State<AnimatedBottomNav> {
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        0,
-        AppSpacing.xl,
-        AppSpacing.xl,
-      ),
-      child: SafeArea(
-        top: false,
-        left: false,
-        right: false,
-        child: SankalpaGlass(
-          sigma: 14,
-          opacity: 0.78,
-          borderRadius: BorderRadius.circular(37),
-          borderColor: const Color(0x08000000),
-          tintColor: AppColors.card,
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.08),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-            BoxShadow(
-              color: const Color(0x0D000000),
-              blurRadius: 20,
-              offset: const Offset(0, 2),
-            ),
-          ],
-          padding: const EdgeInsets.symmetric(
-            vertical: AppSpacing.sm,
-            horizontal: AppSpacing.sm,
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          border: Border(
+            top: BorderSide(color: AppColors.outline, width: 0.5),
           ),
-          child: SizedBox(
-            height: 58,
-            child: Row(
-              children: List.generate(_navItems.length, (index) {
-                final isSelected = index == widget.currentIndex;
-                return Expanded(
-                  child: _NavBarItem(
-                    item: _navItems[index],
-                    isSelected: isSelected,
-                    onTap: () => widget.onTap(index),
-                  ),
-                );
-              }),
-            ),
+        ),
+        child: SizedBox(
+          height: 58,
+          child: Row(
+            children: List.generate(_navItems.length, (index) {
+              final isSelected = index == widget.currentIndex;
+              return Expanded(
+                child: _NavBarItem(
+                  item: _navItems[index],
+                  isSelected: isSelected,
+                  onTap: () => widget.onTap(index),
+                ),
+              );
+            }),
           ),
         ),
       ),
