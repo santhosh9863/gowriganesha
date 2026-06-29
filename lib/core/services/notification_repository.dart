@@ -7,6 +7,8 @@ import 'package:ganesha_2026/core/services/firestore_service.dart';
 class NotificationRepository {
   final FirebaseFirestore _firestore;
 
+  static const Duration _dedupWindow = Duration(seconds: 60);
+
   NotificationRepository(this._firestore);
 
   CollectionReference<Map<String, dynamic>> get _notifications =>
@@ -17,13 +19,77 @@ class NotificationRepository {
 
   String createNotificationId() => _firestore.collection('_').doc().id;
 
+  static String? _computeDedupKey(AppNotification notification) {
+    final entityType = notification.entityType;
+    final entityId = notification.entityId;
+    if (entityType == null || entityId == null) return null;
+    return '$entityType:$entityId:${notification.type.value}:${notification.senderUserId}';
+  }
+
   Future<void> createNotification(AppNotification notification) async {
     try {
-      await _notifications.doc(notification.id).set(notification.toMap());
+      final dedupKey = _computeDedupKey(notification);
+      if (dedupKey != null) {
+        final deduped = await _tryDedup(notification, dedupKey);
+        if (deduped) return;
+      }
+
+      final notificationWithDedupKey = dedupKey != null
+          ? notification.copyWith(dedupKey: dedupKey)
+          : notification;
+
+      await _notifications.doc(notification.id).set(notificationWithDedupKey.toMap());
       debugPrint('[NOTIFICATION_REPO] Created: ${notification.id}');
     } on FirebaseException catch (e) {
       debugPrint('[NOTIFICATION_REPO] Error creating: $e');
       throw FirestoreException('Failed to create notification', originalError: e);
+    }
+  }
+
+  Future<bool> _tryDedup(AppNotification notification, String dedupKey) async {
+    final cutoff = Timestamp.fromDate(
+      DateTime.now().subtract(_dedupWindow),
+    );
+
+    try {
+      final snapshot = await _notifications
+          .where('festivalId', isEqualTo: AppConstants.festivalId)
+          .where('dedupKey', isEqualTo: dedupKey)
+          .where('createdAt', isGreaterThan: cutoff)
+          .orderBy('createdAt', descending: true)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isEmpty) return false;
+
+      final existing = snapshot.docs.first;
+      final existingId = existing.id;
+
+      await _firestore.runTransaction((transaction) async {
+        final docSnapshot = await transaction.get(existing.reference);
+        if (!docSnapshot.exists) return;
+        final existingData = docSnapshot.data()!;
+        final existingMetadata =
+            existingData['metadata'] as Map<String, dynamic>? ?? {};
+        final incomingMetadata = notification.metadata ?? <String, dynamic>{};
+
+        final mergedMetadata = <String, dynamic>{
+          ...existingMetadata,
+          ...incomingMetadata,
+        };
+
+        transaction.update(existing.reference, {
+          'lastUpdatedAt': FieldValue.serverTimestamp(),
+          'metadata': mergedMetadata,
+          if (notification.isPinned) 'isPinned': true,
+        });
+      });
+
+      debugPrint('[NOTIFICATION_REPO] Dedup merged into: $existingId');
+      return true;
+    } on FirebaseException catch (e) {
+      debugPrint('[NOTIFICATION_REPO] Dedup query failed: $e');
+      return false;
     }
   }
 

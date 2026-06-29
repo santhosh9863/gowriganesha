@@ -23,6 +23,7 @@ class AppNotification {
   final Map<String, dynamic>? actionArguments;
   final Map<String, dynamic>? metadata;
   final String? targetRole;
+  final String? dedupKey;
 
   NotificationCategory get category => type.category;
 
@@ -48,6 +49,7 @@ class AppNotification {
     this.actionArguments,
     this.metadata,
     this.targetRole,
+    this.dedupKey,
   });
 
   NotificationStatus statusFor(String userId) {
@@ -82,6 +84,7 @@ class AppNotification {
       if (actionArguments != null) 'actionArguments': actionArguments,
       if (metadata != null) 'metadata': metadata,
       if (targetRole != null) 'targetRole': targetRole,
+      if (dedupKey != null) 'dedupKey': dedupKey,
     };
   }
 
@@ -115,6 +118,7 @@ class AppNotification {
       actionArguments: map['actionArguments'] as Map<String, dynamic>?,
       metadata: map['metadata'] as Map<String, dynamic>?,
       targetRole: map['targetRole'] as String?,
+      dedupKey: map['dedupKey'] as String?,
     );
   }
 
@@ -148,6 +152,7 @@ class AppNotification {
     Map<String, dynamic>? actionArguments,
     Map<String, dynamic>? metadata,
     String? targetRole,
+    String? dedupKey,
     bool clearFestivalId = false,
     bool clearLastUpdatedAt = false,
     bool clearScheduledAt = false,
@@ -183,6 +188,7 @@ class AppNotification {
           clearActionArguments ? null : (actionArguments ?? this.actionArguments),
       metadata: clearMetadata ? null : (metadata ?? this.metadata),
       targetRole: clearTargetRole ? null : (targetRole ?? this.targetRole),
+      dedupKey: dedupKey ?? this.dedupKey,
     );
   }
 
