@@ -12,6 +12,7 @@ import 'package:ganesha_2026/core/models/expense.dart';
 import 'package:ganesha_2026/core/models/daily_collection.dart';
 import 'package:ganesha_2026/core/models/sponsor_followup.dart';
 import 'package:ganesha_2026/core/models/activity.dart';
+import 'package:ganesha_2026/shared/widgets/app_snackbar.dart';
 
 String _csvEscape(String s) {
   if (s.contains(',') || s.contains('"') || s.contains('\n')) {
@@ -95,13 +96,10 @@ class CollectionEntry {
 Future<void> exportAllData(BuildContext context, FirestoreService service) async {
   if (kIsWeb) {
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(const SnackBar(content: Text('Export is not available on web. Please use the mobile app.')));
+    context.showWarning('Export is not available on web. Please use the mobile app.');
     return;
   }
 
-  final messenger = ScaffoldMessenger.of(context);
   final festivalId = AppConstants.festivalId;
   final warnings = <String>[];
 
@@ -166,9 +164,8 @@ Future<void> exportAllData(BuildContext context, FirestoreService service) async
     }
 
     if (files.isEmpty) {
-      messenger
-        ..clearSnackBars()
-        ..showSnackBar(const SnackBar(content: Text('No data to export')));
+      ScaffoldMessenger.of(context).clearSnackBars();
+      context.showWarning('No data to export');
       return;
     }
 
@@ -177,15 +174,11 @@ Future<void> exportAllData(BuildContext context, FirestoreService service) async
     final msg = warnings.isEmpty
         ? 'Export completed'
         : 'Export completed. ${warnings.join('; ')}.';
-    messenger
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).clearSnackBars();
+    context.showInfo(msg);
   } on Exception catch (e) {
-    messenger
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(content: Text('Export failed: $e')),
-      );
+    ScaffoldMessenger.of(context).clearSnackBars();
+    context.showError('Export failed: $e');
   }
 }
 

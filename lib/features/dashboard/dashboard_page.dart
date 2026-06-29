@@ -1219,7 +1219,12 @@ class _ActivityTimelineState extends ConsumerState<_ActivityTimeline> {
               ),
             )
           else
-            _buildList(context, items, theme),
+            SizedBox(
+              height: 280,
+              child: SingleChildScrollView(
+                child: _buildList(context, items, theme),
+              ),
+            ),
         ],
       ),
     );
@@ -1254,9 +1259,7 @@ class _ActivityTimelineState extends ConsumerState<_ActivityTimeline> {
   Widget _buildList(BuildContext context, List<Activity> items, ThemeData theme) {
     final groups = _groupActivities(items);
     final widgets = <Widget>[];
-    var count = 0;
     for (final g in groups) {
-      if (count >= 5) break;
       widgets.add(Padding(
         padding: const EdgeInsets.only(bottom: AppSpacing.sm),
         child: Text(
@@ -1268,8 +1271,6 @@ class _ActivityTimelineState extends ConsumerState<_ActivityTimeline> {
         ),
       ));
       for (final a in g.activities) {
-        if (count >= 5) break;
-        count++;
         final c = _actColor(a.type);
         final icon = _actIcon(a.type);
         final canNavigate = a.recordId != null && a.entityType != null;
@@ -1310,21 +1311,11 @@ class _ActivityTimelineState extends ConsumerState<_ActivityTimeline> {
         ));
       }
     }
-    widgets.add(Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.sm),
-      child: Align(
-        alignment: Alignment.center,
-        child: TextButton(
-          onPressed: () => context.push('/notifications'),
-          style: TextButton.styleFrom(
-            foregroundColor: AppColors.primary,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-          ),
-          child: const Text('View All Activity'),
-        ),
-      ),
-    ));
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: widgets);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: widgets,
+    );
   }
 }
 

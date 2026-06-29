@@ -20,6 +20,7 @@ import 'package:ganesha_2026/shared/widgets/app_metric_card.dart';
 import 'package:ganesha_2026/shared/widgets/app_page_scaffold.dart';
 import 'package:ganesha_2026/shared/widgets/app_skeleton.dart';
 import 'package:ganesha_2026/shared/widgets/app_stagger.dart';
+import 'package:ganesha_2026/shared/widgets/app_snackbar.dart';
 import 'package:ganesha_2026/shared/widgets/confirm_dialog.dart';
 
 class CollectionListPage extends ConsumerStatefulWidget {
@@ -353,10 +354,7 @@ class _CollectionListPageState extends ConsumerState<CollectionListPage>
       await service.deleteTarget(target.id);
     } on Exception {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Failed to delete sponsor. Please try again.')),
-        );
+        context.showError('Failed to delete sponsor. Please try again.');
       }
     }
   }
@@ -487,7 +485,7 @@ class _RecordCollectionDialogState extends State<_RecordCollectionDialog>
             amount: a,
             note: note,
           );
-      widget.ref.read(activityServiceProvider).recordContributionRecorded(
+      await widget.ref.read(activityServiceProvider).recordContributionRecorded(
             _t,
             a,
             userId: widget.ref.read(userIdProvider),

@@ -13,6 +13,7 @@ import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/core/providers/notification_provider.dart';
 import 'package:ganesha_2026/shared/utils/amount_format.dart';
 import 'package:ganesha_2026/shared/widgets/adjust_collection_sheet.dart';
+import 'package:ganesha_2026/shared/widgets/app_snackbar.dart';
 
 class CollectionFormPage extends ConsumerStatefulWidget {
   final String? targetId;
@@ -184,6 +185,8 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
                           const SizedBox(height: AppSpacing.sm),
                           OutlinedButton.icon(
                             onPressed: () {
+                              debugPrint('[ADJUST] STEP 1: Adjust Collection button pressed');
+                              debugPrint('[ADJUST] context.mounted=${context.mounted} ref=$ref');
                               showAdjustCollectionSheet(context, ref, _loadedTarget!);
                             },
                             icon: const Icon(Icons.tune_rounded, size: 16),
@@ -252,15 +255,14 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
     if (_isSaving) return;
     if (!mounted) return;
     if (widget.targetId != null && ref.read(roleProvider) != UserRole.admin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Access Denied')),
-      );
+      context.showWarning('Access Denied');
       return;
     }
     setState(() => _isSaving = true);
 
     final service = ref.read(firestoreProvider);
     final now = Timestamp.now();
+    Target? createdTarget;
 
     try {
       if (widget.targetId != null) {
@@ -278,7 +280,7 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
           updatedAt: now,
         );
         await service.updateTarget(target);
-        service.addActivity(Activity(
+        await service.addActivity(Activity(
           id: service.generateId(),
           festivalId: AppConstants.festivalId,
           type: 'sponsor_updated',
@@ -289,7 +291,7 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
           entityType: 'target',
         ));
       } else {
-        final target = Target(
+        createdTarget = Target(
           id: service.generateId(),
           festivalId: AppConstants.festivalId,
           name: _nameController.text.trim(),
@@ -301,25 +303,34 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
           createdAt: now,
           updatedAt: now,
         );
-        await service.addTarget(target);
-        final activityService = ref.read(activityServiceProvider);
-        final userId = ref.read(userIdProvider);
-        final userName = ref.read(userNameProvider);
-        activityService.recordSponsorAdded(target, userId: userId, userName: userName);
-      }
-
-      if (mounted) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) context.pop();
-        });
+        await service.addTarget(createdTarget);
       }
     } on Exception catch (e) {
       if (mounted) {
+        context.showError(e.toString());
+      }
+      return;
+    } finally {
+      if (mounted) {
         setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
       }
     }
+
+    if (createdTarget != null && mounted) {
+      try {
+        final activityService = ref.read(activityServiceProvider);
+        final userId = ref.read(userIdProvider);
+        final userName = ref.read(userNameProvider);
+        await activityService.recordSponsorAdded(
+          createdTarget,
+          userId: userId,
+          userName: userName,
+        );
+      } on Exception catch (e) {
+        debugPrint('[SPONSOR] Activity/Notification failed (non-fatal): $e');
+      }
+    }
+
+    if (mounted) context.pop();
   }
 }

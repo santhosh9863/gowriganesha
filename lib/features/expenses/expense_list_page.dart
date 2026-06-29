@@ -18,6 +18,7 @@ import 'package:ganesha_2026/shared/widgets/app_page_scaffold.dart';
 import 'package:ganesha_2026/shared/widgets/app_section_header.dart';
 import 'package:ganesha_2026/shared/widgets/app_skeleton.dart';
 import 'package:ganesha_2026/shared/utils/amount_format.dart';
+import 'package:ganesha_2026/shared/widgets/app_snackbar.dart';
 import 'package:ganesha_2026/shared/widgets/confirm_dialog.dart';
 
 class ExpenseListPage extends ConsumerWidget {
@@ -202,9 +203,7 @@ class ExpenseListPage extends ConsumerWidget {
       await service.deleteExpense(expense.id);
     } on Exception {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to delete expense. Please try again.')),
-        );
+        context.showError('Failed to delete expense. Please try again.');
       }
     }
   }

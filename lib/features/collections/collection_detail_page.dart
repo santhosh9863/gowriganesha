@@ -24,6 +24,7 @@ import 'package:ganesha_2026/shared/widgets/app_card.dart';
 import 'package:ganesha_2026/shared/widgets/app_page_scaffold.dart';
 import 'package:ganesha_2026/shared/widgets/app_empty_state.dart';
 import 'package:ganesha_2026/shared/widgets/app_skeleton.dart';
+import 'package:ganesha_2026/shared/widgets/app_snackbar.dart';
 import 'package:ganesha_2026/shared/widgets/confirm_dialog.dart';
 
 class CollectionDetailPage extends ConsumerStatefulWidget {
@@ -165,18 +166,14 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
       final activityService = ref.read(activityServiceProvider);
       final userId = ref.read(userIdProvider);
       final userName = ref.read(userNameProvider);
-      activityService.recordContributionRecorded(target, amount, userId: userId, userName: userName);
+      await activityService.recordContributionRecorded(target, amount, userId: userId, userName: userName);
       debugPrint('[ACTION] CollectionDetailPage: Activity written, mounted=$mounted');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${AppConstants.currencySymbol}${fmtAmount(amount)} recorded')),
-        );
+        context.showSuccess('${AppConstants.currencySymbol}${fmtAmount(amount)} recorded');
       }
     } on Exception catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        context.showError('Error: $e');
       }
     }
   }
@@ -203,9 +200,7 @@ class _CollectionDetailPageState extends ConsumerState<CollectionDetailPage> {
       }
     } on Exception catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        context.showError('Error: $e');
       }
     }
   }

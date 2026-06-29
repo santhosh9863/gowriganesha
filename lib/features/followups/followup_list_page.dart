@@ -21,6 +21,7 @@ import 'package:ganesha_2026/shared/widgets/app_page_scaffold.dart';
 import 'package:ganesha_2026/shared/widgets/app_section_header.dart';
 import 'package:ganesha_2026/shared/widgets/app_skeleton.dart';
 import 'package:ganesha_2026/shared/widgets/app_status_chip.dart';
+import 'package:ganesha_2026/shared/widgets/app_snackbar.dart';
 import 'package:ganesha_2026/shared/widgets/confirm_dialog.dart';
 
 class FollowUpListPage extends ConsumerStatefulWidget {
@@ -343,17 +344,12 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
       final activityService = ref.read(activityServiceProvider);
       final userId = ref.read(userIdProvider);
       final userName = ref.read(userNameProvider);
-      activityService.recordFollowUpCompleted(updated, userId: userId, userName: userName);
+      await activityService.recordFollowUpCompleted(updated, userId: userId, userName: userName);
 
       if (!context.mounted) return;
 
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          SnackBar(
-            content: const Text('Visit marked as completed'),
-            duration: const Duration(seconds: 3),
-            action: SnackBarAction(
+      ScaffoldMessenger.of(context).clearSnackBars();
+      context.showSuccess('Visit marked as completed', action: SnackBarAction(
               label: 'UNDO',
               onPressed: () async {
                 try {
@@ -362,7 +358,7 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
                     clearCompletedAt: true,
                   );
                   await service.updateFollowUp(restored);
-                  service.addActivity(Activity(
+                  await service.addActivity(Activity(
                     id: service.generateId(),
                     festivalId: AppConstants.festivalId,
                     type: 'followup_undo',
@@ -377,13 +373,10 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
                 }
               },
             ),
-          ),
         );
     } on Exception {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update visit')),
-        );
+        context.showError('Failed to update visit');
       }
     }
   }
@@ -405,10 +398,7 @@ class _FollowUpListPageState extends ConsumerState<FollowUpListPage> {
       await service.deleteFollowUp(item.id);
     } on Exception {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Failed to delete visit. Please try again.')),
-        );
+        context.showError('Failed to delete visit. Please try again.');
       }
     }
   }

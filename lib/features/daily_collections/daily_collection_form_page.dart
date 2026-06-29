@@ -11,6 +11,7 @@ import 'package:ganesha_2026/core/providers/auth_provider.dart';
 import 'package:ganesha_2026/core/providers/notification_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/shared/utils/amount_format.dart';
+import 'package:ganesha_2026/shared/widgets/app_snackbar.dart';
 
 class DailyCollectionFormPage extends ConsumerStatefulWidget {
   final String? dailyCollectionId;
@@ -204,17 +205,13 @@ class _DailyCollectionFormPageState
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a date')),
-      );
+      context.showWarning('Please select a date');
       return;
     }
     if (_isSaving) return;
     if (!mounted) return;
     if (ref.read(roleProvider) != UserRole.admin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Access Denied')),
-      );
+      context.showWarning('Access Denied');
       return;
     }
     setState(() => _isSaving = true);
@@ -245,7 +242,7 @@ class _DailyCollectionFormPageState
         final activityService = ref.read(activityServiceProvider);
         final userId = ref.read(userIdProvider);
         final userName = ref.read(userNameProvider);
-        activityService.recordDailyCollectionRecorded(dc, userId: userId, userName: userName);
+        await activityService.recordDailyCollectionRecorded(dc, userId: userId, userName: userName);
       }
 
       if (mounted) {
@@ -256,9 +253,7 @@ class _DailyCollectionFormPageState
     } on Exception catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        context.showError(e.toString());
       }
     }
   }

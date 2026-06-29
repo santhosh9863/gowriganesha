@@ -11,6 +11,7 @@ import 'package:ganesha_2026/core/providers/auth_provider.dart';
 import 'package:ganesha_2026/core/providers/notification_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/shared/utils/amount_format.dart';
+import 'package:ganesha_2026/shared/widgets/app_snackbar.dart';
 
 class FollowUpFormPage extends ConsumerStatefulWidget {
   final String? followUpId;
@@ -235,17 +236,13 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
     if (_followUpDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a visit date')),
-      );
+      context.showWarning('Please select a visit date');
       return;
     }
     if (_isSaving) return;
     if (!mounted) return;
     if (ref.read(roleProvider) != UserRole.admin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Access Denied')),
-      );
+      context.showWarning('Access Denied');
       return;
     }
     setState(() => _isSaving = true);
@@ -284,7 +281,7 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
         final activityService = ref.read(activityServiceProvider);
         final userId = ref.read(userIdProvider);
         final userName = ref.read(userNameProvider);
-        activityService.recordFollowUpAdded(item, userId: userId, userName: userName);
+        await activityService.recordFollowUpAdded(item, userId: userId, userName: userName);
       }
       if (mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -294,9 +291,7 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
     } on Exception catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        context.showError('Error: $e');
       }
     }
   }

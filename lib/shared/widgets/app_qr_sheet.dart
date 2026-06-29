@@ -11,6 +11,7 @@ import 'package:ganesha_2026/core/design/app_colors.dart';
 import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/festival.dart';
+import 'package:ganesha_2026/shared/widgets/app_snackbar.dart';
 
 const _qrSize = 240.0;
 
@@ -42,9 +43,7 @@ class _PaymentQrSheetState extends State<_PaymentQrSheet> {
   Future<void> _shareQr() async {
     if (kIsWeb) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(const SnackBar(content: Text('QR sharing is not available on web. Please use the mobile app.')));
+      context.showWarning('QR sharing is not available on web. Please use the mobile app.');
       return;
     }
     setState(() => _sharing = true);
@@ -254,14 +253,8 @@ class _PaymentQrSheetState extends State<_PaymentQrSheet> {
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: upiLink));
                   HapticFeedback.lightImpact();
-                  ScaffoldMessenger.of(context)
-                    ..clearSnackBars()
-                    ..showSnackBar(
-                      const SnackBar(
-                        content: Text('UPI ID copied'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
+                  ScaffoldMessenger.of(context).clearSnackBars();
+                  context.showInfo('UPI ID copied');
                 },
                 icon: const Icon(Icons.copy_rounded, size: 14),
                 label: Text(

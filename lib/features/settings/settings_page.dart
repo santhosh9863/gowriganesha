@@ -21,6 +21,7 @@ import 'package:ganesha_2026/shared/widgets/amount_text.dart';
 import 'package:ganesha_2026/shared/widgets/app_page_scaffold.dart';
 import 'package:ganesha_2026/shared/widgets/app_section_header.dart';
 import 'package:go_router/go_router.dart';
+import 'package:ganesha_2026/shared/widgets/app_snackbar.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -332,7 +333,7 @@ class _BudgetCardState extends ConsumerState<_BudgetCard> {
     final activityService = ref.read(activityServiceProvider);
     final userId = ref.read(userIdProvider);
     final userName = ref.read(userNameProvider);
-    activityService.recordSettingsUpdated(userId: userId, userName: userName);
+    await activityService.recordSettingsUpdated(userId: userId, userName: userName);
     debugPrint('[DIAG:_editBudget] AFTER firestore write');
     if (!context.mounted) {
       debugPrint('[DIAG:_editBudget] NOT MOUNTED after firestore write');
@@ -340,15 +341,8 @@ class _BudgetCardState extends ConsumerState<_BudgetCard> {
     }
 
     debugPrint('[DIAG:_editBudget] BEFORE snackbar');
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            'Budget updated to ${AppConstants.currencySymbol}${fmtAmount(result)}',
-          ),
-        ),
-      );
+    ScaffoldMessenger.of(context).clearSnackBars();
+    context.showSuccess('Budget updated to ${AppConstants.currencySymbol}${fmtAmount(result)}');
     debugPrint('[DIAG:_editBudget] AFTER snackbar');
 
     debugPrint('[DIAG:_editBudget] BEFORE addPostFrameCallback');
@@ -610,7 +604,7 @@ class _FestivalInfoCardState extends ConsumerState<_FestivalInfoCard> {
     final activityService = ref.read(activityServiceProvider);
     final userId = ref.read(userIdProvider);
     final userName = ref.read(userNameProvider);
-    activityService.recordSettingsUpdated(userId: userId, userName: userName);
+    await activityService.recordSettingsUpdated(userId: userId, userName: userName);
     debugPrint('[DIAG:_editText] AFTER firestore write');
     if (!context.mounted) {
       debugPrint('[DIAG:_editText] NOT MOUNTED after firestore write');
@@ -618,11 +612,8 @@ class _FestivalInfoCardState extends ConsumerState<_FestivalInfoCard> {
     }
 
     debugPrint('[DIAG:_editText] BEFORE snackbar');
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(content: Text('$label updated')),
-      );
+    ScaffoldMessenger.of(context).clearSnackBars();
+    context.showSuccess('$label updated');
     debugPrint('[DIAG:_editText] AFTER snackbar');
 
     debugPrint('[DIAG:_editText] BEFORE addPostFrameCallback');
@@ -658,7 +649,7 @@ class _FestivalInfoCardState extends ConsumerState<_FestivalInfoCard> {
     final activityService = ref.read(activityServiceProvider);
     final userId = ref.read(userIdProvider);
     final userName = ref.read(userNameProvider);
-    activityService.recordSettingsUpdated(userId: userId, userName: userName);
+    await activityService.recordSettingsUpdated(userId: userId, userName: userName);
     debugPrint('[DIAG:_pickDate] AFTER firestore write');
     if (!context.mounted) {
       debugPrint('[DIAG:_pickDate] NOT MOUNTED after firestore write');
@@ -666,13 +657,8 @@ class _FestivalInfoCardState extends ConsumerState<_FestivalInfoCard> {
     }
 
     debugPrint('[DIAG:_pickDate] BEFORE snackbar');
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text('Festival date updated to ${DateFormat('d MMMM yyyy').format(picked)}'),
-        ),
-      );
+    ScaffoldMessenger.of(context).clearSnackBars();
+    context.showSuccess('Festival date updated to ${DateFormat('d MMMM yyyy').format(picked)}');
     debugPrint('[DIAG:_pickDate] AFTER snackbar');
 
     debugPrint('[DIAG:_pickDate] BEFORE addPostFrameCallback');
@@ -1295,13 +1281,11 @@ class _AccountCard extends ConsumerWidget {
     if (!context.mounted) return;
 
     if (success) {
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(const SnackBar(content: Text('Switched to Admin mode')));
+      ScaffoldMessenger.of(context).clearSnackBars();
+      context.showSuccess('Switched to Admin mode');
     } else {
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(const SnackBar(content: Text('Incorrect admin password')));
+      ScaffoldMessenger.of(context).clearSnackBars();
+      context.showError('Incorrect admin password');
     }
   }
 }

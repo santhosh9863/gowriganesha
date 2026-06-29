@@ -342,6 +342,7 @@ class FirestoreService {
     String note = '',
     String recordedBy = 'system',
   }) async {
+    debugPrint('[ADJUST] FIRESTORE.recordContribution BEGIN: targetId=$targetId amount=$amount');
     try {
       final batch = _firestore.batch();
       final targetRef = _targets.doc(targetId);
@@ -361,12 +362,14 @@ class FirestoreService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
+      debugPrint('[ADJUST] FIRESTORE.recordContribution: About to batch.commit()');
       await batch.commit();
-      debugPrint('[FIRESTORE] Contribution recorded: ${contributionRef.id}');
+      debugPrint('[ADJUST] FIRESTORE.recordContribution: batch.commit() completed');
     } on FirebaseException catch (e) {
-      debugPrint('[FIRESTORE] Error recording contribution: $e');
+      debugPrint('[ADJUST] FIRESTORE.recordContribution ERROR: $e');
       throw FirestoreException('Failed to record contribution', originalError: e);
     }
+    debugPrint('[ADJUST] FIRESTORE.recordContribution END');
   }
 
   Future<void> recordCorrection({
@@ -376,12 +379,17 @@ class FirestoreService {
     String note = '',
     String recordedBy = 'system',
   }) async {
+    debugPrint('[ADJUST] FIRESTORE.recordCorrection BEGIN: targetId=$targetId currentTotal=$currentTotal newTotal=$newTotal');
     if (newTotal < 0) {
+      debugPrint('[ADJUST] FIRESTORE.recordCorrection: newTotal < 0, throwing');
       throw FirestoreException('New total cannot be negative');
     }
 
     final delta = newTotal - currentTotal;
-    if (delta == 0) return;
+    if (delta == 0) {
+      debugPrint('[ADJUST] FIRESTORE.recordCorrection: delta=0, returning early');
+      return;
+    }
 
     try {
       final batch = _firestore.batch();
@@ -402,12 +410,14 @@ class FirestoreService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
+      debugPrint('[ADJUST] FIRESTORE.recordCorrection: About to batch.commit()');
       await batch.commit();
-      debugPrint('[FIRESTORE] Correction recorded: ${contributionRef.id} (delta=$delta)');
+      debugPrint('[ADJUST] FIRESTORE.recordCorrection: batch.commit() completed');
     } on FirebaseException catch (e) {
-      debugPrint('[FIRESTORE] Error recording correction: $e');
+      debugPrint('[ADJUST] FIRESTORE.recordCorrection ERROR: $e');
       throw FirestoreException('Failed to record correction', originalError: e);
     }
+    debugPrint('[ADJUST] FIRESTORE.recordCorrection END');
   }
 
   Stream<List<Expense>> watchExpenses(String festivalId) {
@@ -595,12 +605,15 @@ class FirestoreService {
   }
 
   Future<void> addActivity(Activity activity) async {
+    debugPrint('[ADJUST] FIRESTORE.addActivity BEGIN: id=${activity.id} type=${activity.type}');
     try {
+      debugPrint('[ADJUST] FIRESTORE.addActivity: About to Firestore set()');
       await _activities.doc(activity.id).set(activity.toMap());
-      debugPrint('[FIRESTORE] Activity added: ${activity.id}');
+      debugPrint('[ADJUST] FIRESTORE.addActivity: Firestore set() completed');
     } on FirebaseException catch (e) {
-      debugPrint('[FIRESTORE] Error adding activity: $e');
+      debugPrint('[ADJUST] FIRESTORE.addActivity ERROR: $e');
     }
+    debugPrint('[ADJUST] FIRESTORE.addActivity END');
   }
 
   Future<void> clearActivityFeed() async {

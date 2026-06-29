@@ -20,6 +20,7 @@ import 'package:ganesha_2026/shared/widgets/app_metric_card.dart';
 import 'package:ganesha_2026/shared/widgets/app_page_scaffold.dart';
 import 'package:ganesha_2026/shared/widgets/app_section_header.dart';
 import 'package:ganesha_2026/shared/widgets/app_skeleton.dart';
+import 'package:ganesha_2026/shared/widgets/app_snackbar.dart';
 import 'package:ganesha_2026/shared/widgets/confirm_dialog.dart';
 
 class DailyCollectionListPage extends ConsumerStatefulWidget {
@@ -377,9 +378,7 @@ class _DailyCollectionListPageState
     if (amountStr.isEmpty) return;
     final amount = tryParseAmount(amountStr);
     if (amount == null || amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid amount')),
-      );
+      context.showWarning('Enter a valid amount');
       return;
     }
 
@@ -400,14 +399,12 @@ class _DailyCollectionListPageState
       final activityService = ref.read(activityServiceProvider);
       final userId = ref.read(userIdProvider);
       final userName = ref.read(userNameProvider);
-      activityService.recordDailyCollectionRecorded(dc, userId: userId, userName: userName);
+      await activityService.recordDailyCollectionRecorded(dc, userId: userId, userName: userName);
 
       _amountController.clear();
     } on Exception catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        context.showError('Error: $e');
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -433,11 +430,7 @@ class _DailyCollectionListPageState
       await service.deleteDailyCollection(dc.id);
     } on Exception {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content:
-                  Text('Failed to delete collection. Please try again.')),
-        );
+        context.showError('Failed to delete collection. Please try again.');
       }
     }
   }

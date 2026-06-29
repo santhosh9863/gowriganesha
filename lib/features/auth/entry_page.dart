@@ -7,6 +7,7 @@ import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/design/app_radius.dart';
 import 'package:ganesha_2026/core/design/app_shadows.dart';
 import 'package:ganesha_2026/core/providers/auth_provider.dart';
+import 'package:ganesha_2026/shared/widgets/app_snackbar.dart';
 
 class EntryPage extends ConsumerStatefulWidget {
   const EntryPage({super.key});
@@ -261,9 +262,7 @@ class _EntryPageState extends ConsumerState<EntryPage> {
       context.go('/');
     } else {
       debugPrint('[VOLUNTEER] Wrong password — showing error');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Incorrect volunteer password')),
-      );
+      context.showError('Incorrect volunteer password');
     }
   }
 
@@ -313,9 +312,7 @@ class _EntryPageState extends ConsumerState<EntryPage> {
     if (success) {
       context.go('/');
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Incorrect admin password')),
-      );
+      context.showError('Incorrect admin password');
     }
   }
 }
