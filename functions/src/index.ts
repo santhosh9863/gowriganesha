@@ -5,40 +5,134 @@ import * as admin from 'firebase-admin';
 admin.initializeApp();
 
 const CHUNK_SIZE = 500;
+const NOTIFICATION_COLLECTION = 'notifications';
+const DEVICE_TOKENS_COLLECTION = 'device_tokens';
+const PREFERENCES_COLLECTION = 'notification_preferences';
+
+interface DeviceTokenDoc {
+  ref: admin.firestore.DocumentReference;
+  token: string;
+  userId: string;
+}
+
+interface NotificationPreferences {
+  pushEnabled: boolean;
+  channels: Record<string, boolean>;
+}
+
+const defaultPreferences: NotificationPreferences = {
+  pushEnabled: true,
+  channels: {},
+};
+
+function getCorrelationId(event: { params: Record<string, string> }): string {
+  return `notif-${event.params.notificationId}`;
+}
+
+async function getPreferencesBatch(
+  db: admin.firestore.Firestore,
+  userIds: Set<string>,
+): Promise<Map<string, NotificationPreferences>> {
+  const prefsMap = new Map<string, NotificationPreferences>();
+  const chunk = Array.from(userIds);
+  for (let i = 0; i < chunk.length; i += 30) {
+    const batch = chunk.slice(i, i + 30);
+    const docs = await db
+      .collection(PREFERENCES_COLLECTION)
+      .where('__name__', 'in', batch)
+      .get();
+    for (const doc of docs.docs) {
+      const data = doc.data();
+      prefsMap.set(doc.id, {
+        pushEnabled: data.pushEnabled !== false,
+        channels: (data.channels as Record<string, boolean>) ?? {},
+      });
+    }
+  }
+  return prefsMap;
+}
+
+async function updateDeliveryMetadata(
+  db: admin.firestore.Firestore,
+  notificationId: string,
+  correlationId: string,
+  status: 'attempted' | 'sent' | 'failed',
+  error?: string,
+): Promise<void> {
+  const update: Record<string, unknown> = {
+    'metadata.deliveryStatus': status,
+    'metadata.lastDeliveryAttempt': admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  if (error) {
+    update['metadata.lastDeliveryError'] = error;
+    update['metadata.deliveryAttempts'] = admin.firestore.FieldValue.increment(1);
+  }
+
+  try {
+    await db.collection(NOTIFICATION_COLLECTION).doc(notificationId).update(update);
+  } catch (err) {
+    logger.warn(`[${correlationId}] Failed to update delivery metadata:`, err);
+  }
+}
 
 export const sendNotificationPush = onDocumentCreated(
-  'notifications/{notificationId}',
+  NOTIFICATION_COLLECTION + '/{notificationId}',
   async (event) => {
+    const correlationId = getCorrelationId(event);
     const snapshot = event.data;
     if (!snapshot) {
-      logger.warn('No data in notification document');
+      logger.warn(`[${correlationId}] No data in notification document`);
       return;
     }
 
     const notification = snapshot.data();
+    const notificationId = event.params.notificationId as string;
     const title = notification.title as string | undefined;
     const body = notification.body as string | undefined;
     const type = notification.type as string | undefined;
     const priority = notification.priority as string | undefined;
     const entityType = notification.entityType as string | undefined;
     const entityId = notification.entityId as string | undefined;
-
+    const category = notification.category as string | undefined;
     if (!title || !body) {
-      logger.warn('Skipping notification without title or body');
+      logger.warn(`[${correlationId}] Skipping notification without title or body`);
       return;
     }
 
-    const tokensSnapshot = await admin
-      .firestore()
-      .collection('device_tokens')
-      .get();
+    const db = admin.firestore();
 
-    const tokens = tokensSnapshot.docs.map((doc) => {
-      return { ref: doc.ref, token: doc.data().token as string };
-    });
+    await updateDeliveryMetadata(db, notificationId, correlationId, 'attempted');
+
+    const tokensSnapshot = await db.collection(DEVICE_TOKENS_COLLECTION).get();
+
+    const tokens: DeviceTokenDoc[] = tokensSnapshot.docs.map((doc) => ({
+      ref: doc.ref,
+      token: doc.data().token as string,
+      userId: doc.data().userId as string,
+    }));
 
     if (tokens.length === 0) {
-      logger.info('No device tokens registered, skipping push');
+      logger.info(`[${correlationId}] No device tokens registered, skipping push`);
+      await updateDeliveryMetadata(db, notificationId, correlationId, 'sent');
+      return;
+    }
+
+    const userIds = new Set(tokens.map((t) => t.userId));
+    const preferencesMap = await getPreferencesBatch(db, userIds);
+
+    const eligibleTokens = tokens.filter((t) => {
+      const userPrefs = preferencesMap.get(t.userId) ?? defaultPreferences;
+      if (!userPrefs.pushEnabled) return false;
+      if (category && userPrefs.channels[category] === false) return false;
+      return true;
+    });
+
+    if (eligibleTokens.length === 0) {
+      logger.info(
+        `[${correlationId}] All users have disabled push for this notification, skipping`,
+      );
+      await updateDeliveryMetadata(db, notificationId, correlationId, 'sent');
       return;
     }
 
@@ -48,17 +142,19 @@ export const sendNotificationPush = onDocumentCreated(
     };
 
     const dataPayload: Record<string, string> = {
-      notificationId: event.params.notificationId,
+      notificationId,
     };
     if (type) dataPayload.type = type;
     if (priority) dataPayload.priority = priority;
     if (entityType) dataPayload.entityType = entityType;
     if (entityId) dataPayload.entityId = entityId;
+    if (category) dataPayload.category = category;
 
     const failedTokens: admin.firestore.DocumentReference[] = [];
+    let totalSent = 0;
 
-    for (let i = 0; i < tokens.length; i += CHUNK_SIZE) {
-      const chunk = tokens.slice(i, i + CHUNK_SIZE);
+    for (let i = 0; i < eligibleTokens.length; i += CHUNK_SIZE) {
+      const chunk = eligibleTokens.slice(i, i + CHUNK_SIZE);
       const tokenStrings = chunk.map((t) => t.token);
 
       try {
@@ -67,6 +163,8 @@ export const sendNotificationPush = onDocumentCreated(
           notification: notificationPayload,
           data: dataPayload,
         });
+
+        totalSent += response.successCount;
 
         if (response.failureCount > 0) {
           response.responses.forEach((resp, index) => {
@@ -82,29 +180,35 @@ export const sendNotificationPush = onDocumentCreated(
           });
 
           logger.info(
-            `Chunk ${i / CHUNK_SIZE + 1}: ${response.successCount} sent, ` +
+            `[${correlationId}] Chunk ${i / CHUNK_SIZE + 1}: ${response.successCount} sent, ` +
               `${response.failureCount} failed`,
           );
         }
       } catch (error) {
         logger.error(
-          `Failed to send chunk ${i / CHUNK_SIZE + 1}:`,
+          `[${correlationId}] Failed to send chunk ${i / CHUNK_SIZE + 1}:`,
           error,
         );
       }
     }
 
     if (failedTokens.length > 0) {
-      const batch = admin.firestore().batch();
+      const batch = db.batch();
       for (const ref of failedTokens) {
         batch.delete(ref);
       }
       await batch.commit();
-      logger.warn(`Removed ${failedTokens.length} invalid device tokens`);
+      logger.warn(
+        `[${correlationId}] Removed ${failedTokens.length} invalid device tokens`,
+      );
     }
 
+    const deliveredCount = eligibleTokens.length - failedTokens.length;
+    await updateDeliveryMetadata(db, notificationId, correlationId, 'sent');
+
     logger.info(
-      `Sent notification ${event.params.notificationId} to ${tokens.length - failedTokens.length} devices`,
+      `[${correlationId}] Sent notification ${notificationId} to ${deliveredCount} devices ` +
+        `(${eligibleTokens.length} eligible, ${totalSent} successful)`,
     );
   },
 );

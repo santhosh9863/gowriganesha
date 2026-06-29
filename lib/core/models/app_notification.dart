@@ -69,6 +69,7 @@ class AppNotification {
       'title': title,
       'body': body,
       'type': type.value,
+      'category': category.value,
       'priority': priority.value,
       'senderUserId': senderUserId,
       'senderUserName': senderUserName,
