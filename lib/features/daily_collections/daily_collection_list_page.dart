@@ -1,12 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
+import 'package:ganesha_2026/core/design/app_colors.dart';
+import 'package:ganesha_2026/core/design/app_radius.dart';
+import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/daily_collection.dart';
+import 'package:ganesha_2026/shared/utils/amount_format.dart';
+import 'package:ganesha_2026/core/models/user_role.dart';
+import 'package:ganesha_2026/core/providers/auth_provider.dart';
 import 'package:ganesha_2026/core/providers/daily_collection_provider.dart';
+import 'package:ganesha_2026/core/providers/notification_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
 import 'package:ganesha_2026/features/daily_collections/daily_collection_tile.dart';
+import 'package:ganesha_2026/shared/widgets/app_empty_state.dart';
+import 'package:ganesha_2026/shared/widgets/app_metric_card.dart';
+import 'package:ganesha_2026/shared/widgets/app_page_scaffold.dart';
+import 'package:ganesha_2026/shared/widgets/app_section_header.dart';
+import 'package:ganesha_2026/shared/widgets/app_skeleton.dart';
+import 'package:ganesha_2026/shared/widgets/app_snackbar.dart';
 import 'package:ganesha_2026/shared/widgets/confirm_dialog.dart';
 
 class DailyCollectionListPage extends ConsumerStatefulWidget {
@@ -20,33 +34,78 @@ class DailyCollectionListPage extends ConsumerStatefulWidget {
 class _DailyCollectionListPageState
     extends ConsumerState<DailyCollectionListPage> {
   final _amountController = TextEditingController();
-  final _noteController = TextEditingController();
   bool _isSaving = false;
 
   static const _amountChips = [1000, 2000, 5000, 10000];
 
   @override
+  void initState() {
+    super.initState();
+    debugPrint('[LIFECYCLE] DailyCollectionListPage.initState');
+  }
+
+  @override
   void dispose() {
+    debugPrint('[LIFECYCLE] DailyCollectionListPage.dispose');
     _amountController.dispose();
-    _noteController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('[BUILD] DailyCollectionListPage.build');
     final dailyCollectionAsync = ref.watch(dailyCollectionsStreamProvider);
+    final role = ref.watch(roleProvider);
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final showAdd = role == UserRole.admin;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Daily Collections')),
-      body: dailyCollectionAsync.when(
-        data: (collections) =>
-            _buildContent(context, ref, collections, theme, colorScheme),
-        loading: () => const Center(child: CircularProgressIndicator()),
+    return AppPageScaffold(
+      festivalName: 'Daily Collections',
+      onSettings: () => context.push('/settings'),
+      onAdd: showAdd ? () => context.push('/daily-collections/add') : null,
+      bottomNavHeight: 56,
+      child: dailyCollectionAsync.when(
+        data: (collections) => RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(dailyCollectionsStreamProvider);
+          },
+          child: _buildContent(context, ref, collections, theme, role),
+        ),
+        loading: () => const AppSkeletonList(),
         error: (e, _) => Center(child: Text('Error: $e')),
       ),
     );
+  }
+
+  List<DailyCollection> _todayItems(List<DailyCollection> all) {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final end = start.add(const Duration(days: 1));
+    return all.where((dc) {
+      final d = dc.date.toDate();
+      return !d.isBefore(start) && d.isBefore(end);
+    }).toList();
+  }
+
+  List<DailyCollection> _yesterdayItems(List<DailyCollection> all) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final start = today.subtract(const Duration(days: 1));
+    final end = today;
+    return all.where((dc) {
+      final d = dc.date.toDate();
+      return !d.isBefore(start) && d.isBefore(end);
+    }).toList();
+  }
+
+  List<DailyCollection> _earlierItems(List<DailyCollection> all) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    return all.where((dc) {
+      final d = dc.date.toDate();
+      return d.isBefore(yesterday);
+    }).toList();
   }
 
   Widget _buildContent(
@@ -54,126 +113,272 @@ class _DailyCollectionListPageState
     WidgetRef ref,
     List<DailyCollection> collections,
     ThemeData theme,
-    ColorScheme colorScheme,
+    UserRole role,
   ) {
     final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day);
-    final todayEnd = todayStart.add(const Duration(days: 1));
+    final todayItems = _todayItems(collections);
+    final yesterdayItems = _yesterdayItems(collections);
+    final earlierItems = _earlierItems(collections);
 
-    final todayCollections = collections.where((dc) {
-      final d = dc.date.toDate();
-      return d.isAfter(todayStart) && d.isBefore(todayEnd);
-    }).toList();
+    final todayTotal = todayItems.fold<int>(0, (v, dc) => v + dc.amount);
+    final todayCount = todayItems.length;
+    final avgCollection = todayCount > 0 ? (todayTotal / todayCount).round() : 0;
+    final largest = todayItems.fold<int>(0, (v, dc) => v > dc.amount ? v : dc.amount);
 
-    final todayTotal =
-        todayCollections.fold<int>(0, (v, dc) => v + dc.amount);
+    final hasToday = todayItems.isNotEmpty;
+    final hasYesterday = yesterdayItems.isNotEmpty;
+    final hasEarlier = earlierItems.isNotEmpty;
+    final hasAny = collections.isNotEmpty;
 
-    final earlierCollections = collections.where((dc) {
-      final d = dc.date.toDate();
-      return !d.isAfter(todayStart);
-    }).toList();
+    if (hasAny) {
+      for (final dc in collections) {
+        final d = dc.date.toDate();
+        final inToday = !d.isBefore(DateTime(now.year, now.month, now.day)) &&
+            d.isBefore(DateTime(now.year, now.month, now.day).add(const Duration(days: 1)));
+        final inYesterday = !d.isBefore(DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1))) &&
+            d.isBefore(DateTime(now.year, now.month, now.day));
+        final inEarlier = d.isBefore(DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1)));
+        debugPrint('[DATE_BUCKET] amount=${dc.amount} date=$d → today=$inToday yesterday=$inYesterday earlier=$inEarlier');
+      }
+    }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 72),
       children: [
-        _TodayTotalCard(
-          total: todayTotal,
-          theme: theme,
-          colorScheme: colorScheme,
-          fmt: _fmt,
-        ),
-        const SizedBox(height: 12),
-        _QuickAddCard(
-          amountController: _amountController,
-          noteController: _noteController,
-          isSaving: _isSaving,
-          amountChips: _amountChips,
-          onChipTap: _onChipTap,
-          onRecord: _handleRecord,
-          theme: theme,
-          colorScheme: colorScheme,
-        ),
-        if (todayCollections.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          _SectionHeader(
-            label: "Today's Entries",
-            count: todayCollections.length,
-            theme: theme,
-            colorScheme: colorScheme,
+        // Summary metrics 2x2
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            0,
+            AppSpacing.lg,
+            AppSpacing.md,
           ),
-          const SizedBox(height: 4),
-          ...todayCollections.map((dc) => DailyCollectionTile(
-                dailyCollection: dc,
-                onDelete: () => _handleDelete(context, ref, dc),
-              )),
-        ],
-        if (earlierCollections.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          _SectionHeader(
-            label: 'Earlier',
-            count: earlierCollections.length,
-            theme: theme,
-            colorScheme: colorScheme,
-          ),
-          const SizedBox(height: 4),
-          ...earlierCollections.map((dc) => DailyCollectionTile(
-                dailyCollection: dc,
-                onDelete: () => _handleDelete(context, ref, dc),
-              )),
-        ],
-        if (collections.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 32),
-            child: Center(
-              child: Column(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final w = (constraints.maxWidth - AppSpacing.sm) / 2;
+              return Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
                 children: [
-                  Icon(
-                    Icons.account_balance_wallet_rounded,
-                    size: 48,
-                    color: colorScheme.onSurface.withAlpha(60),
+                  SizedBox(
+                    width: w,
+                    child: AppMetricCard(
+                      label: "Today's Collection",
+                      value: '${AppConstants.currencySymbol}${_fmt(todayTotal)}',
+                      icon: Icons.account_balance_wallet_rounded,
+                      iconColor: AppColors.primary,
+                      iconBgColor: AppColors.primaryBg,
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'No collections recorded yet',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
+                  SizedBox(
+                    width: w,
+                    child: AppMetricCard(
+                      label: 'Entries',
+                      value: '$todayCount',
+                      icon: Icons.receipt_long_rounded,
+                      iconColor: AppColors.info,
+                      iconBgColor: AppColors.infoBg,
+                    ),
+                  ),
+                  SizedBox(
+                    width: w,
+                    child: AppMetricCard(
+                      label: 'Average',
+                      value: '${AppConstants.currencySymbol}${_fmt(avgCollection)}',
+                      icon: Icons.calculate_rounded,
+                      iconColor: AppColors.warning,
+                      iconBgColor: AppColors.warningBg,
+                    ),
+                  ),
+                  SizedBox(
+                    width: w,
+                    child: AppMetricCard(
+                      label: 'Largest',
+                      value: '${AppConstants.currencySymbol}${_fmt(largest)}',
+                      icon: Icons.trending_up_rounded,
+                      iconColor: AppColors.success,
+                      iconBgColor: AppColors.successBg,
                     ),
                   ),
                 ],
-              ),
+              );
+            },
+          ),
+        ),
+        if (role == UserRole.admin)
+          // Quick add
+          Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            0,
+            AppSpacing.lg,
+            AppSpacing.md,
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: AppRadius.largeBorder,
+              border: Border.all(color: AppColors.outline),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.sm),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryBg,
+                        borderRadius: AppRadius.mediumBorder,
+                      ),
+                      child: const Icon(
+                        Icons.add_circle_rounded,
+                        size: 18,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Text(
+                      'Record Collection',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: AppColors.charcoal,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: _amountController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: const [IndianAmountInputFormatter()],
+                  decoration: InputDecoration(
+                    labelText: 'Amount',
+                    hintText: 'e.g. 5,000',
+                    prefixText: '${AppConstants.currencySymbol} ',
+                    filled: true,
+                    fillColor: AppColors.warmGray50,
+                    border: OutlineInputBorder(
+                      borderRadius: AppRadius.mediumBorder,
+                      borderSide: BorderSide(color: AppColors.outline),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.md,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: _amountChips.map((a) => _AmountChip(
+                    amount: a,
+                    isSelected: _amountController.text == fmtAmount(a),
+                    onTap: () {
+                      _amountController.text = fmtAmount(a);
+                    },
+                    theme: theme,
+                  )).toList(),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                FilledButton.icon(
+                  onPressed: _isSaving ? null : () => _handleRecord(ref),
+                  icon: _isSaving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.save_rounded, size: 18),
+                  label: Text(_isSaving ? 'Saving...' : 'Record Collection'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Section: Today
+        if (hasToday) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.sm,
+              AppSpacing.lg,
+              AppSpacing.xs,
+            ),
+            child: AppSectionHeader(
+              title: 'Today',
+              subtitle: '$todayCount entries',
+            ),
+          ),
+          ...todayItems.map((dc) => DailyCollectionTile(
+                dailyCollection: dc,
+                onDelete: () => _handleDelete(context, ref, dc),
+              )),
+        ],
+        // Section: Yesterday
+        if (hasYesterday) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              AppSpacing.xs,
+            ),
+            child: AppSectionHeader(
+              title: 'Yesterday',
+              subtitle: '${yesterdayItems.length} entries',
+            ),
+          ),
+          ...yesterdayItems.map((dc) => DailyCollectionTile(
+                dailyCollection: dc,
+                onDelete: () => _handleDelete(context, ref, dc),
+              )),
+        ],
+        // Section: Earlier
+        if (hasEarlier) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              AppSpacing.xs,
+            ),
+            child: AppSectionHeader(
+              title: 'Earlier',
+              subtitle: '${earlierItems.length} entries',
+            ),
+          ),
+          ...earlierItems.map((dc) => DailyCollectionTile(
+                dailyCollection: dc,
+                onDelete: () => _handleDelete(context, ref, dc),
+              )),
+        ],
+        // Empty state
+        if (!hasAny)
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.xxxl),
+            child: AppEmptyState(
+              icon: Icons.account_balance_wallet_rounded,
+              title: 'No collections recorded yet',
+              subtitle: 'Use the form above to record your first collection',
             ),
           ),
       ],
     );
   }
 
-  void _onChipTap(int amount) {
-    _amountController.text = amount.toString();
-  }
-
-  Future<void> _handleRecord() async {
+  Future<void> _handleRecord(WidgetRef ref) async {
     final amountStr = _amountController.text.trim();
-    final note = _noteController.text.trim();
-
-    if (amountStr.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter an amount')),
-      );
-      return;
-    }
-
-    final amount = int.tryParse(amountStr);
+    if (amountStr.isEmpty) return;
+    final amount = tryParseAmount(amountStr);
     if (amount == null || amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid amount')),
-      );
-      return;
-    }
-
-    if (note.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a note')),
-      );
+      context.showWarning('Enter a valid amount');
       return;
     }
 
@@ -186,19 +391,20 @@ class _DailyCollectionListPageState
         id: service.generateId(),
         festivalId: AppConstants.festivalId,
         amount: amount,
-        note: note,
+        note: '',
         date: now,
         createdAt: now,
       );
       await service.addDailyCollection(dc);
+      final activityService = ref.read(activityServiceProvider);
+      final userId = ref.read(userIdProvider);
+      final userName = ref.read(userNameProvider);
+      await activityService.recordDailyCollectionRecorded(dc, userId: userId, userName: userName);
 
       _amountController.clear();
-      _noteController.clear();
     } on Exception catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        context.showError('Error: $e');
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -210,9 +416,7 @@ class _DailyCollectionListPageState
     WidgetRef ref,
     DailyCollection dc,
   ) async {
-    final formatter = NumberFormat('#,##,###', 'en_IN');
-    final amountStr =
-        '${AppConstants.currencySymbol}${formatter.format(dc.amount)}';
+    final amountStr = '${AppConstants.currencySymbol}${fmtAmount(dc.amount)}';
     final dateStr = DateFormat('dd MMM yyyy').format(dc.date.toDate());
     final confirm = await showConfirmDialog(
       context,
@@ -226,234 +430,57 @@ class _DailyCollectionListPageState
       await service.deleteDailyCollection(dc.id);
     } on Exception {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content:
-                  Text('Failed to delete collection. Please try again.')),
-        );
+        context.showError('Failed to delete collection. Please try again.');
       }
     }
   }
 
   String _fmt(int n) {
-    return NumberFormat('#,##,###', 'en_IN').format(n);
+    return fmtAmount(n);
   }
 }
 
-class _TodayTotalCard extends StatelessWidget {
-  final int total;
+class _AmountChip extends StatelessWidget {
+  final int amount;
+  final bool isSelected;
+  final VoidCallback onTap;
   final ThemeData theme;
-  final ColorScheme colorScheme;
-  final String Function(int) fmt;
 
-  const _TodayTotalCard({
-    required this.total,
+  const _AmountChip({
+    required this.amount,
+    required this.isSelected,
+    required this.onTap,
     required this.theme,
-    required this.colorScheme,
-    required this.fmt,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: colorScheme.secondaryContainer.withAlpha(80),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.today_rounded,
-                color: colorScheme.secondary,
-                size: 28,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Today's Collection",
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${AppConstants.currencySymbol}${fmt(total)}',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
         ),
-      ),
-    );
-  }
-}
-
-class _QuickAddCard extends StatelessWidget {
-  final TextEditingController amountController;
-  final TextEditingController noteController;
-  final bool isSaving;
-  final List<int> amountChips;
-  final ValueChanged<int> onChipTap;
-  final VoidCallback onRecord;
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-
-  const _QuickAddCard({
-    required this.amountController,
-    required this.noteController,
-    required this.isSaving,
-    required this.amountChips,
-    required this.onChipTap,
-    required this.onRecord,
-    required this.theme,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.add_circle_rounded,
-                  size: 20,
-                  color: colorScheme.secondary,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Quick Add Collection',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: amountController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Amount',
-                hintText: 'e.g. 5000',
-                prefixText: '${AppConstants.currencySymbol} ',
-                border: const OutlineInputBorder(),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: amountChips
-                  .map((a) => ActionChip(
-                        label: Text(
-                          '${AppConstants.currencySymbol}${NumberFormat('#,##,###', 'en_IN').format(a)}',
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        onPressed: () => onChipTap(a),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                      ))
-                  .toList(),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: noteController,
-              decoration: const InputDecoration(
-                labelText: 'Note',
-                hintText: 'Source or purpose',
-                border: OutlineInputBorder(),
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              ),
-              textCapitalization: TextCapitalization.sentences,
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: isSaving ? null : onRecord,
-              icon: isSaving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.save_rounded),
-              label: Text(isSaving ? 'Saving...' : 'Record Collection'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-            ),
-          ],
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.primaryBg
+              : Colors.transparent,
+          borderRadius: AppRadius.mediumBorder,
+          border: Border.all(
+            color: isSelected
+                ? AppColors.primary.withValues(alpha: 0.3)
+                : AppColors.outline,
+          ),
         ),
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final String label;
-  final int count;
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-
-  const _SectionHeader({
-    required this.label,
-    required this.count,
-    required this.theme,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-      child: Row(
-        children: [
-          Text(
-            label,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+        child: Text(
+          '${AppConstants.currencySymbol}${fmtAmount(amount)}',
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: isSelected ? AppColors.primary : AppColors.warmGray500,
+            fontWeight: FontWeight.w600,
           ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              '$count',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

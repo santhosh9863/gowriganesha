@@ -1,1060 +1,1405 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:ganesha_2026/core/constants.dart';
+import 'package:ganesha_2026/core/design/app_colors.dart';
+import 'package:ganesha_2026/core/design/app_radius.dart';
+import 'package:ganesha_2026/core/design/app_spacing.dart';
+import 'package:ganesha_2026/core/models/activity.dart';
+import 'package:ganesha_2026/core/models/festival.dart';
 import 'package:ganesha_2026/core/providers/dashboard_provider.dart';
 import 'package:ganesha_2026/core/providers/activity_provider.dart';
-import 'package:ganesha_2026/core/models/sponsor_followup.dart';
+import 'package:ganesha_2026/core/providers/chart_provider.dart';
+import 'package:ganesha_2026/core/providers/daily_collection_provider.dart';
+import 'package:ganesha_2026/core/providers/expense_provider.dart';
 import 'package:ganesha_2026/core/providers/followup_provider.dart';
+import 'package:ganesha_2026/core/providers/target_provider.dart';
+import 'package:ganesha_2026/core/providers/festival_provider.dart';
+import 'package:ganesha_2026/core/providers/auth_provider.dart';
+import 'package:ganesha_2026/core/models/user_role.dart';
+import 'package:ganesha_2026/shared/services/festival_countdown_service.dart';
+import 'package:ganesha_2026/shared/widgets/confirm_dialog.dart';
+import 'package:ganesha_2026/shared/utils/amount_format.dart';
+import 'package:ganesha_2026/shared/widgets/app_page_header.dart';
+import 'package:ganesha_2026/shared/widgets/app_qr_sheet.dart';
+import 'package:ganesha_2026/shared/widgets/app_skeleton.dart';
+String _shortFmt(int n) {
+  if (n >= 100000) return '${(n / 100000).toStringAsFixed(1)}L';
+  if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
+  return n.toString();
+}
+
+double _roundInterval(double maxVal) {
+  if (maxVal <= 0) return 1000;
+  final exp = (math.log(maxVal.abs()) / math.ln10 - 1).ceil();
+  final order = math.pow(10, exp < 0 ? 0 : exp).toDouble();
+  if (order <= 0) return 1000;
+  final n = maxVal / order;
+  if (n <= 2) return 0.5 * order;
+  if (n <= 5) return 1 * order;
+  return 2 * order;
+}
 
 class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
-
   @override
   ConsumerState<DashboardPage> createState() => _DashboardPageState();
 }
 
 class _DashboardPageState extends ConsumerState<DashboardPage>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _heroFade;
+  late final AnimationController _fadeCtrl;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
+    debugPrint('[LIFECYCLE] DashboardPage.initState');
+    _fadeCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
-    _heroFade = CurvedAnimation(
-      parent: _ctrl,
-      curve: const Interval(0.0, 0.45, curve: Curves.easeOut),
-    );
-    WidgetsBinding.instance.addPostFrameCallback((_) => _ctrl.forward());
+      duration: const Duration(milliseconds: 500),
+    )..forward();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    debugPrint('[LIFECYCLE] DashboardPage.didChangeDependencies');
   }
 
   @override
   void dispose() {
+    debugPrint('[LIFECYCLE] DashboardPage.dispose');
+    _fadeCtrl.stop();
+    _fadeCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    debugPrint('[BUILD] DashboardPage.build');
+    final targetsAsync = ref.watch(targetsStreamProvider);
+    final expensesAsync = ref.watch(expensesStreamProvider);
+    final collectionsAsync = ref.watch(dailyCollectionsStreamProvider);
+
+    final festival = ref.watch(festivalProvider).valueOrNull;
+    final countdown = festival?.festivalDate != null
+        ? FestivalCountdownService().compute(festival!.festivalDate!)
+        : null;
+
+    final qrUrl = festival?.qrImageUrl;
+    if (qrUrl != null && qrUrl.isNotEmpty) {
+      precacheImage(NetworkImage(qrUrl), context);
+    }
+
+    final isLoading = targetsAsync.isLoading ||
+        expensesAsync.isLoading ||
+        collectionsAsync.isLoading;
+    final hasError = targetsAsync.hasError ||
+        expensesAsync.hasError ||
+        collectionsAsync.hasError;
+
+    if (hasError) {
+      return Scaffold(
+        backgroundColor: AppColors.surface,
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.xxxl),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.cloud_off_rounded,
+                      size: 48, color: AppColors.error),
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(
+                    'Failed to load dashboard',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(color: AppColors.charcoal),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'Check your connection and try again',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.copyWith(color: AppColors.warmGray500),
+                  ),
+                  const SizedBox(height: AppSpacing.xxl),
+                  FilledButton.icon(
+                    onPressed: () {
+                      ref.invalidate(targetsStreamProvider);
+                      ref.invalidate(expensesStreamProvider);
+                      ref.invalidate(dailyCollectionsStreamProvider);
+                    },
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.surface,
+        body: SafeArea(child: const AppSkeletonList()),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      body: SafeArea(
+        child: FadeTransition(
+          opacity: _fadeCtrl,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final w = constraints.maxWidth;
+              final isWide = w > 900;
+              return RefreshIndicator(
+                onRefresh: () async {
+                  ref.invalidate(dashboardProvider);
+                  ref.invalidate(activitiesStreamProvider);
+                  ref.invalidate(activeFollowUpsProvider);
+                  ref.invalidate(dailyChartProvider);
+                },
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(
+                    isWide ? AppSpacing.xxxl : AppSpacing.lg,
+                    AppSpacing.xl,
+                    isWide ? AppSpacing.xxxl : AppSpacing.lg,
+                    AppSpacing.xxxl,
+                  ),
+                  child: isWide
+                      ? _WideLayout(onSettings: () => context.push('/settings'), countdown: countdown)
+                      : _NarrowLayout(onSettings: () => context.push('/settings'), countdown: countdown),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WideLayout extends StatelessWidget {
+  final VoidCallback? onSettings;
+  final FestivalCountdownResult? countdown;
+  const _WideLayout({this.onSettings, this.countdown});
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AppPageHeader(onSettings: onSettings),
+        if (countdown != null) ...[
+          const SizedBox(height: AppSpacing.sm),
+          _CompactCountdown(countdown: countdown!),
+        ],
+        const SizedBox(height: AppSpacing.xxl),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Expanded(flex: 5, child: _FestivalMission()),
+            const SizedBox(width: AppSpacing.xxl),
+            const Expanded(flex: 2, child: _QuickActions()),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xxl),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Expanded(flex: 2, child: _KpiGrid()),
+            const SizedBox(width: AppSpacing.xxl),
+            const Expanded(flex: 3, child: _CollectionTrend()),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xxl),
+        const _ActivityTimeline(),
+      ],
+    );
+  }
+}
+
+class _NarrowLayout extends StatelessWidget {
+  final VoidCallback? onSettings;
+  final FestivalCountdownResult? countdown;
+  const _NarrowLayout({this.onSettings, this.countdown});
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AppPageHeader(onSettings: onSettings),
+        if (countdown != null) ...[
+          const SizedBox(height: AppSpacing.sm),
+          _CompactCountdown(countdown: countdown!),
+        ],
+        const SizedBox(height: AppSpacing.md),
+        const _FestivalMission(),
+        const SizedBox(height: AppSpacing.md),
+        const _QuickActions(),
+        const SizedBox(height: AppSpacing.md),
+        const _KpiGrid(),
+        const SizedBox(height: AppSpacing.md),
+        const _CollectionTrend(),
+        const SizedBox(height: AppSpacing.xl),
+        const _ActivityTimeline(),
+      ],
+    );
+  }
+}
+
+class _CountUp extends StatelessWidget {
+  final int target;
+  final TextStyle? style;
+  final String Function(int) format;
+  const _CountUp({required this.target, this.style, required this.format});
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<int>(
+      tween: IntTween(begin: 0, end: target),
+      duration: const Duration(milliseconds: 800),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, _) {
+        return Text(format(value), style: style);
+      },
+    );
+  }
+}
+
+class _CompactCountdown extends StatelessWidget {
+  final FestivalCountdownResult countdown;
+  const _CompactCountdown({required this.countdown});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: AppRadius.mediumBorder,
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            countdown.isPast
+                ? Icons.check_circle_rounded
+                : Icons.schedule_rounded,
+            size: 18,
+            color: countdown.isPast ? AppColors.warmGray400 : AppColors.warning,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Text(
+            countdown.title,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppColors.charcoal,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            countdown.formattedDate,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppColors.warmGray400,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FestivalMission extends ConsumerWidget {
+  const _FestivalMission();
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final db = ref.watch(dashboardProvider);
+    final pct = (db.progressPercent / 100).clamp(0.0, 1.0);
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: AppRadius.largeBorder,
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryBg,
+                  borderRadius: AppRadius.mediumBorder,
+                ),
+                child: const Icon(Icons.flag_rounded, size: 16, color: AppColors.primary),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                'Festival Mission',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: AppColors.warmGray500,
+                  letterSpacing: 0.3,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _CountUp(
+                      target: db.collectedTotal,
+                      style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                        color: AppColors.charcoal,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -1.5,
+                        height: 1.0,
+                      ),
+                      format: (v) => '${AppConstants.currencySymbol}${fmtAmount(v)}',
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Goal: ${AppConstants.currencySymbol}${fmtAmount(db.expectedTotal)}',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.warmGray400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.lg),
+              _HeroRing(progress: pct, size: 64, stroke: 5),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: pct),
+              duration: const Duration(milliseconds: 700),
+              curve: Curves.easeOut,
+              builder: (context, value, _) => LinearProgressIndicator(
+                value: value,
+                minHeight: 10,
+                backgroundColor: AppColors.warmGray200,
+                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryBg,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '${db.progressPercent.toStringAsFixed(1)}%',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Text(
+                '${AppConstants.currencySymbol}${_shortFmt(db.remainingCollection)} to reach',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: AppColors.warmGray400,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Divider(height: 1, color: AppColors.outline),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              _Metric(label: 'Pending', value: db.pendingSponsorCount),
+              _Divider(),
+              _Metric(label: 'Expenses', value: AppConstants.currencySymbol + _shortFmt(db.totalExpenses)),
+              _Divider(),
+              _Metric(label: 'Balance', value: AppConstants.currencySymbol + _shortFmt(db.balance)),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
+      ),
+    );
+  }
+}
+
+class _Metric extends StatelessWidget {
+  final String label;
+  final dynamic value;
+  const _Metric({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$value',
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: AppColors.charcoal,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: AppColors.warmGray400,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Divider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1, height: 28, color: AppColors.outline,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+    );
+  }
+}
+
+class _HeroRing extends StatelessWidget {
+  final double progress;
+  final double size;
+  final double stroke;
+  const _HeroRing({required this.progress, required this.size, required this.stroke});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size + 8,
+      height: size + 8,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          CustomPaint(
+            painter: _RingPainter(
+              progress: 1, stroke: stroke,
+              color: AppColors.warmGray200,
+              trackColor: const Color(0x00000000),
+            ),
+            size: Size(size, size),
+          ),
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: progress),
+            duration: const Duration(milliseconds: 1000),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, _) => CustomPaint(
+              painter: _RingPainter(
+                progress: value, stroke: stroke,
+                color: AppColors.primary, trackColor: const Color(0x00000000),
+              ),
+              size: Size(size, size),
+            ),
+          ),
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: progress),
+            duration: const Duration(milliseconds: 1000),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, _) => Text(
+              '${(value * 100).toStringAsFixed(0)}%',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RingPainter extends CustomPainter {
+  final double progress;
+  final double stroke;
+  final Color color;
+  final Color trackColor;
+  _RingPainter({required this.progress, required this.stroke, required this.color, required this.trackColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width / 2, size.height / 2);
+    final r = size.width / 2 - stroke / 2;
+    if (trackColor.a > 0) {
+      canvas.drawCircle(c, r, Paint()
+        ..color = trackColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = stroke
+        ..strokeCap = StrokeCap.round);
+    }
+    if (progress > 0) {
+      canvas.drawArc(
+        Rect.fromCircle(center: c, radius: r),
+        -math.pi / 2,
+        2 * math.pi * progress,
+        false,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = stroke
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RingPainter old) => old.progress != progress;
+}
+
+class _KpiGrid extends ConsumerWidget {
+  const _KpiGrid();
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final db = ref.watch(dashboardProvider);
+    final dcAsync = ref.watch(dailyCollectionsStreamProvider);
+    final dc = dcAsync.valueOrNull ?? [];
+    final now = DateTime.now();
+    final yesterdayStart = DateTime(now.year, now.month, now.day - 1);
+    final yesterdayEnd = yesterdayStart.add(const Duration(days: 1));
+    final yesterdayTotal = dc
+        .where((c) =>
+            c.date.toDate().isAfter(yesterdayStart) &&
+            c.date.toDate().isBefore(yesterdayEnd))
+        .fold<int>(0, (v, c) => v + c.amount);
+    final trendUp = db.todayCollection > yesterdayTotal;
+    final trendFlat = db.todayCollection == yesterdayTotal;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = (constraints.maxWidth - AppSpacing.sm) / 2;
+        return Wrap(
+          spacing: AppSpacing.sm, runSpacing: AppSpacing.sm,
+          children: [
+            SizedBox(width: w, child: _KpiCard(
+              icon: Icons.today_rounded, label: "Today's Collection",
+              value: db.todayCollection, trend: '${db.todayEntryCount} entries',
+              color: AppColors.success, fmtCurrency: true,
+              trendUp: trendUp, trendFlat: trendFlat,
+            )),
+            SizedBox(width: w, child: _KpiCard(
+              icon: Icons.people_rounded, label: 'Pending Sponsors',
+              value: db.pendingSponsorCount,
+              trend: '${AppConstants.currencySymbol}${_shortFmt(db.pendingRemainingTotal)} pending',
+              color: AppColors.warning, fmtCurrency: false,
+            )),
+            SizedBox(width: w, child: _KpiCard(
+              icon: Icons.receipt_long_rounded, label: 'Expenses',
+              value: db.totalExpenses,
+              trend: db.totalExpenses > 0
+                  ? '${((db.totalExpenses / (db.collectedTotal > 0 ? db.collectedTotal : 1)) * 100).toStringAsFixed(0)}% of collected'
+                  : 'No expenses',
+              color: AppColors.error, fmtCurrency: true,
+            )),
+            SizedBox(width: w, child: _KpiCard(
+              icon: Icons.notifications_rounded, label: 'Pending Visits',
+              value: db.activeVisitCount, trend: '${db.overdueVisitCount} overdue',
+              color: AppColors.primary, fmtCurrency: false,
+            )),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _KpiCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final int value;
+  final String trend;
+  final Color color;
+  final bool fmtCurrency;
+  final bool trendUp;
+  final bool trendFlat;
+  const _KpiCard({required this.icon, required this.label, required this.value, required this.trend, required this.color, required this.fmtCurrency, this.trendUp = false, this.trendFlat = true});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: AppRadius.largeBorder,
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.xs),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: AppRadius.mediumBorder,
+            ),
+            child: Icon(icon, size: 14, color: color),
+          ),
+          const SizedBox(height: 16),
+          _CountUp(
+            target: value,
+            style: theme.textTheme.titleLarge?.copyWith(
+              color: AppColors.charcoal,
+              height: 1.0,
+            ),
+            format: fmtCurrency
+                ? (v) => '${AppConstants.currencySymbol}${_shortFmt(v)}'
+                : (v) => '$v',
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: AppColors.warmGray500,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              if (!trendFlat)
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Icon(
+                    trendUp ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                    size: 12,
+                    color: trendUp ? AppColors.success : AppColors.error,
+                  ),
+                ),
+              Flexible(
+                child: Text(
+                  trend,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: AppColors.warmGray400,
+                    height: 1.0,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickActions extends ConsumerWidget {
+  const _QuickActions();
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final festival = ref.watch(festivalProvider).valueOrNull;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+          child: Text(
+            'Quick Actions',
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: AppColors.warmGray500,
+            ),
+          ),
+        ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final w = (constraints.maxWidth - AppSpacing.sm) / 2;
+            return Wrap(
+              spacing: AppSpacing.sm, runSpacing: AppSpacing.sm,
+              children: [
+                SizedBox(width: w, child: _ActionTile(icon: Icons.person_add_rounded, label: 'Sponsor', color: AppColors.primary, onTap: () => context.push('/collections/add'))),
+                SizedBox(width: w, child: _ActionTile(icon: Icons.account_balance_wallet_rounded, label: 'Collection', color: AppColors.success, onTap: () => context.push('/daily-collections/add'))),
+                SizedBox(width: w, child: _ActionTile(icon: Icons.notifications_active_rounded, label: 'Visit', color: AppColors.warning, onTap: () => context.push('/followups/add'))),
+                SizedBox(width: w, child: _ActionTile(icon: Icons.receipt_rounded, label: 'Expense', color: AppColors.error, onTap: () => context.push('/expenses/add'))),
+              ],
+            );
+          },
+        ),
+        if (festival != null) ...[
+          const SizedBox(height: AppSpacing.xs),
+          _QrStrip(festival: festival),
+        ],
+      ],
+    );
+  }
+}
+
+class _QrStrip extends StatelessWidget {
+  final Festival festival;
+  const _QrStrip({required this.festival});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: AppRadius.largeBorder,
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: AppRadius.largeBorder,
+        child: InkWell(
+          onTap: () => showPaymentQrSheet(context, festival),
+          borderRadius: AppRadius.largeBorder,
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                margin: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryBg,
+                  borderRadius: AppRadius.mediumBorder,
+                ),
+                child: const Icon(Icons.qr_code_rounded, size: 22, color: AppColors.primary),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  'Show Payment QR',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: AppColors.charcoal,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(right: AppSpacing.md),
+                child: Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.warmGray400),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _ActionTile({required this.icon, required this.label, required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      height: 72,
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: AppRadius.largeBorder,
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: AppRadius.largeBorder,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 34, height: 34,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: AppRadius.mediumBorder,
+                ),
+                child: Icon(icon, size: 18, color: color),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                label,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: AppColors.charcoal,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CollectionTrend extends ConsumerWidget {
+  const _CollectionTrend();
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final chartData = ref.watch(dailyChartProvider);
+    final total = chartData.fold<int>(0, (v, p) => v + p.amount);
+    final spots = chartData.asMap().entries
+        .map((e) => FlSpot(e.key.toDouble(), e.value.amount.toDouble())).toList();
+    final hasData = spots.isNotEmpty && spots.any((s) => s.y > 0);
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: AppRadius.largeBorder,
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Progress Trend',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: AppColors.warmGray500,
+                ),
+              ),
+              Text(
+                '14 days',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: AppColors.warmGray400,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            height: 140,
+            child: hasData
+                ? LineChart(
+                    LineChartData(
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        horizontalInterval: _roundInterval(
+                          chartData.map((e) => e.amount).reduce((a, b) => a > b ? a : b).toDouble(),
+                        ),
+                        getDrawingHorizontalLine: (v) => FlLine(color: AppColors.outline, strokeWidth: 1),
+                      ),
+                      titlesData: const FlTitlesData(
+                        topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: spots,
+                          isCurved: true,
+                          preventCurveOverShooting: true,
+                          color: AppColors.primary,
+                          barWidth: 2,
+                          isStrokeCapRound: true,
+                          dotData: const FlDotData(show: false),
+                          belowBarData: BarAreaData(
+                            show: true,
+                            gradient: LinearGradient(
+                              colors: [
+                                AppColors.primary.withValues(alpha: 0.12),
+                                AppColors.primary.withValues(alpha: 0.0),
+                              ],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ),
+                          ),
+                        ),
+                      ],
+                      lineTouchData: LineTouchData(
+                        enabled: true,
+                        touchTooltipData: LineTouchTooltipData(
+                          getTooltipItems: (touchedSpots) {
+                            return touchedSpots.map((spot) {
+                              final idx = spot.spotIndex;
+                              final label = idx < chartData.length ? chartData[idx].label : '';
+                              return LineTooltipItem(
+                                '$label\n${AppConstants.currencySymbol}${_shortFmt(spot.y.toInt())}',
+                                const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 11),
+                              );
+                            }).toList();
+                          },
+                        ),
+                      ),
+                    ),
+                  )
+                : const _ChartSkeleton(),
+          ),
+          if (hasData) ...[
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              children: [
+                Text(
+                  '${AppConstants.currencySymbol}${fmtAmount(total)}',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: AppColors.charcoal,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'total in 14 days',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppColors.warmGray400,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ChartSkeleton extends StatefulWidget {
+  const _ChartSkeleton();
+  @override
+  State<_ChartSkeleton> createState() => _ChartSkeletonState();
+}
+
+class _ChartSkeletonState extends State<_ChartSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(seconds: 2))
+      ..repeat(reverse: true)
+      ..addListener(_onTick);
+  }
+
+  void _onTick() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _ctrl.stop();
+    _ctrl.removeListener(_onTick);
     _ctrl.dispose();
     super.dispose();
   }
 
-  String _fmt(int n) {
-    return NumberFormat('#,##,###', 'en_IN').format(n);
-  }
-
   @override
   Widget build(BuildContext context) {
-    final dashboard = ref.watch(dashboardProvider);
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final progress = dashboard.progressPercent / 100;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Dashboard'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_rounded),
-            tooltip: 'Settings',
-            onPressed: () => context.push('/settings'),
-          ),
-        ],
-      ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isWide = constraints.maxWidth >= 600;
-          final isDesktop = constraints.maxWidth >= 900;
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                _HeroSection(
-                  fade: _heroFade,
-                  target: dashboard.expectedTotal,
-                  theme: theme,
-                  colorScheme: colorScheme,
-                  fmt: _fmt,
+    final o = 0.04 + _ctrl.value * 0.06;
+    return SizedBox(
+      height: 140,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: List.generate(10, (i) {
+          final h = 0.2 + (i.isEven ? 0.3 : 0.5) + (i % 3 == 0 ? 0.2 : 0.0);
+          return Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: Container(
+                height: 140 * h,
+                decoration: BoxDecoration(
+                  color: AppColors.warmGray400.withValues(alpha: o),
+                  borderRadius: BorderRadius.circular(3),
                 ),
-                const SizedBox(height: 24),
-                _ProgressSection(
-                  controller: _ctrl,
-                  collected: dashboard.collectedTotal,
-                  progress: progress,
-                  theme: theme,
-                  colorScheme: colorScheme,
-                  fmt: _fmt,
-                ),
-                const SizedBox(height: 24),
-                _PrimaryCards(
-                  controller: _ctrl,
-                  expected: dashboard.expectedTotal,
-                  collected: dashboard.collectedTotal,
-                  remaining: dashboard.remainingCollection,
-                  isWide: isWide,
-                  theme: theme,
-                  colorScheme: colorScheme,
-                  fmt: _fmt,
-                ),
-                const SizedBox(height: 24),
-                _SecondaryCards(
-                  controller: _ctrl,
-                  expenses: dashboard.totalExpenses,
-                  balance: dashboard.balance,
-                  efficiency: dashboard.progressPercent,
-                  isWide: isWide,
-                  isDesktop: isDesktop,
-                  theme: theme,
-                  colorScheme: colorScheme,
-                  fmt: _fmt,
-                ),
-                const SizedBox(height: 24),
-                _PendingSponsors(theme: theme, colorScheme: colorScheme),
-                const SizedBox(height: 24),
-                _TodayCollection(theme: theme, colorScheme: colorScheme),
-                const SizedBox(height: 24),
-                _PendingVisits(theme: theme, colorScheme: colorScheme),
-                const SizedBox(height: 24),
-                _RecentActivity(theme: theme, colorScheme: colorScheme),
-              ],
+              ),
             ),
           );
-        },
+        }),
       ),
     );
   }
 }
 
-class _HeroSection extends StatelessWidget {
-  final Animation<double> fade;
-  final int target;
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-  final String Function(int) fmt;
-
-  const _HeroSection({
-    required this.fade,
-    required this.target,
-    required this.theme,
-    required this.colorScheme,
-    required this.fmt,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: fade,
-      child: Column(
-        children: [
-          const SizedBox(height: 12),
-          Text(
-            'Expected Sponsorship',
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${AppConstants.currencySymbol}${fmt(target)}',
-            style: TextStyle(
-              fontSize: 42,
-              fontWeight: FontWeight.bold,
-              color: colorScheme.primary,
-              letterSpacing: -0.5,
-              height: 1.1,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'festival goal',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurface.withAlpha(100),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ProgressSection extends StatelessWidget {
-  final Animation<double> controller;
-  final int collected;
-  final double progress;
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-  final String Function(int) fmt;
-
-  const _ProgressSection({
-    required this.controller,
-    required this.collected,
-    required this.progress,
-    required this.theme,
-    required this.colorScheme,
-    required this.fmt,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: AnimatedBuilder(
-          animation: controller,
-          builder: (context, _) {
-            final t = controller.value;
-            final displayCollected = (collected * t).round();
-            final displayProgress = progress * t;
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.account_balance_wallet_rounded,
-                      size: 20,
-                      color: colorScheme.tertiary,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Collected',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      '${(displayProgress * 100).toStringAsFixed(1)}%',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.tertiary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${AppConstants.currencySymbol}${fmt(displayCollected)}',
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: displayProgress,
-                    minHeight: 10,
-                    backgroundColor: colorScheme.primaryContainer.withAlpha(80),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _PrimaryCards extends StatelessWidget {
-  final Animation<double> controller;
-  final int expected;
-  final int collected;
-  final int remaining;
-  final bool isWide;
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-  final String Function(int) fmt;
-
-  const _PrimaryCards({
-    required this.controller,
-    required this.expected,
-    required this.collected,
-    required this.remaining,
-    required this.isWide,
-    required this.theme,
-    required this.colorScheme,
-    required this.fmt,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cards = [
-      _buildCard('Sponsor', expected, colorScheme.primary, Icons.flag_rounded),
-      _buildCard(
-          'Collected', collected, colorScheme.tertiary, Icons.check_circle_rounded),
-      _buildCard(
-          'Remaining',
-          remaining,
-          remaining > 0 ? colorScheme.error : Colors.green.shade700,
-          Icons.more_horiz_rounded),
-    ];
-
-    if (isWide) {
-      return Row(
-        children: cards
-            .map((c) => Expanded(child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: c,
-            )))
-            .toList(),
-      );
-    }
-
-    return Column(children: cards
-        .map((c) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: c,
-        ))
-        .toList());
-  }
-
-  Widget _buildCard(String label, int value, Color color, IconData icon) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: AnimatedBuilder(
-          animation: controller,
-          builder: (context, _) {
-            final display = (value * controller.value).round();
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(icon, size: 18, color: color),
-                    const SizedBox(width: 6),
-                    Text(
-                      label,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${AppConstants.currencySymbol}${fmt(display)}',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _SecondaryCards extends StatelessWidget {
-  final Animation<double> controller;
-  final int expenses;
-  final int balance;
-  final double efficiency;
-  final bool isWide;
-  final bool isDesktop;
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-  final String Function(int) fmt;
-
-  const _SecondaryCards({
-    required this.controller,
-    required this.expenses,
-    required this.balance,
-    required this.efficiency,
-    required this.isWide,
-    required this.isDesktop,
-    required this.theme,
-    required this.colorScheme,
-    required this.fmt,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cards = [
-      _SecondaryCard(
-        controller: controller,
-        icon: Icons.receipt_long_rounded,
-        label: 'Total Expenses',
-        value: expenses,
-        color: colorScheme.error,
-        suffix: null,
-        theme: theme,
-        colorScheme: colorScheme,
-        fmt: fmt,
-      ),
-      _SecondaryCard(
-        controller: controller,
-        icon: Icons.balance_rounded,
-        label: 'Current Balance',
-        value: balance,
-        color: balance >= 0 ? colorScheme.tertiary : colorScheme.error,
-        suffix: null,
-        theme: theme,
-        colorScheme: colorScheme,
-        fmt: fmt,
-      ),
-      _SecondaryCard(
-        controller: controller,
-        icon: Icons.trending_up_rounded,
-        label: 'Collection Efficiency',
-        value: efficiency.round(),
-        color: colorScheme.primary,
-        suffix: '%',
-        theme: theme,
-        colorScheme: colorScheme,
-        fmt: fmt,
-      ),
-    ];
-
-    if (isDesktop) {
-      return Row(
-        children: cards
-            .map((c) => Expanded(
-                child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: c)))
-            .toList(),
-      );
-    }
-
-    return Column(
-      children: cards
-          .map((c) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: c,
-              ))
-          .toList(),
-    );
-  }
-}
-
-class _SecondaryCard extends StatelessWidget {
-  final Animation<double> controller;
-  final IconData icon;
-  final String label;
-  final int value;
-  final Color color;
-  final String? suffix;
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-  final String Function(int) fmt;
-
-  const _SecondaryCard({
-    required this.controller,
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-    this.suffix,
-    required this.theme,
-    required this.colorScheme,
-    required this.fmt,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: AnimatedBuilder(
-          animation: controller,
-          builder: (context, _) {
-            final display = (value * controller.value).round();
-            final displayStr = suffix != null
-                ? '$display$suffix'
-                : '${AppConstants.currencySymbol}${fmt(display)}';
-            return Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: color.withAlpha(30),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(icon, size: 20, color: color),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        label,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        displayStr,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: color,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _PendingSponsors extends ConsumerWidget {
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-
-  const _PendingSponsors({
-    required this.theme,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final dashboard = ref.watch(dashboardProvider);
-
-    return Card(
-      margin: EdgeInsets.zero,
-      child: InkWell(
-        onTap: () => context.push('/collections?filter=pending'),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.people_rounded,
-                    size: 20,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Pending Sponsors',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const Spacer(),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    size: 20,
-                    color: colorScheme.onSurface.withAlpha(80),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '${dashboard.pendingSponsorCount} Sponsors',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '₹${NumberFormat('#,##,###', 'en_IN').format(dashboard.pendingRemainingTotal)} Remaining',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.error,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              if (dashboard.pendingSponsorCount == 0) ...[
-                const SizedBox(height: 4),
-                Text(
-                  'All sponsorships collected',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TodayCollection extends ConsumerWidget {
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-
-  const _TodayCollection({
-    required this.theme,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final dashboard = ref.watch(dashboardProvider);
-
-    return Card(
-      margin: EdgeInsets.zero,
-      child: InkWell(
-        onTap: () => context.push('/daily-collections'),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.today_rounded,
-                    size: 20,
-                    color: colorScheme.tertiary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    "Today's Collection",
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const Spacer(),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    size: 20,
-                    color: colorScheme.onSurface.withAlpha(80),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '${AppConstants.currencySymbol}${NumberFormat('#,##,###', 'en_IN').format(dashboard.todayCollection)}',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.tertiary,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${dashboard.todayEntryCount} Entries Today',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PendingVisits extends ConsumerWidget {
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-
-  const _PendingVisits({
-    required this.theme,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final allActive = ref.watch(activeFollowUpsProvider);
-    final count = allActive.length;
-    final visits = allActive.take(5).toList();
-
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            InkWell(
-              onTap: () => context.push('/followups'),
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.notifications_rounded,
-                      size: 20,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Pending Visits ($count)',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const Spacer(),
-                    if (count > 0)
-                      Text(
-                        'View All',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                    if (count > 0) ...[
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        size: 16,
-                        color: colorScheme.primary,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            if (count == 0)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.check_circle_rounded,
-                      size: 20,
-                      color: Colors.green.shade600,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'No pending follow-ups',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w500,
-                              color: Colors.green.shade700,
-                            ),
-                          ),
-                          Text(
-                            'All sponsor visits are completed.',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              ...visits.map((fu) => _VisitRow(
-                    followup: fu,
-                    theme: theme,
-                    colorScheme: colorScheme,
-                  )),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _VisitRow extends StatelessWidget {
-  final SponsorFollowup followup;
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-
-  const _VisitRow({
-    required this.followup,
-    required this.theme,
-    required this.colorScheme,
-  });
-
-  String _formatDate(DateTime d) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final date = DateTime(d.year, d.month, d.day);
-    if (date == today) return 'Today';
-    if (date == today.add(const Duration(days: 1))) return 'Tomorrow';
-    final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    final diff = date.difference(today).inDays;
-    if (diff > 0 && diff <= 7) return dayNames[date.weekday - 1];
-    return DateFormat('d MMM').format(d);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isOverdue =
-        followup.followUpDate.toDate().isBefore(DateTime.now());
-    return InkWell(
-      onTap: () => context.push('/followups/${followup.id}/edit'),
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: isOverdue
-                    ? colorScheme.errorContainer.withAlpha(80)
-                    : colorScheme.primaryContainer.withAlpha(80),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                isOverdue ? Icons.warning_amber_rounded : Icons.person_rounded,
-                size: 20,
-                color: isOverdue ? colorScheme.error : colorScheme.primary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    followup.sponsorName,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.calendar_today_rounded,
-                        size: 13,
-                        color: isOverdue ? colorScheme.error : colorScheme.primary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _formatDate(followup.followUpDate.toDate()),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color:
-                              isOverdue ? colorScheme.error : colorScheme.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (followup.amount != null) ...[
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: colorScheme.secondaryContainer.withAlpha(120),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        '₹${NumberFormat('#,##,###', 'en_IN').format(followup.amount)}',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: colorScheme.secondary,
-                        ),
-                      ),
-                    ),
-                  ],
-                  if (followup.note.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      followup.note,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 20,
-              color: colorScheme.onSurface.withAlpha(80),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-String _activityRelativeTime(DateTime dt) {
-  final now = DateTime.now();
-  final diff = now.difference(dt);
-  if (diff.inMinutes < 1) return 'just now';
-  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-  if (diff.inHours < 24) return '${diff.inHours}h ago';
-  if (diff.inDays == 1) return 'Yesterday';
-  if (diff.inDays < 30) return '${diff.inDays}d ago';
+String _relTime(DateTime dt) {
+  final d = DateTime.now().difference(dt);
+  if (d.inMinutes < 1) return 'now';
+  if (d.inMinutes < 60) return '${d.inMinutes}m';
+  if (d.inHours < 24) return '${d.inHours}h';
+  if (d.inDays == 1) return 'yesterday';
+  if (d.inDays < 30) return '${d.inDays}d';
   return DateFormat('d MMM').format(dt);
 }
 
-IconData _activityIcon(String type) {
+Color _actColor(String type) {
   switch (type) {
-    case 'collection_recorded':
-      return Icons.account_balance_wallet_rounded;
-    case 'expense_added':
-      return Icons.receipt_long_rounded;
-    case 'followup_added':
-      return Icons.notifications_rounded;
-    case 'followup_completed':
-      return Icons.check_circle_rounded;
-    default:
-      return Icons.circle_rounded;
+    case 'collection_recorded': return AppColors.success;
+    case 'collection_corrected': return AppColors.warning;
+    case 'expense_added': return AppColors.error;
+    case 'followup_added': return AppColors.warning;
+    case 'followup_completed': return AppColors.success;
+    case 'followup_undo': return AppColors.warmGray500;
+    case 'sponsor_added': return AppColors.primary;
+    case 'sponsor_updated': return AppColors.info;
+    case 'festival_updated': return AppColors.warmGray500;
+    case 'qr_updated': return AppColors.info;
+    default: return AppColors.warmGray400;
   }
 }
 
-Color _activityColor(String type, ColorScheme cs) {
+IconData _actIcon(String type) {
   switch (type) {
-    case 'collection_recorded':
-      return cs.tertiary;
-    case 'expense_added':
-      return cs.error;
-    case 'followup_added':
-      return cs.primary;
-    case 'followup_completed':
-      return Colors.green.shade600;
-    default:
-      return cs.onSurface;
+    case 'collection_recorded': return Icons.account_balance_wallet_rounded;
+    case 'collection_corrected': return Icons.edit_note_rounded;
+    case 'expense_added': return Icons.receipt_rounded;
+    case 'followup_added': return Icons.notifications_active_rounded;
+    case 'followup_completed': return Icons.check_circle_rounded;
+    case 'followup_undo': return Icons.undo_rounded;
+    case 'sponsor_added': return Icons.person_add_rounded;
+    case 'sponsor_updated': return Icons.edit_rounded;
+    case 'festival_updated': return Icons.settings_rounded;
+    case 'qr_updated': return Icons.qr_code_rounded;
+    default: return Icons.circle_rounded;
   }
 }
 
-class _RecentActivity extends ConsumerWidget {
-  final ThemeData theme;
-  final ColorScheme colorScheme;
+class _ActivityGroup {
+  final String label;
+  final List<Activity> activities;
+  _ActivityGroup({required this.label, required this.activities});
+}
 
-  const _RecentActivity({
-    required this.theme,
-    required this.colorScheme,
-  });
+List<_ActivityGroup> _groupActivities(List<Activity> activities) {
+  final sorted = List<Activity>.from(activities)
+    ..sort((a, b) => b.createdAt.toDate().compareTo(a.createdAt.toDate()));
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final yesterday = today.subtract(const Duration(days: 1));
+  final groups = <_ActivityGroup>[];
+  _ActivityGroup? current;
+  for (final a in sorted) {
+    final date = a.createdAt.toDate();
+    final day = DateTime(date.year, date.month, date.day);
+    final label = day == today
+        ? 'Today'
+        : day == yesterday
+            ? 'Yesterday'
+            : DateFormat('d MMM').format(date);
+    if (current == null || current.label != label) {
+      current = _ActivityGroup(label: label, activities: []);
+      groups.add(current);
+    }
+    current.activities.add(a);
+  }
+  return groups;
+}
+
+enum _ActivityFilter { all, sponsors, expenses, collections }
+
+class _FilterRow extends StatelessWidget {
+  final _ActivityFilter value;
+  final ValueChanged<_ActivityFilter> onChanged;
+  const _FilterRow({required this.value, required this.onChanged});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final activitiesAsync = ref.watch(activitiesStreamProvider);
-    final items = activitiesAsync.valueOrNull ?? [];
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _buildChip(theme, 'All', _ActivityFilter.all),
+          const SizedBox(width: AppSpacing.sm),
+          _buildChip(theme, 'Sponsors', _ActivityFilter.sponsors),
+          const SizedBox(width: AppSpacing.sm),
+          _buildChip(theme, 'Expenses', _ActivityFilter.expenses),
+          const SizedBox(width: AppSpacing.sm),
+          _buildChip(theme, 'Collections', _ActivityFilter.collections),
+        ],
+      ),
+    );
+  }
 
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+  Widget _buildChip(ThemeData theme, String label, _ActivityFilter f) {
+    final selected = value == f;
+    return GestureDetector(
+      onTap: () => onChanged(f),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs + 2,
+        ),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.1)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.full),
+          border: Border.all(
+            color: selected
+                ? AppColors.primary.withValues(alpha: 0.3)
+                : AppColors.outline,
+          ),
+        ),
+        child: Text(
+          label,
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: selected ? AppColors.primary : AppColors.warmGray500,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActivityTimeline extends ConsumerStatefulWidget {
+  const _ActivityTimeline();
+  @override
+  ConsumerState<_ActivityTimeline> createState() => _ActivityTimelineState();
+}
+
+class _ActivityTimelineState extends ConsumerState<_ActivityTimeline> {
+  _ActivityFilter _filter = _ActivityFilter.all;
+  bool _clearing = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final role = ref.watch(roleProvider);
+    final allItems = ref.watch(activitiesStreamProvider).valueOrNull ?? [];
+    final items = _filtered(allItems);
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: AppRadius.largeBorder,
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('Activity Feed', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.warmGray500)),
+              const Spacer(),
+              if (role == UserRole.admin)
+                _clearing
+                    ? const SizedBox(
+                        width: 16, height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.warmGray400),
+                        tooltip: 'Clear activity feed',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                        onPressed: () => _handleClear(context),
+                      ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _FilterRow(
+            value: _filter,
+            onChanged: (v) => setState(() => _filter = v),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          if (items.isEmpty)
+            const SizedBox(
+              height: 80,
+              child: Center(
+                child: Text('No activity yet', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.warmGray500)),
+              ),
+            )
+          else
+            SizedBox(
+              height: 280,
+              child: SingleChildScrollView(
+                child: _buildList(context, items, theme),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleClear(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Clear Activity Feed',
+      message: 'Delete all activity records? This cannot be undone.',
+      confirmLabel: 'Clear All',
+    );
+    if (!confirmed || !mounted) return;
+    setState(() => _clearing = true);
+    try {
+      await ref.read(firestoreProvider).clearActivityFeed();
+    } catch (_) {
+      if (mounted) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Failed to clear activity feed')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
+  List<Activity> _filtered(List<Activity> items) {
+    if (_filter == _ActivityFilter.all) return items;
+    final type = switch (_filter) {
+      _ActivityFilter.sponsors => 'target',
+      _ActivityFilter.expenses => 'expense',
+      _ActivityFilter.collections => 'daily_collection',
+      _ => null,
+    };
+    if (type == null) return items;
+    return items.where((a) => a.entityType == type).toList();
+  }
+
+  void _navigateToActivity(BuildContext context, Activity a) {
+    if (a.recordId == null || a.entityType == null) return;
+    switch (a.entityType) {
+      case 'target':
+        context.push('/collections/${a.recordId}');
+      case 'expense':
+        context.push('/expenses/${a.recordId}/edit');
+      case 'sponsor_followup':
+        context.push('/followups/${a.recordId}/edit');
+      default:
+        break;
+    }
+  }
+
+  Widget _buildList(BuildContext context, List<Activity> items, ThemeData theme) {
+    final groups = _groupActivities(items);
+    final widgets = <Widget>[];
+    for (final g in groups) {
+      widgets.add(Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+        child: Text(
+          g.label,
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: AppColors.warmGray400,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ));
+      for (final a in g.activities) {
+        final c = _actColor(a.type);
+        final icon = _actIcon(a.type);
+        final canNavigate = a.recordId != null && a.entityType != null;
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: InkWell(
+            onTap: canNavigate ? () => _navigateToActivity(context, a) : null,
+            borderRadius: AppRadius.mediumBorder,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.history_rounded,
-                  size: 20,
-                  color: colorScheme.onSurfaceVariant,
+                Container(
+                  width: 28, height: 28,
+                  decoration: BoxDecoration(
+                    color: c.withValues(alpha: 0.1),
+                    borderRadius: AppRadius.mediumBorder,
+                  ),
+                  child: Icon(icon, size: 14, color: c),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _HighlightedText(
+                    text: a.userName != null && a.userName!.isNotEmpty
+                        ? '${a.userName} — ${a.description.isNotEmpty ? a.description : a.title}'
+                        : (a.description.isNotEmpty ? a.description : a.title),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.charcoal,
+                    ),
+                  ),
+                ),
                 Text(
-                  'Recent Activity',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
+                  _relTime(a.createdAt.toDate()),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: AppColors.warmGray400,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            if (items.isEmpty)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.inbox_rounded,
-                        size: 40,
-                        color: colorScheme.onSurface.withAlpha(50),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'No recent activity',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurface.withAlpha(100),
-                        ),
-                      ),
-                      Text(
-                        'Activity will appear here once you start recording',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurface.withAlpha(60),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            else
-              ...items.take(20).map((a) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: _activityColor(a.type, colorScheme)
-                                .withAlpha(30),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            _activityIcon(a.type),
-                            size: 18,
-                            color: _activityColor(a.type, colorScheme),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                a.title,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                a.description,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _activityRelativeTime(a.createdAt.toDate()),
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )),
-          ],
+          ),
+        ));
+      }
+    }
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: widgets,
+    );
+  }
+}
+
+class _HighlightedText extends StatelessWidget {
+  final String text;
+  final TextStyle? style;
+
+  const _HighlightedText({required this.text, this.style});
+
+  @override
+  Widget build(BuildContext context) {
+    final amountPattern = RegExp(r'₹[\d,]+');
+    final matches = amountPattern.allMatches(text).toList();
+
+    if (matches.isEmpty) {
+      return Text(text, style: style, maxLines: 2);
+    }
+
+    final spans = <InlineSpan>[];
+    int lastEnd = 0;
+    for (final m in matches) {
+      if (m.start > lastEnd) {
+        spans.add(TextSpan(text: text.substring(lastEnd, m.start)));
+      }
+      spans.add(TextSpan(
+        text: m.group(0),
+        style: (style ?? const TextStyle()).copyWith(
+          fontWeight: FontWeight.w700,
+          color: AppColors.charcoal,
         ),
-      ),
+      ));
+      lastEnd = m.end;
+    }
+    if (lastEnd < text.length) {
+      spans.add(TextSpan(text: text.substring(lastEnd)));
+    }
+
+    return RichText(
+      text: TextSpan(children: spans, style: style),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }

@@ -1,0 +1,85 @@
+{
+  "project": "Sankalpa",
+  "description": "Festival management application for Sri Gowri Ganesha Geleyara Balaga",
+  "stack": "flutter",
+  "tokens": {
+    "color": {
+      "primary": "#0F6B3C",
+      "accent": "#C8A43E",
+      "success": "#22C55E",
+      "warning": "#E8A838",
+      "error": "#DC2626",
+      "info": "#3686D6",
+      "surface": "#F4F4F0",
+      "card": "#FFFFFF",
+      "charcoal": "#2D2D2D",
+      "primaryBg": "#E7F0EA",
+      "accentBg": "#FAF5E8",
+      "successBg": "#E7F8ED",
+      "warningBg": "#FEF4E3",
+      "errorBg": "#FDE8E8",
+      "infoBg": "#EBF3FC",
+      "outline": "#E2E2E0",
+      "warmGray50": "#F8F8F6",
+      "warmGray100": "#F0EFEC",
+      "warmGray200": "#E2E2DE",
+      "warmGray300": "#C5C4C0",
+      "warmGray400": "#A3A29E",
+      "warmGray500": "#7A7976",
+      "warmGray600": "#5C5B58",
+      "warmGray700": "#40403D"
+    },
+    "typography": {
+      "fontFamily": "Inter",
+      "tiers": {
+        "display": { "size": 36, "weight": 700 },
+        "headlineLarge": { "size": 24, "weight": 600 },
+        "headlineMedium": { "size": 20, "weight": 600 },
+        "headlineSmall": { "size": 18, "weight": 600 },
+        "titleLarge": { "size": 16, "weight": 600 },
+        "titleMedium": { "size": 14, "weight": 600 },
+        "titleSmall": { "size": 13, "weight": 500 },
+        "bodyLarge": { "size": 15, "weight": 400 },
+        "bodyMedium": { "size": 14, "weight": 400 },
+        "bodySmall": { "size": 13, "weight": 400 },
+        "labelLarge": { "size": 12, "weight": 600 },
+        "labelMedium": { "size": 11, "weight": 500 },
+        "labelSmall": { "size": 10, "weight": 500 }
+      }
+    },
+    "spacing": {
+      "xs": 4,
+      "sm": 8,
+      "md": 12,
+      "lg": 16,
+      "xl": 20,
+      "xxl": 24,
+      "xxxl": 32,
+      "xxxxl": 40
+    },
+    "radius": {
+      "small": 8,
+      "medium": 12,
+      "large": 16,
+      "hero": 24,
+      "full": 999
+    },
+    "shadows": {
+      "none": "none",
+      "subtle": "0 2px 4px 0 rgba(0,0,0,0.04)",
+      "soft": "0 4px 12px 0 rgba(0,0,0,0.06)",
+      "elevated": "0 8px 24px 0 rgba(0,0,0,0.10)",
+      "card": "0 2px 8px 0 rgba(0,0,0,0.06)"
+    },
+    "glass": {
+      "sigma": 14,
+      "opacity": 0.94,
+      "tint": "white"
+    },
+    "animation": {
+      "duration": 250,
+      "curve": "easeOutCubic"
+    }
+  },
+  "notes": "These tokens take precedence over any skill-generated recommendations. The Dart source of truth lives in lib/core/design/. Inter font via google_fonts is already configured."
+}

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "219118146107",
+    "project_id": "sri-gowri-ganesha",
+    "storage_bucket": "sri-gowri-ganesha.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:219118146107:android:6d1fddee44cf3acaa2421e",
+        "android_client_info": {
+          "package_name": "com.srigowriganesha.ganesha_2026"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCrmzFykWCHo8wlFAxsu5rdO1eZwfBABO8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

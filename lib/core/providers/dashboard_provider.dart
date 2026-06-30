@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ganesha_2026/core/providers/target_provider.dart';
 import 'package:ganesha_2026/core/providers/expense_provider.dart';
 import 'package:ganesha_2026/core/providers/daily_collection_provider.dart';
+import 'package:ganesha_2026/core/providers/budget_provider.dart';
+import 'package:ganesha_2026/core/providers/followup_provider.dart';
 
 class DashboardData {
   final int expectedTotal;
@@ -15,6 +17,8 @@ class DashboardData {
   final int totalDailyCollections;
   final int pendingSponsorCount;
   final int pendingRemainingTotal;
+  final int activeVisitCount;
+  final int overdueVisitCount;
 
   const DashboardData({
     required this.expectedTotal,
@@ -28,6 +32,8 @@ class DashboardData {
     required this.totalDailyCollections,
     required this.pendingSponsorCount,
     required this.pendingRemainingTotal,
+    required this.activeVisitCount,
+    required this.overdueVisitCount,
   });
 }
 
@@ -35,18 +41,20 @@ final dashboardProvider = Provider<DashboardData>((ref) {
   final targetsAsync = ref.watch(targetsStreamProvider);
   final expensesAsync = ref.watch(expensesStreamProvider);
   final dailyCollectionsAsync = ref.watch(dailyCollectionsStreamProvider);
+  final budgetAsync = ref.watch(budgetProvider);
+  final followupsAsync = ref.watch(allFollowUpsStreamProvider);
 
   final targets = targetsAsync.valueOrNull ?? [];
   final expenses = expensesAsync.valueOrNull ?? [];
   final dailyCollections = dailyCollectionsAsync.valueOrNull ?? [];
 
-  final expectedTotal =
+  final expectedFromTargets =
       targets.fold<int>(0, (v, t) => v + t.expectedAmount);
-  final sponsorCollected =
-      targets.fold<int>(0, (v, t) => v + t.givenAmount);
+  final budget = budgetAsync.valueOrNull ?? expectedFromTargets;
+  final expectedTotal = budget > 0 ? budget : expectedFromTargets;
   final totalDaily =
       dailyCollections.fold<int>(0, (v, dc) => v + dc.amount);
-  final collectedTotal = sponsorCollected + totalDaily;
+  final collectedTotal = totalDaily;
   final totalExpenses =
       expenses.fold<int>(0, (v, e) => v + e.amount);
   final balance = collectedTotal - totalExpenses;
@@ -72,6 +80,15 @@ final dashboardProvider = Provider<DashboardData>((ref) {
   final pendingSponsorCount = pending.length;
   final pendingRemainingTotal = pending.fold<int>(0, (v, t) => v + (t.expectedAmount - t.givenAmount));
 
+  final followups = followupsAsync.valueOrNull ?? [];
+  final today = DateTime(now.year, now.month, now.day);
+  final activeVisits = followups.where((f) => f.status == 'active').toList();
+  final activeVisitCount = activeVisits.length;
+  final overdueVisitCount = activeVisits.where((f) {
+    final d = f.followUpDate.toDate();
+    return DateTime(d.year, d.month, d.day).isBefore(today);
+  }).length;
+
   return DashboardData(
     expectedTotal: expectedTotal,
     collectedTotal: collectedTotal,
@@ -84,5 +101,7 @@ final dashboardProvider = Provider<DashboardData>((ref) {
     totalDailyCollections: totalDailyCollections,
     pendingSponsorCount: pendingSponsorCount,
     pendingRemainingTotal: pendingRemainingTotal,
+    activeVisitCount: activeVisitCount,
+    overdueVisitCount: overdueVisitCount,
   );
 });

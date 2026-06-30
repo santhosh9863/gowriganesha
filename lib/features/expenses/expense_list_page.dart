@@ -3,11 +3,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
+import 'package:ganesha_2026/core/design/app_colors.dart';
+import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/expense.dart';
+import 'package:ganesha_2026/core/models/user_role.dart';
+import 'package:ganesha_2026/core/providers/auth_provider.dart';
 import 'package:ganesha_2026/core/providers/expense_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
+import 'package:ganesha_2026/core/providers/financial_metrics_provider.dart';
 import 'package:ganesha_2026/features/expenses/expense_tile.dart';
-import 'package:ganesha_2026/shared/widgets/amount_text.dart';
+import 'package:ganesha_2026/shared/widgets/app_empty_state.dart';
+import 'package:ganesha_2026/shared/widgets/app_metric_card.dart';
+import 'package:ganesha_2026/shared/widgets/app_page_scaffold.dart';
+import 'package:ganesha_2026/shared/widgets/app_section_header.dart';
+import 'package:ganesha_2026/shared/widgets/app_skeleton.dart';
+import 'package:ganesha_2026/shared/utils/amount_format.dart';
+import 'package:ganesha_2026/shared/widgets/app_snackbar.dart';
 import 'package:ganesha_2026/shared/widgets/confirm_dialog.dart';
 
 class ExpenseListPage extends ConsumerWidget {
@@ -15,84 +26,162 @@ class ExpenseListPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    debugPrint('[BUILD] ExpenseListPage.build');
     final expensesAsync = ref.watch(expensesStreamProvider);
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final metrics = ref.watch(financialMetricsProvider);
+    final isAdmin = ref.watch(roleProvider.select((r) => r == UserRole.admin));
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Expenses')),
-      body: expensesAsync.when(
-        data: (expenses) => _buildList(context, ref, expenses, theme, colorScheme),
-        loading: () => const Center(child: CircularProgressIndicator()),
+    return AppPageScaffold(
+      festivalName: 'Expenses',
+      onSettings: () => context.push('/settings'),
+      onAdd: isAdmin ? () => context.push('/expenses/add') : null,
+      bottomNavHeight: 56,
+      child: expensesAsync.when(
+        data: (expenses) => _buildContent(context, ref, expenses, metrics, isAdmin),
+        loading: () => const AppSkeletonList(),
         error: (e, _) => Center(child: Text('Error: $e')),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/expenses/add'),
-        child: const Icon(Icons.add_rounded),
       ),
     );
   }
 
-  Widget _buildList(
+  Widget _buildContent(
     BuildContext context,
     WidgetRef ref,
     List<Expense> expenses,
-    ThemeData theme,
-    ColorScheme colorScheme,
+    FinancialMetrics metrics,
+    bool isAdmin,
   ) {
     if (expenses.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.receipt_long_rounded,
-              size: 64,
-              color: colorScheme.primary,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No expenses recorded',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Tap + to add your first expense',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurface.withAlpha(128),
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(0, AppSpacing.lg, 0, 72),
+        children: [
+          isAdmin
+              ? AppEmptyState(
+                  icon: Icons.receipt_long_rounded,
+                  title: 'No expenses recorded',
+                  subtitle: 'Tap + to record your first expense',
+                  action: FilledButton.icon(
+                    onPressed: () => context.push('/expenses/add'),
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Add Expense'),
+                  ),
+                )
+              : AppEmptyState(
+                  icon: Icons.receipt_long_rounded,
+                  title: 'No expenses recorded',
+                  subtitle: 'No expenses have been recorded yet.',
+                ),
+        ],
       );
     }
 
-    final totalExpenses =
-        expenses.fold<int>(0, (sum, e) => sum + e.amount);
+    final totalExpenses = metrics.totalExpenses;
+    final largestExpense = expenses.fold<int>(0, (s, e) => s > e.amount ? s : e.amount);
+    final remaining = metrics.remainingBudget;
+    final isOverBudget = remaining < 0;
 
-    return Column(
+    // Group by month
+    final grouped = <String, List<Expense>>{};
+    for (final e in expenses) {
+      final d = e.date.toDate();
+      final key = DateFormat('MMMM yyyy').format(d);
+      grouped.putIfAbsent(key, () => []);
+      grouped[key]!.add(e);
+    }
+
+    // Sort groups reverse chronologically
+    final sortedKeys = grouped.keys.toList()..sort((a, b) {
+      final da = DateFormat('MMMM yyyy').parse(a);
+      final db = DateFormat('MMMM yyyy').parse(b);
+      return db.compareTo(da);
+    });
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 72),
       children: [
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.only(top: 8, bottom: 80),
-            itemCount: expenses.length,
-            itemBuilder: (context, index) {
-              final expense = expenses[index];
-              return ExpenseTile(
-                expense: expense,
-                onDelete: () => _handleDelete(context, ref, expense),
+        // Summary 2x2
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            0,
+            AppSpacing.lg,
+            AppSpacing.md,
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final w = (constraints.maxWidth - AppSpacing.sm) / 2;
+              return Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: [
+                  SizedBox(
+                    width: w,
+                    child: AppMetricCard(
+                      label: 'Total Expenses',
+                      value: '${AppConstants.currencySymbol}${fmtAmount(totalExpenses)}',
+                      icon: Icons.receipt_long_rounded,
+                      iconColor: AppColors.error,
+                      iconBgColor: AppColors.errorBg,
+                    ),
+                  ),
+                  SizedBox(
+                    width: w,
+                    child: AppMetricCard(
+                      label: isOverBudget ? 'Over Budget' : 'Remaining Budget',
+                      value: isOverBudget
+                          ? '-${AppConstants.currencySymbol}${fmtAmount(remaining.abs())}'
+                          : '${AppConstants.currencySymbol}${fmtAmount(remaining)}',
+                      icon: isOverBudget
+                          ? Icons.warning_amber_rounded
+                          : Icons.account_balance_wallet_rounded,
+                      iconColor: isOverBudget ? AppColors.error : AppColors.success,
+                      iconBgColor: isOverBudget ? AppColors.errorBg : AppColors.successBg,
+                    ),
+                  ),
+                  SizedBox(
+                    width: w,
+                    child: AppMetricCard(
+                      label: 'Largest Expense',
+                      value: '${AppConstants.currencySymbol}${fmtAmount(largestExpense)}',
+                      icon: Icons.arrow_upward_rounded,
+                      iconColor: AppColors.warning,
+                      iconBgColor: AppColors.warningBg,
+                    ),
+                  ),
+                  SizedBox(
+                    width: w,
+                    child: AppMetricCard(
+                      label: 'Expense Count',
+                      value: '${expenses.length}',
+                      icon: Icons.format_list_numbered_rounded,
+                      iconColor: AppColors.info,
+                      iconBgColor: AppColors.infoBg,
+                    ),
+                  ),
+                ],
               );
             },
           ),
         ),
-        _ExpensesFooter(
-          totalExpenses: totalExpenses,
-          theme: theme,
-          colorScheme: colorScheme,
-        ),
+        // Grouped expenses
+        for (final key in sortedKeys) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.sm,
+              AppSpacing.lg,
+              AppSpacing.xs,
+            ),
+            child: AppSectionHeader(
+              title: key,
+              subtitle: '${grouped[key]!.length} entries · ${AppConstants.currencySymbol}${fmtAmount(grouped[key]!.fold<int>(0, (s, e) => s + e.amount))}',
+            ),
+          ),
+          ...grouped[key]!.map((e) => ExpenseTile(
+                expense: e,
+                onDelete: () => _handleDelete(context, ref, e),
+              )),
+        ],
       ],
     );
   }
@@ -102,13 +191,11 @@ class ExpenseListPage extends ConsumerWidget {
     WidgetRef ref,
     Expense expense,
   ) async {
-    final formatter = NumberFormat('#,##,###', 'en_IN');
-    final amountStr = '${AppConstants.currencySymbol}${formatter.format(expense.amount)}';
+    final amountStr = '${AppConstants.currencySymbol}${fmtAmount(expense.amount)}';
     final confirm = await showConfirmDialog(
       context,
       title: 'Delete Expense',
-      message:
-          'Delete expense of $amountStr? This cannot be undone.',
+      message: 'Delete expense of $amountStr? This cannot be undone.',
     );
     if (!confirm) return;
     try {
@@ -116,71 +203,8 @@ class ExpenseListPage extends ConsumerWidget {
       await service.deleteExpense(expense.id);
     } on Exception {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to delete expense. Please try again.')),
-        );
+        context.showError('Failed to delete expense. Please try again.');
       }
     }
-  }
-}
-
-class _ExpensesFooter extends StatelessWidget {
-  final int totalExpenses;
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-
-  const _ExpensesFooter({
-    required this.totalExpenses,
-    required this.theme,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        border: Border(
-          top: BorderSide(color: colorScheme.outlineVariant),
-        ),
-      ),
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 12,
-        bottom: MediaQuery.of(context).padding.bottom + 12,
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.receipt_long_rounded,
-            size: 20,
-            color: colorScheme.error,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Total Expenses',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: colorScheme.error,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                AmountText(
-                  amount: totalExpenses,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

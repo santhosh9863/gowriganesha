@@ -1,11 +1,14 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:ganesha_2026/core/constants.dart';
 import 'package:ganesha_2026/core/models/festival.dart';
 import 'package:ganesha_2026/core/models/target.dart';
 import 'package:ganesha_2026/core/models/expense.dart';
 import 'package:ganesha_2026/core/models/daily_collection.dart';
 import 'package:ganesha_2026/core/models/activity.dart';
+import 'package:ganesha_2026/core/models/contribution.dart';
 import 'package:ganesha_2026/core/models/sponsor_followup.dart';
 
 class FirestoreException implements Exception {
@@ -36,10 +39,117 @@ class FirestoreService {
   CollectionReference<Map<String, dynamic>> get _followUps =>
       _firestore.collection('sponsor_followups');
 
+  CollectionReference<Map<String, dynamic>> get _settings =>
+      _firestore.collection('settings');
+
   CollectionReference<Map<String, dynamic>> get _activities =>
       _firestore.collection('activities');
 
+  CollectionReference<Map<String, dynamic>> get _config =>
+      _firestore.collection('config');
+
   String generateId() => _firestore.collection('_').doc().id;
+
+  Future<String?> getAdminPasswordHash() async {
+    try {
+      final doc = await _config.doc('security').get();
+      if (!doc.exists || doc.data() == null) return null;
+      return doc.data()!['adminPasswordHash'] as String?;
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error fetching admin password hash: $e');
+      throw FirestoreException('Failed to load admin credentials', originalError: e);
+    }
+  }
+
+  Future<void> setAdminPasswordHash(String hash) async {
+    await _config.doc('security').set({
+      'adminPasswordHash': hash,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<String?> getVolunteerPassword() async {
+    try {
+      final doc = await _config.doc('security').get();
+      debugPrint('[FIRESTORE] Document config/security exists: ${doc.exists}');
+      debugPrint('[FIRESTORE] Document data: ${doc.data()}');
+      if (!doc.exists || doc.data() == null) return null;
+      debugPrint('[FIRESTORE] volunteerPassword field value: "${doc.data()!['volunteerPassword']}"');
+      return doc.data()!['volunteerPassword'] as String?;
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error fetching volunteer password: $e');
+      throw FirestoreException('Failed to load volunteer credentials', originalError: e);
+    }
+  }
+
+  Future<void> setVolunteerPassword(String password) async {
+    try {
+      await _config.doc('security').set({
+        'volunteerPassword': password,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error setting volunteer password: $e');
+      throw FirestoreException('Failed to set volunteer password', originalError: e);
+    }
+  }
+
+  Future<int> getBudget(String settingsId) async {
+    try {
+      final doc = await _settings.doc(settingsId).get();
+      if (!doc.exists || doc.data() == null) return 0;
+      return doc.data()!['festivalBudget'] as int? ?? 0;
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error fetching budget: $e');
+      throw FirestoreException('Failed to load budget', originalError: e);
+    }
+  }
+
+  Future<void> setBudget(String settingsId, int amount) async {
+    try {
+      await _settings.doc(settingsId).set({'festivalBudget': amount});
+      debugPrint('[FIRESTORE] Budget updated: $settingsId → $amount');
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error setting budget: $e');
+      throw FirestoreException('Failed to save budget', originalError: e);
+    }
+  }
+
+  Reference get _qrRef => FirebaseStorage.instance
+      .ref('festival-assets/${AppConstants.festivalId}/payment_qr.png');
+
+  Future<String> uploadQrImage(File image) async {
+    try {
+      final task = await _qrRef.putFile(image);
+      final url = await task.ref.getDownloadURL();
+      debugPrint('[STORAGE] QR image uploaded');
+      return url;
+    } on FirebaseException catch (e) {
+      debugPrint('[STORAGE] Error uploading QR: $e');
+      throw FirestoreException('Failed to upload QR image', originalError: e);
+    }
+  }
+
+  Future<String> uploadQrImageBytes(Uint8List bytes) async {
+    try {
+      final task = await _qrRef.putData(bytes);
+      final url = await task.ref.getDownloadURL();
+      debugPrint('[STORAGE] QR image uploaded from bytes');
+      return url;
+    } on FirebaseException catch (e) {
+      debugPrint('[STORAGE] Error uploading QR: $e');
+      throw FirestoreException('Failed to upload QR image', originalError: e);
+    }
+  }
+
+  Future<void> deleteQrImage() async {
+    try {
+      await _qrRef.delete();
+      debugPrint('[STORAGE] QR image deleted');
+    } on FirebaseException catch (e) {
+      debugPrint('[STORAGE] Error deleting QR: $e');
+    }
+  }
 
   Future<Festival?> getFestival(String festivalId) async {
     try {
@@ -63,6 +173,77 @@ class FirestoreService {
     } on FirebaseException catch (e) {
       debugPrint('[FIRESTORE] Error creating festival: $e');
       throw FirestoreException('Failed to create festival', originalError: e);
+    }
+  }
+
+  Future<List<Target>> getAllTargets(String festivalId) async {
+    try {
+      final snapshot = await _targets
+          .where('festivalId', isEqualTo: festivalId)
+          .get();
+      return snapshot.docs
+          .map((doc) => Target.fromMap(doc.id, doc.data()))
+          .toList();
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error fetching all targets: $e');
+      throw FirestoreException('Failed to load targets', originalError: e);
+    }
+  }
+
+  Future<List<Expense>> getAllExpenses(String festivalId) async {
+    try {
+      final snapshot = await _expenses
+          .where('festivalId', isEqualTo: festivalId)
+          .get();
+      return snapshot.docs
+          .map((doc) => Expense.fromMap(doc.id, doc.data()))
+          .toList();
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error fetching all expenses: $e');
+      throw FirestoreException('Failed to load expenses', originalError: e);
+    }
+  }
+
+  Future<List<DailyCollection>> getAllDailyCollections(String festivalId) async {
+    try {
+      final snapshot = await _dailyCollections
+          .where('festivalId', isEqualTo: festivalId)
+          .get();
+      return snapshot.docs
+          .map((doc) => DailyCollection.fromMap(doc.id, doc.data()))
+          .toList();
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error fetching all daily collections: $e');
+      throw FirestoreException('Failed to load daily collections', originalError: e);
+    }
+  }
+
+  Future<List<SponsorFollowup>> getAllFollowUps(String festivalId) async {
+    try {
+      final snapshot = await _followUps
+          .where('festivalId', isEqualTo: festivalId)
+          .get();
+      return snapshot.docs
+          .map((doc) => SponsorFollowup.fromMap(doc.id, doc.data()))
+          .toList();
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error fetching all follow-ups: $e');
+      throw FirestoreException('Failed to load follow-ups', originalError: e);
+    }
+  }
+
+  Future<List<Activity>> getAllActivities(String festivalId) async {
+    try {
+      final snapshot = await _activities
+          .where('festivalId', isEqualTo: festivalId)
+          .orderBy('createdAt', descending: true)
+          .get();
+      return snapshot.docs
+          .map((doc) => Activity.fromMap(doc.id, doc.data()))
+          .toList();
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error fetching all activities: $e');
+      throw FirestoreException('Failed to load activities', originalError: e);
     }
   }
 
@@ -107,7 +288,9 @@ class FirestoreService {
 
   Future<void> addTarget(Target target) async {
     try {
+      debugPrint('[ADD_TARGET_STEP-1] About to Firestore .set() id=${target.id}');
       await _targets.doc(target.id).set(target.toMap());
+      debugPrint('[ADD_TARGET_STEP-2] Firestore .set() complete');
       debugPrint('[FIRESTORE] Target added: ${target.id}');
     } on FirebaseException catch (e) {
       debugPrint('[FIRESTORE] Error adding target: $e');
@@ -127,8 +310,17 @@ class FirestoreService {
 
   Future<void> deleteTarget(String targetId) async {
     try {
-      await _targets.doc(targetId).delete();
-      debugPrint('[FIRESTORE] Target deleted: $targetId');
+      final batch = _firestore.batch();
+      final contributions = await _targets
+          .doc(targetId)
+          .collection('contributions')
+          .get();
+      for (final doc in contributions.docs) {
+        batch.delete(doc.reference);
+      }
+      batch.delete(_targets.doc(targetId));
+      await batch.commit();
+      debugPrint('[FIRESTORE] Target deleted: $targetId (${contributions.docs.length} contributions cleaned up)');
     } on FirebaseException catch (e) {
       debugPrint('[FIRESTORE] Error deleting target: $e');
       throw FirestoreException('Failed to delete target', originalError: e);
@@ -151,6 +343,105 @@ class FirestoreService {
       debugPrint('[FIRESTORE] Error deleting all targets: $e');
       throw FirestoreException('Failed to clear targets', originalError: e);
     }
+  }
+
+  Stream<List<Contribution>> streamContributions(String targetId) {
+    return _targets
+        .doc(targetId)
+        .collection('contributions')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .handleError((e) {
+      debugPrint('[FIRESTORE] Error streaming contributions: $e');
+    }).map((snapshot) {
+      return snapshot.docs
+          .map((doc) => Contribution.fromMap(doc.id, doc.data()))
+          .toList();
+    });
+  }
+
+  Future<void> recordContribution({
+    required String targetId,
+    required int amount,
+    String note = '',
+    String recordedBy = 'system',
+  }) async {
+    debugPrint('[REC_CONT_STEP-1] BEGIN: targetId=$targetId amount=$amount');
+    try {
+      final batch = _firestore.batch();
+      final targetRef = _targets.doc(targetId);
+      final contributionRef = targetRef.collection('contributions').doc();
+
+      batch.update(targetRef, {
+        'givenAmount': FieldValue.increment(amount),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      batch.set(contributionRef, {
+        'type': ContributionType.contribution.name,
+        'amount': amount,
+        'note': note,
+        'recordedBy': recordedBy,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      debugPrint('[REC_CONT_STEP-2] About to batch.commit()');
+      await batch.commit();
+      debugPrint('[REC_CONT_STEP-3] batch.commit() completed');
+    } on FirebaseException catch (e) {
+      debugPrint('[REC_CONT_STEP-ERR] batch.commit() threw: $e');
+      throw FirestoreException('Failed to record contribution', originalError: e);
+    }
+    debugPrint('[REC_CONT_STEP-4] END');
+  }
+
+  Future<void> recordCorrection({
+    required String targetId,
+    required int currentTotal,
+    required int newTotal,
+    String note = '',
+    String recordedBy = 'system',
+  }) async {
+    debugPrint('[ADJUST] FIRESTORE.recordCorrection BEGIN: targetId=$targetId currentTotal=$currentTotal newTotal=$newTotal');
+    if (newTotal < 0) {
+      debugPrint('[ADJUST] FIRESTORE.recordCorrection: newTotal < 0, throwing');
+      throw FirestoreException('New total cannot be negative');
+    }
+
+    final delta = newTotal - currentTotal;
+    if (delta == 0) {
+      debugPrint('[ADJUST] FIRESTORE.recordCorrection: delta=0, returning early');
+      return;
+    }
+
+    try {
+      final batch = _firestore.batch();
+      final targetRef = _targets.doc(targetId);
+      final contributionRef = targetRef.collection('contributions').doc();
+
+      batch.update(targetRef, {
+        'givenAmount': FieldValue.increment(delta),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      batch.set(contributionRef, {
+        'type': ContributionType.correction.name,
+        'amount': delta,
+        'note': note,
+        'recordedBy': recordedBy,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      debugPrint('[ADJUST] FIRESTORE.recordCorrection: About to batch.commit()');
+      await batch.commit();
+      debugPrint('[ADJUST] FIRESTORE.recordCorrection: batch.commit() completed');
+    } on FirebaseException catch (e) {
+      debugPrint('[ADJUST] FIRESTORE.recordCorrection ERROR: $e');
+      throw FirestoreException('Failed to record correction', originalError: e);
+    }
+    debugPrint('[ADJUST] FIRESTORE.recordCorrection END');
   }
 
   Stream<List<Expense>> watchExpenses(String festivalId) {
@@ -338,11 +629,53 @@ class FirestoreService {
   }
 
   Future<void> addActivity(Activity activity) async {
+    debugPrint('[ADD_ACT_STEP-1] BEGIN: id=${activity.id} type=${activity.type}');
     try {
+      debugPrint('[ADD_ACT_STEP-2] About to Firestore .set()');
       await _activities.doc(activity.id).set(activity.toMap());
-      debugPrint('[FIRESTORE] Activity added: ${activity.id}');
+      debugPrint('[ADD_ACT_STEP-3] Firestore .set() completed');
     } on FirebaseException catch (e) {
-      debugPrint('[FIRESTORE] Error adding activity: $e');
+      debugPrint('[ADD_ACT_STEP-ERR] Firestore .set() threw: $e');
+    }
+    debugPrint('[ADD_ACT_STEP-4] END');
+  }
+
+  Future<void> clearActivityFeed() async {
+    const batchLimit = 500;
+    bool hasMore;
+    int totalDeleted = 0;
+
+    debugPrint('[CLEAR] Clear Activity Feed pressed');
+
+    try {
+      do {
+        final Query<Map<String, dynamic>> query = _activities
+            .orderBy('createdAt', descending: true)
+            .limit(batchLimit);
+
+        final snapshot = await query.get();
+        final docs = snapshot.docs;
+        hasMore = docs.length >= batchLimit;
+
+        if (docs.isNotEmpty) {
+          debugPrint('[CLEAR] Found ${docs.length} activity documents in this batch');
+          final batch = _firestore.batch();
+          for (final doc in docs) {
+            batch.delete(doc.reference);
+          }
+          await batch.commit();
+          totalDeleted += docs.length;
+          debugPrint('[CLEAR] Deleted ${docs.length} documents in this batch (total: $totalDeleted)');
+        }
+      } while (hasMore);
+
+      debugPrint('[CLEAR] Successfully cleared $totalDeleted activity documents');
+    } on FirebaseException catch (e) {
+      debugPrint('[CLEAR] Firestore error: ${e.code} - ${e.message}');
+      rethrow;
+    } catch (e) {
+      debugPrint('[CLEAR] Unexpected error: $e');
+      rethrow;
     }
   }
 
@@ -350,6 +683,7 @@ class FirestoreService {
     return _activities
         .where('festivalId', isEqualTo: festivalId)
         .orderBy('createdAt', descending: true)
+        .limit(50)
         .snapshots()
         .handleError((e) {
       debugPrint('[FIRESTORE] Error watching activities: $e');

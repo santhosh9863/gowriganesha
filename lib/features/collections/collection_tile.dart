@@ -1,207 +1,368 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:ganesha_2026/core/constants.dart';
+import 'package:ganesha_2026/core/design/app_colors.dart';
+import 'package:ganesha_2026/core/design/app_radius.dart';
+import 'package:ganesha_2026/core/design/app_shadows.dart';
+import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/target.dart';
-import 'package:ganesha_2026/shared/widgets/amount_text.dart';
+import 'package:ganesha_2026/core/providers/auth_provider.dart';
+import 'package:ganesha_2026/core/utils/permissions.dart';
+import 'package:ganesha_2026/shared/utils/amount_format.dart';
+import 'package:ganesha_2026/shared/widgets/app_status_chip.dart';
 
-enum _CollectionStatus { notStarted, pending, complete }
+enum _SponsorStatus { notStarted, pending, complete }
 
-_CollectionStatus _status(Target t) {
-  if (t.givenAmount >= t.expectedAmount) return _CollectionStatus.complete;
-  if (t.givenAmount > 0) return _CollectionStatus.pending;
-  return _CollectionStatus.notStarted;
+_SponsorStatus _status(Target t) {
+  if (t.givenAmount >= t.expectedAmount) return _SponsorStatus.complete;
+  if (t.givenAmount > 0) return _SponsorStatus.pending;
+  return _SponsorStatus.notStarted;
 }
 
-class _StatusData {
-  final String label;
-  final IconData icon;
-  final Color color;
-  const _StatusData(this.label, this.icon, this.color);
-}
-
-_StatusData _statusData(_CollectionStatus s, ColorScheme cs) => switch (s) {
-      _CollectionStatus.notStarted => _StatusData(
-          'Not Started',
-          Icons.circle_outlined,
-          cs.outline,
-        ),
-      _CollectionStatus.pending => _StatusData(
-          'Pending',
-          Icons.schedule_rounded,
-          Colors.orange.shade700,
-        ),
-      _CollectionStatus.complete => _StatusData(
-          'Complete',
-          Icons.check_circle_rounded,
-          Colors.green.shade700,
-        ),
+AppChipVariant _chipVariant(_SponsorStatus s) => switch (s) {
+      _SponsorStatus.notStarted => AppChipVariant.neutral,
+      _SponsorStatus.pending => AppChipVariant.warning,
+      _SponsorStatus.complete => AppChipVariant.success,
     };
 
-String _relativeTime(DateTime updated) {
-  final now = DateTime.now();
-  final diff = now.difference(updated);
-  if (diff.inMinutes < 1) return 'Updated just now';
-  if (diff.inMinutes < 60) return 'Updated ${diff.inMinutes} min ago';
-  if (diff.inHours < 24) return 'Updated ${diff.inHours}h ago';
-  if (diff.inDays == 1) return 'Updated Yesterday';
-  return 'Updated ${diff.inDays} days ago';
+String _statusLabel(_SponsorStatus s) => switch (s) {
+      _SponsorStatus.notStarted => 'Ready',
+      _SponsorStatus.pending => 'Active',
+      _SponsorStatus.complete => 'Achieved',
+    };
+
+String _initials(String name) {
+  final parts = name.trim().split(' ');
+  if (parts.length >= 2) {
+    return '${parts.first[0]}${parts.last[0]}';
+  }
+  return name.isNotEmpty ? name[0] : '?';
 }
 
-class CollectionTile extends StatelessWidget {
+String _relTime(DateTime dt) {
+  final d = DateTime.now().difference(dt);
+  if (d.inMinutes < 1) return 'now';
+  if (d.inMinutes < 60) return '${d.inMinutes}m ago';
+  if (d.inHours < 24) return '${d.inHours}h ago';
+  if (d.inDays == 1) return 'yesterday';
+  if (d.inDays < 30) return '${d.inDays}d ago';
+  return DateFormat('d MMM').format(dt);
+}
+
+class SponsorCard extends ConsumerWidget {
   final Target target;
   final VoidCallback onDelete;
   final VoidCallback onQuickUpdate;
+  final String? searchQuery;
 
-  const CollectionTile({
+  const SponsorCard({
     super.key,
     required this.target,
     required this.onDelete,
     required this.onQuickUpdate,
+    this.searchQuery,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final role = ref.watch(roleProvider);
+    final showAdminMenu = canEditRecords(role) || canDelete(role);
     final status = _status(target);
-    final sd = _statusData(status, colorScheme);
-    final hasLocation = target.building.isNotEmpty || target.area.isNotEmpty;
+    final ratio = target.expectedAmount > 0
+        ? (target.givenAmount / target.expectedAmount).clamp(0.0, 1.0)
+        : 0.0;
+    final remaining = target.expectedAmount - target.givenAmount;
+    final location =
+        '${target.building}${target.building.isNotEmpty && target.area.isNotEmpty ? ', ' : ''}${target.area}';
+    final subtitle = location.isNotEmpty && location != ', '
+        ? location
+        : null;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => context.push('/collections/${target.id}'),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(sd.icon, size: 16, color: sd.color),
-                  const SizedBox(width: 6),
-                  Text(
-                    sd.label,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: sd.color,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      target.name,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+    return Container(
+      margin: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: AppRadius.largeBorder,
+        border: Border.all(color: AppColors.outline),
+        boxShadow: AppShadows.subtle,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: AppRadius.largeBorder,
+          onTap: () => context.push('/collections/${target.id}'),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top row: Avatar, Name, Status, Menu
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Avatar with initials
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryBg,
+                        borderRadius: AppRadius.mediumBorder,
                       ),
-                    ),
-                  ),
-                  PopupMenuButton<String>(
-                    onSelected: (value) {
-                      if (value == 'edit') {
-                        context.push('/collections/${target.id}/edit');
-                      } else if (value == 'delete') {
-                        onDelete();
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit_rounded, size: 20),
-                            SizedBox(width: 8),
-                            Text('Edit'),
-                          ],
+                      alignment: Alignment.center,
+                      child: Text(
+                        _initials(target.name),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete_rounded, size: 20),
-                            SizedBox(width: 8),
-                            Text('Delete'),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              if (hasLocation) ...[
-                const SizedBox(height: 2),
-                Text(
-                  [
-                    if (target.building.isNotEmpty) target.building,
-                    if (target.area.isNotEmpty) target.area,
-                  ].join(', '),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-              const SizedBox(height: 2),
-              Text(
-                _relativeTime(target.updatedAt.toDate()),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: _AmountLabel(
-                      label: 'Expected',
-                      amount: target.expectedAmount,
-                      color: colorScheme.primary,
-                      theme: theme,
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: onQuickUpdate,
-                      child: Row(
+                    const SizedBox(width: AppSpacing.md),
+                    // Name + location
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: _AmountLabel(
-                              label: 'Received',
-                              amount: target.givenAmount,
-                              color: colorScheme.tertiary,
-                              theme: theme,
+                          Hero(
+                            tag: 'sponsor-name-${target.id}',
+                            child: Material(
+                              color: Colors.transparent,
+                              child: _highlightText(
+                                target.name,
+                                searchQuery,
+                                theme.textTheme.titleMedium?.copyWith(
+                                  color: AppColors.charcoal,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                              ),
                             ),
                           ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.edit_rounded,
-                            size: 16,
-                            color: colorScheme.tertiary,
-                          ),
+                          if (subtitle != null) ...[
+                            const SizedBox(height: 1),
+                            Hero(
+                              tag: 'sponsor-location-${target.id}',
+                              child: Material(
+                                color: Colors.transparent,
+                                child: _highlightText(
+                                  subtitle,
+                                  searchQuery,
+                                  theme.textTheme.bodySmall?.copyWith(
+                                    color: AppColors.warmGray400,
+                                  ),
+                                  maxLines: 1,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
+                    const SizedBox(width: AppSpacing.sm),
+                    // Status chip
+                    AppStatusChip(
+                      label: _statusLabel(status),
+                      variant: _chipVariant(status),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    // Menu
+                    if (showAdminMenu)
+                      PopupMenuButton<String>(
+                        onSelected: (value) {
+                          if (value == 'edit') {
+                            context.push('/collections/${target.id}/edit');
+                          } else if (value == 'delete') {
+                            onDelete();
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          if (canEditRecords(role))
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.edit_rounded, size: 20),
+                                  SizedBox(width: 8),
+                                  Text('Edit'),
+                                ],
+                              ),
+                            ),
+                          if (canDelete(role))
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete_rounded, size: 20),
+                                  SizedBox(width: 8),
+                                  Text('Delete'),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                // Progress bar
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: ratio,
+                    minHeight: 4,
+                    backgroundColor: AppColors.warmGray200,
+                    color: status == _SponsorStatus.complete
+                        ? AppColors.success
+                        : AppColors.primary,
                   ),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                // Amounts row
+                Row(
+                  children: [
+                    _AmountBlock(
+                      label: 'Commitment',
+                      amount: target.expectedAmount,
+                      color: AppColors.warmGray500,
+                      theme: theme,
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    _AmountBlock(
+                      label: 'Raised',
+                      amount: target.givenAmount,
+                      color: status == _SponsorStatus.complete
+                          ? AppColors.success
+                          : AppColors.primary,
+                      theme: theme,
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    _AmountBlock(
+                      label: 'To Reach',
+                      amount: remaining < 0 ? 0 : remaining,
+                      color: remaining > 0 ? AppColors.warning : AppColors.warmGray400,
+                      theme: theme,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                // Bottom row: Last updated + Quick actions
+                Row(
+                  children: [
+                    Icon(
+                      Icons.access_time_rounded,
+                      size: 12,
+                      color: AppColors.warmGray400,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _relTime(target.updatedAt.toDate()),
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: AppColors.warmGray400,
+                      ),
+                    ),
+                    const Spacer(),
+                    _QuickAction(
+                      label: 'Collect',
+                      icon: Icons.account_balance_wallet_rounded,
+                      color: AppColors.primary,
+                      onTap: onQuickUpdate,
+                      theme: theme,
+                      filled: true,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    _QuickAction(
+                      label: 'Visit',
+                      icon: Icons.notifications_active_rounded,
+                      color: AppColors.warning,
+                      onTap: () => context.push(
+                        '/followups/add?sponsorId=${target.id}&sponsorName=$_name',
+                      ),
+                      theme: theme,
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+
+  String get _name => Uri.encodeComponent(target.name);
+
+  Widget _highlightText(
+    String text,
+    String? query,
+    TextStyle? style, {
+    int maxLines = 1,
+  }) {
+    if (query == null || query.isEmpty) {
+      return Text(
+        text,
+        style: style,
+        maxLines: maxLines,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+
+    final lower = text.toLowerCase();
+    final q = query.toLowerCase();
+    final matches = <int>[];
+    int idx = 0;
+    while ((idx = lower.indexOf(q, idx)) != -1) {
+      matches.add(idx);
+      idx += q.length;
+    }
+
+    if (matches.isEmpty) {
+      return Text(
+        text,
+        style: style,
+        maxLines: maxLines,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+
+    final spans = <InlineSpan>[];
+    int last = 0;
+    for (final start in matches) {
+      if (start > last) {
+        spans.add(TextSpan(text: text.substring(last, start)));
+      }
+      spans.add(TextSpan(
+        text: text.substring(start, start + q.length),
+        style: style?.copyWith(
+          color: AppColors.primary,
+          fontWeight: FontWeight.w700,
+        ),
+      ));
+      last = start + q.length;
+    }
+    if (last < text.length) {
+      spans.add(TextSpan(text: text.substring(last)));
+    }
+
+    return RichText(
+      text: TextSpan(children: spans, style: style),
+      maxLines: maxLines,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
 }
 
-class _AmountLabel extends StatelessWidget {
+class _AmountBlock extends StatelessWidget {
   final String label;
   final int amount;
   final Color color;
   final ThemeData theme;
 
-  const _AmountLabel({
+  const _AmountBlock({
     required this.label,
     required this.amount,
     required this.color,
@@ -210,24 +371,76 @@ class _AmountLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: color,
-            fontWeight: FontWeight.w500,
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${AppConstants.currencySymbol}${fmtAmount(amount)}',
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-        ),
-        const SizedBox(height: 2),
-        AmountText(
-          amount: amount,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
+          const SizedBox(height: 1),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: AppColors.warmGray400,
+            ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickAction extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  final ThemeData theme;
+  final bool filled;
+
+  const _QuickAction({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+    required this.theme,
+    this.filled = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: AppRadius.mediumBorder,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: filled ? AppSpacing.md : AppSpacing.sm,
+          vertical: AppSpacing.xs,
         ),
-      ],
+        decoration: BoxDecoration(
+          color: filled ? color : color.withValues(alpha: 0.08),
+          borderRadius: AppRadius.mediumBorder,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: filled ? Colors.white : color),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: filled ? Colors.white : color,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

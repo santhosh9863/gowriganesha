@@ -16,14 +16,7 @@ final festivalProvider = FutureProvider<Festival>((ref) async {
     debugPrint('[FIRESTORE] Connection successful');
     return festival;
   }
-  debugPrint('[FIRESTORE] Festival not found — creating default');
-  final defaultFestival = Festival(
-    id: AppConstants.festivalId,
-    name: AppConstants.defaultFestivalName,
-    year: AppConstants.defaultFestivalYear,
-    location: AppConstants.defaultFestivalLocation,
+  throw FirestoreException(
+    'Festival "${AppConstants.festivalId}" not found. Please seed it in Firebase Console.',
   );
-  await service.setFestival(defaultFestival);
-  debugPrint('[FIRESTORE] Connection successful (after creation)');
-  return defaultFestival;
 });

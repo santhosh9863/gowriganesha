@@ -1,10 +1,86 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // TODO: Tighten security rules before production deployment
-    // For development only — allows all read/write access
-    match /{document=**} {
-      allow read, write: if true;
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // All collections require authentication
+    match /activities/{document} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Notifications: authenticated users can read; only server processes can write
+    match /notifications/{notification} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // Notification preferences: each user manages their own
+    match /notification_preferences/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Device tokens: each user manages their own
+    match /device_tokens/{token} {
+      allow read: if isAuthenticated();
+      allow create, update: if request.resource.data.userId == request.auth.uid;
+      allow delete: if resource.data.userId == request.auth.uid;
+    }
+
+    // Festival metadata
+    match /festivals/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Sponsor targets
+    match /targets/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+
+      // Target contributions subcollection
+      match /contributions/{subDocument} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
+      }
+    }
+
+    // Festival expenses
+    match /expenses/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Daily street/area collections
+    match /daily_collections/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Sponsor follow-ups
+    match /sponsor_followups/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // App settings (budget, etc.)
+    match /settings/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Config (security passwords, etc.)
+    match /config/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
     }
   }
 }

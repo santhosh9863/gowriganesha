@@ -4,9 +4,14 @@ import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
+import 'package:ganesha_2026/shared/utils/amount_format.dart';
+import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/expense.dart';
-import 'package:ganesha_2026/core/models/activity.dart';
+import 'package:ganesha_2026/core/models/user_role.dart';
+import 'package:ganesha_2026/core/providers/auth_provider.dart';
+import 'package:ganesha_2026/core/providers/notification_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
+import 'package:ganesha_2026/shared/widgets/app_snackbar.dart';
 
 class ExpenseFormPage extends ConsumerStatefulWidget {
   final String? expenseId;
@@ -23,6 +28,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   late final TextEditingController _noteController;
   DateTime? _selectedDate;
   bool _isLoading = true;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -41,7 +47,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     final expense = await service.getExpense(widget.expenseId!);
 
     if (expense != null && mounted) {
-      _amountController.text = expense.amount.toString();
+      _amountController.text = fmtAmount(expense.amount);
       _noteController.text = expense.note;
       _selectedDate = expense.date.toDate();
     }
@@ -75,6 +81,16 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     final dateStr = _selectedDate != null
         ? DateFormat('dd MMM yyyy').format(_selectedDate!)
         : null;
+    final role = ref.watch(roleProvider);
+
+    if (role != UserRole.admin) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) context.go('/expenses');
+      });
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -83,9 +99,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               child: Form(
                 key: _formKey,
+                autovalidateMode: AutovalidateMode.always,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -93,7 +110,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       controller: _amountController,
                       decoration: InputDecoration(
                         labelText: 'Amount',
-                        hintText: 'e.g. 5000',
+                        hintText: 'e.g. 5,000',
                         border: const OutlineInputBorder(),
                         prefixIcon: Icon(
                           Icons.currency_rupee_rounded,
@@ -101,18 +118,19 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                         ),
                       ),
                       keyboardType: TextInputType.number,
+                      inputFormatters: const [IndianAmountInputFormatter()],
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
                           return 'Amount is required';
                         }
-                        final n = int.tryParse(v.trim());
+                        final n = tryParseAmount(v.trim());
                         if (n == null || n <= 0) {
                           return 'Enter an amount greater than 0';
                         }
                         return null;
                       },
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     TextFormField(
                       controller: _noteController,
                       decoration: const InputDecoration(
@@ -123,10 +141,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       ),
                       maxLines: 3,
                       textCapitalization: TextCapitalization.sentences,
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Note is required' : null,
+                      validator: null,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     InkWell(
                       onTap: _pickDate,
                       borderRadius: BorderRadius.circular(8),
@@ -160,10 +177,16 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                           ),
                         ),
                       ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: AppSpacing.xxl),
                     FilledButton.icon(
-                      onPressed: _handleSave,
-                      icon: Icon(isEditing ? Icons.save_rounded : Icons.add_rounded),
+                      onPressed: _isSaving ? null : _handleSave,
+                      icon: _isSaving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(isEditing ? Icons.save_rounded : Icons.add_rounded),
                       label: Text(isEditing ? 'Update Expense' : 'Add Expense'),
                     ),
                   ],
@@ -176,11 +199,16 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a date')),
-      );
+      context.showWarning('Please select a date');
       return;
     }
+    if (_isSaving) return;
+    if (!mounted) return;
+    if (ref.read(roleProvider) != UserRole.admin) {
+      context.showWarning('Access Denied');
+      return;
+    }
+    setState(() => _isSaving = true);
 
     final service = ref.read(firestoreProvider);
 
@@ -189,7 +217,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         final expense = Expense(
           id: widget.expenseId!,
           festivalId: AppConstants.festivalId,
-          amount: int.parse(_amountController.text.trim()),
+          amount: parseAmount(_amountController.text.trim()),
           note: _noteController.text.trim(),
           date: Timestamp.fromDate(_selectedDate!),
           createdAt: Timestamp.now(),
@@ -199,28 +227,27 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         final expense = Expense(
           id: service.generateId(),
           festivalId: AppConstants.festivalId,
-          amount: int.parse(_amountController.text.trim()),
+          amount: parseAmount(_amountController.text.trim()),
           note: _noteController.text.trim(),
           date: Timestamp.fromDate(_selectedDate!),
           createdAt: Timestamp.now(),
         );
         await service.addExpense(expense);
-        service.addActivity(Activity(
-          id: service.generateId(),
-          festivalId: AppConstants.festivalId,
-          type: 'expense_added',
-          title: 'Expense Added',
-          description: '₹${NumberFormat('#,##,###', 'en_IN').format(expense.amount)} — ${expense.note}',
-          createdAt: Timestamp.now(),
-        ));
+        final activityService = ref.read(activityServiceProvider);
+        final userId = ref.read(userIdProvider);
+        final userName = ref.read(userNameProvider);
+        await activityService.recordExpenseAdded(expense, userId: userId, userName: userName);
       }
 
-      if (mounted) context.pop();
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) context.pop();
+        });
+      }
     } on Exception catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        setState(() => _isSaving = false);
+        context.showError(e.toString());
       }
     }
   }

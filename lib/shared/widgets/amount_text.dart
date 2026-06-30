@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
+import 'package:ganesha_2026/shared/utils/amount_format.dart';
 
 class AmountText extends StatelessWidget {
   final int amount;
@@ -15,9 +15,8 @@ class AmountText extends StatelessWidget {
   });
 
   String get _formatted {
-    final formatter = NumberFormat('#,##,###', 'en_IN');
     final prefix = showSymbol ? AppConstants.currencySymbol : '';
-    return '$prefix${formatter.format(amount)}';
+    return '$prefix${fmtAmount(amount)}';
   }
 
   @override

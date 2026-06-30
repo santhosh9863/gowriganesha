@@ -4,8 +4,14 @@ import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
+import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/daily_collection.dart';
+import 'package:ganesha_2026/core/models/user_role.dart';
+import 'package:ganesha_2026/core/providers/auth_provider.dart';
+import 'package:ganesha_2026/core/providers/notification_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
+import 'package:ganesha_2026/shared/utils/amount_format.dart';
+import 'package:ganesha_2026/shared/widgets/app_snackbar.dart';
 
 class DailyCollectionFormPage extends ConsumerStatefulWidget {
   final String? dailyCollectionId;
@@ -24,6 +30,7 @@ class _DailyCollectionFormPageState
   late final TextEditingController _noteController;
   DateTime? _selectedDate;
   bool _isLoading = true;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -42,7 +49,7 @@ class _DailyCollectionFormPageState
     final dc = await service.getDailyCollection(widget.dailyCollectionId!);
 
     if (dc != null && mounted) {
-      _amountController.text = dc.amount.toString();
+      _amountController.text = fmtAmount(dc.amount);
       _noteController.text = dc.note;
       _selectedDate = dc.date.toDate();
     }
@@ -76,6 +83,16 @@ class _DailyCollectionFormPageState
     final dateStr = _selectedDate != null
         ? DateFormat('dd MMM yyyy').format(_selectedDate!)
         : null;
+    final role = ref.watch(roleProvider);
+
+    if (role != UserRole.admin) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) context.go('/daily-collections');
+      });
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -84,9 +101,10 @@ class _DailyCollectionFormPageState
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               child: Form(
                 key: _formKey,
+                autovalidateMode: AutovalidateMode.always,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -94,7 +112,7 @@ class _DailyCollectionFormPageState
                       controller: _amountController,
                       decoration: InputDecoration(
                         labelText: 'Amount',
-                        hintText: 'e.g. 5000',
+                        hintText: 'e.g. 5,000',
                         border: const OutlineInputBorder(),
                         prefixIcon: Icon(
                           Icons.currency_rupee_rounded,
@@ -102,18 +120,19 @@ class _DailyCollectionFormPageState
                         ),
                       ),
                       keyboardType: TextInputType.number,
+                      inputFormatters: const [IndianAmountInputFormatter()],
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
                           return 'Amount is required';
                         }
-                        final n = int.tryParse(v.trim());
+                        final n = tryParseAmount(v.trim());
                         if (n == null || n <= 0) {
                           return 'Enter an amount greater than 0';
                         }
                         return null;
                       },
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     TextFormField(
                       controller: _noteController,
                       decoration: const InputDecoration(
@@ -124,10 +143,9 @@ class _DailyCollectionFormPageState
                       ),
                       maxLines: 3,
                       textCapitalization: TextCapitalization.sentences,
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Note is required' : null,
+                      validator: null,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     InkWell(
                       onTap: _pickDate,
                       borderRadius: BorderRadius.circular(8),
@@ -162,11 +180,17 @@ class _DailyCollectionFormPageState
                           ),
                         ),
                       ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: AppSpacing.xxl),
                     FilledButton.icon(
-                      onPressed: _handleSave,
-                      icon: Icon(
-                          isEditing ? Icons.save_rounded : Icons.add_rounded),
+                      onPressed: _isSaving ? null : _handleSave,
+                      icon: _isSaving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              isEditing ? Icons.save_rounded : Icons.add_rounded),
                       label: Text(isEditing
                           ? 'Update Collection'
                           : 'Add Collection'),
@@ -181,11 +205,16 @@ class _DailyCollectionFormPageState
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a date')),
-      );
+      context.showWarning('Please select a date');
       return;
     }
+    if (_isSaving) return;
+    if (!mounted) return;
+    if (ref.read(roleProvider) != UserRole.admin) {
+      context.showWarning('Access Denied');
+      return;
+    }
+    setState(() => _isSaving = true);
 
     final service = ref.read(firestoreProvider);
 
@@ -194,7 +223,7 @@ class _DailyCollectionFormPageState
         final dc = DailyCollection(
           id: widget.dailyCollectionId!,
           festivalId: AppConstants.festivalId,
-          amount: int.parse(_amountController.text.trim()),
+          amount: parseAmount(_amountController.text.trim()),
           note: _noteController.text.trim(),
           date: Timestamp.fromDate(_selectedDate!),
           createdAt: Timestamp.now(),
@@ -204,20 +233,27 @@ class _DailyCollectionFormPageState
         final dc = DailyCollection(
           id: service.generateId(),
           festivalId: AppConstants.festivalId,
-          amount: int.parse(_amountController.text.trim()),
+          amount: parseAmount(_amountController.text.trim()),
           note: _noteController.text.trim(),
           date: Timestamp.fromDate(_selectedDate!),
           createdAt: Timestamp.now(),
         );
         await service.addDailyCollection(dc);
+        final activityService = ref.read(activityServiceProvider);
+        final userId = ref.read(userIdProvider);
+        final userName = ref.read(userNameProvider);
+        await activityService.recordDailyCollectionRecorded(dc, userId: userId, userName: userName);
       }
 
-      if (mounted) context.pop();
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) context.pop();
+        });
+      }
     } on Exception catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        setState(() => _isSaving = false);
+        context.showError(e.toString());
       }
     }
   }

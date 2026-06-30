@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 class PageTransition {
@@ -6,20 +6,16 @@ class PageTransition {
     return CustomTransitionPage(
       child: page,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        final slideAnimation = Tween<Offset>(
-          begin: const Offset(0.02, 0.0),
-          end: Offset.zero,
-        ).animate(
-          CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeInOut,
-          ),
-        );
-
         return FadeTransition(
           opacity: animation,
           child: SlideTransition(
-            position: slideAnimation,
+            position: Tween<Offset>(
+              begin: const Offset(0.08, 0),
+              end: Offset.zero,
+            ).animate(CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            )),
             child: child,
           ),
         );

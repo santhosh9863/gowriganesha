@@ -4,9 +4,14 @@ import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
+import 'package:ganesha_2026/core/design/app_spacing.dart';
 import 'package:ganesha_2026/core/models/sponsor_followup.dart';
-import 'package:ganesha_2026/core/models/activity.dart';
+import 'package:ganesha_2026/core/models/user_role.dart';
+import 'package:ganesha_2026/core/providers/auth_provider.dart';
+import 'package:ganesha_2026/core/providers/notification_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
+import 'package:ganesha_2026/shared/utils/amount_format.dart';
+import 'package:ganesha_2026/shared/widgets/app_snackbar.dart';
 
 class FollowUpFormPage extends ConsumerStatefulWidget {
   final String? followUpId;
@@ -26,27 +31,32 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
   bool _isLoading = true;
   String _sponsorId = '';
   bool _initialized = false;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
+    debugPrint('[LIFECYCLE] FollowUpFormPage.initState followUpId=${widget.followUpId}');
     _sponsorNameController = TextEditingController();
     _amountController = TextEditingController();
     _noteController = TextEditingController();
     if (widget.followUpId != null) {
       _loadFollowUp();
+    } else {
+      _followUpDate = DateTime.now();
     }
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    debugPrint('[LIFECYCLE] FollowUpFormPage.didChangeDependencies initialized=$_initialized');
     if (!_initialized && widget.followUpId == null) {
       _initialized = true;
       final queryParams = GoRouterState.of(context).uri.queryParameters;
       _sponsorId = queryParams['sponsorId'] ?? '';
-      final sponsorName = queryParams['sponsorName'];
-      if (sponsorName != null) {
+      final sponsorName = (queryParams['sponsorName'] ?? queryParams['targetName']) ?? '';
+      if (sponsorName.isNotEmpty) {
         _sponsorNameController.text = Uri.decodeComponent(sponsorName);
       }
       _isLoading = false;
@@ -54,19 +64,22 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
   }
 
   Future<void> _loadFollowUp() async {
+    debugPrint('[LIFECYCLE] FollowUpFormPage._loadFollowUp');
     final service = ref.read(firestoreProvider);
     final item = await service.getFollowUp(widget.followUpId!);
     if (item != null && mounted) {
       _sponsorNameController.text = item.sponsorName;
-      _amountController.text = item.amount?.toString() ?? '';
+      _amountController.text = item.amount != null ? fmtAmount(item.amount!) : '';
       _noteController.text = item.note;
       _followUpDate = item.followUpDate.toDate();
+      if (item.sponsorId.isNotEmpty) _sponsorId = item.sponsorId;
     }
     if (mounted) setState(() => _isLoading = false);
   }
 
   @override
   void dispose() {
+    debugPrint('[LIFECYCLE] FollowUpFormPage.dispose');
     _sponsorNameController.dispose();
     _amountController.dispose();
     _noteController.dispose();
@@ -80,7 +93,7 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
       initialDate: _followUpDate ?? now,
       firstDate: now,
       lastDate: now.add(const Duration(days: 365)),
-      helpText: 'Select follow-up date',
+      helpText: 'Select visit date',
     );
     if (picked != null) setState(() => _followUpDate = picked);
   }
@@ -93,43 +106,55 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
     final dateStr = _followUpDate != null
         ? DateFormat('dd MMM yyyy').format(_followUpDate!)
         : null;
+    final role = ref.watch(roleProvider);
+
+    if (role != UserRole.admin) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) context.go('/followups');
+      });
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEditing ? 'Edit Follow-Up' : 'Add Follow-Up'),
+        title: Text(isEditing ? 'Edit Visit' : 'Add Visit'),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               child: Form(
                 key: _formKey,
+                autovalidateMode: AutovalidateMode.always,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    TextFormField(
-                      controller: _sponsorNameController,
-                      decoration: InputDecoration(
-                        labelText: 'Sponsor Name',
-                        hintText: 'e.g. Doctor',
-                        border: const OutlineInputBorder(),
-                        prefixIcon: Icon(
-                          Icons.person_rounded,
-                          color: colorScheme.primary,
+                    if (_sponsorId.isEmpty)
+                      TextFormField(
+                        controller: _sponsorNameController,
+                        decoration: InputDecoration(
+                          labelText: 'Sponsor Name',
+                          hintText: 'e.g. Doctor',
+                          border: const OutlineInputBorder(),
+                          prefixIcon: Icon(
+                            Icons.person_rounded,
+                            color: colorScheme.primary,
+                          ),
                         ),
+                        textCapitalization: TextCapitalization.words,
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Sponsor name is required'
+                            : null,
                       ),
-                      textCapitalization: TextCapitalization.words,
-                      validator: (v) => (v == null || v.trim().isEmpty)
-                          ? 'Sponsor name is required'
-                          : null,
-                    ),
-                    const SizedBox(height: 16),
+                    if (_sponsorId.isEmpty) const SizedBox(height: AppSpacing.lg),
                     InkWell(
                       onTap: _pickDate,
                       borderRadius: BorderRadius.circular(8),
                       child: InputDecorator(
                         decoration: InputDecoration(
-                          labelText: 'Follow-Up Date',
+                          labelText: 'Visit Date',
                           border: const OutlineInputBorder(),
                           prefixIcon: Icon(
                             Icons.calendar_today_rounded,
@@ -152,18 +177,18 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
                       Padding(
                         padding: const EdgeInsets.only(top: 8, left: 12),
                         child: Text(
-                          'Follow-up date is required',
+                          'Visit date is required',
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: colorScheme.error,
                           ),
                         ),
                       ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     TextFormField(
                       controller: _amountController,
                       decoration: InputDecoration(
                         labelText: 'Amount (optional)',
-                        hintText: 'e.g. 5000',
+                        hintText: 'e.g. 5,000',
                         border: const OutlineInputBorder(),
                         prefixIcon: Icon(
                           Icons.currency_rupee_rounded,
@@ -171,8 +196,9 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
                         ),
                       ),
                       keyboardType: TextInputType.number,
+                      inputFormatters: const [IndianAmountInputFormatter()],
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     TextFormField(
                       controller: _noteController,
                       decoration: const InputDecoration(
@@ -183,17 +209,22 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
                       ),
                       maxLines: 3,
                       textCapitalization: TextCapitalization.sentences,
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Note is required' : null,
+                      validator: null,
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: AppSpacing.xxl),
                     FilledButton.icon(
-                      onPressed: _handleSave,
-                      icon: Icon(isEditing
-                          ? Icons.save_rounded
-                          : Icons.add_rounded),
+                      onPressed: _isSaving ? null : _handleSave,
+                      icon: _isSaving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(isEditing
+                              ? Icons.save_rounded
+                              : Icons.add_rounded),
                       label:
-                          Text(isEditing ? 'Update Follow-Up' : 'Add Follow-Up'),
+                          Text(isEditing ? 'Update Visit' : 'Add Visit'),
                     ),
                   ],
                 ),
@@ -205,23 +236,29 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
     if (_followUpDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a follow-up date')),
-      );
+      context.showWarning('Please select a visit date');
       return;
     }
+    if (_isSaving) return;
+    if (!mounted) return;
+    if (ref.read(roleProvider) != UserRole.admin) {
+      context.showWarning('Access Denied');
+      return;
+    }
+    setState(() => _isSaving = true);
 
     final service = ref.read(firestoreProvider);
     final now = Timestamp.now();
     final amountText = _amountController.text.trim();
     final amount =
-        amountText.isNotEmpty ? int.tryParse(amountText) : null;
+        amountText.isNotEmpty ? tryParseAmount(amountText) : null;
 
     try {
       if (widget.followUpId != null) {
         final item = SponsorFollowup(
           id: widget.followUpId!,
           festivalId: AppConstants.festivalId,
+          sponsorId: _sponsorId,
           sponsorName: _sponsorNameController.text.trim(),
           followUpDate: Timestamp.fromDate(_followUpDate!),
           amount: amount,
@@ -241,21 +278,20 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
           createdAt: now,
         );
         await service.addFollowUp(item);
-        service.addActivity(Activity(
-          id: service.generateId(),
-          festivalId: AppConstants.festivalId,
-          type: 'followup_added',
-          title: 'Follow-Up Added',
-          description: 'Follow-up created for ${item.sponsorName}',
-          createdAt: Timestamp.now(),
-        ));
+        final activityService = ref.read(activityServiceProvider);
+        final userId = ref.read(userIdProvider);
+        final userName = ref.read(userNameProvider);
+        await activityService.recordFollowUpAdded(item, userId: userId, userName: userName);
       }
-      if (mounted) context.pop();
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) context.pop();
+        });
+      }
     } on Exception catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        setState(() => _isSaving = false);
+        context.showError('Error: $e');
       }
     }
   }
