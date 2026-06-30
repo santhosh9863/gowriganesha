@@ -25,7 +25,9 @@ class NotificationService {
       );
     }
 
+    debugPrint('[NOTIF_SVC_STEP-1] About to repo.createNotification id=${enriched.id}');
     final deduped = await _repository.createNotification(enriched);
+    debugPrint('[NOTIF_SVC_STEP-2] repo.createNotification returned deduped=$deduped');
 
     if (deduped) {
       _analytics?.trackDeduplicated(
@@ -37,7 +39,7 @@ class NotificationService {
       );
     }
 
-    debugPrint('[NOTIFICATION_SVC] Created: ${enriched.id}');
+    debugPrint('[NOTIF_SVC_STEP-3] analytics done, returning');
     return enriched.id;
   }
 

@@ -154,7 +154,7 @@ class AppNotificationTile extends StatelessWidget {
                         color: AppColors.warmGray600,
                         height: 1.3,
                       ),
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
@@ -226,7 +226,7 @@ class AppNotificationTile extends StatelessWidget {
     final now = DateTime.now();
     final diff = now.difference(dt);
 
-    if (diff.inMinutes < 1) return 'now';
+    if (diff.inMinutes < 1) return 'Just now';
     if (diff.inMinutes < 60) return '${diff.inMinutes}m';
     if (diff.inHours < 24) return '${diff.inHours}h';
     if (diff.inDays == 1) return 'yesterday';

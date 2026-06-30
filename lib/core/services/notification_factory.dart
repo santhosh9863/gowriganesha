@@ -19,8 +19,9 @@ class NotificationFactory {
       id: notificationId,
       title: NotificationMessages.expenseRecordedTitle,
       body: NotificationMessages.expenseRecordedBody
-          .replaceAll('{amount}', fmtAmount(amount))
-          .replaceAll('{note}', note),
+          .replaceAll('{userName}', senderUserName)
+          .replaceAll('{note}', note)
+          .replaceAll('{amount}', fmtAmount(amount)),
       type: NotificationType.expenseRecorded,
       priority: NotificationPriority.normal,
       senderUserId: senderUserId,
@@ -44,6 +45,7 @@ class NotificationFactory {
       id: notificationId,
       title: NotificationMessages.largeExpenseTitle,
       body: NotificationMessages.largeExpenseBody
+          .replaceAll('{userName}', senderUserName)
           .replaceAll('{amount}', fmtAmount(amount)),
       type: NotificationType.largeExpenseWarning,
       priority: NotificationPriority.high,
@@ -68,6 +70,7 @@ class NotificationFactory {
       id: notificationId,
       title: NotificationMessages.collectionRecordedTitle,
       body: NotificationMessages.collectionRecordedBody
+          .replaceAll('{userName}', senderUserName)
           .replaceAll('{amount}', fmtAmount(amount))
           .replaceAll('{sponsor}', sponsorName),
       type: NotificationType.collectionCompleted,
@@ -92,8 +95,8 @@ class NotificationFactory {
       id: notificationId,
       title: NotificationMessages.dailyCollectionRecordedTitle,
       body: NotificationMessages.dailyCollectionRecordedBody
-          .replaceAll('{amount}', fmtAmount(amount))
-          .replaceAll('{date}', dateLabel),
+          .replaceAll('{userName}', senderUserName)
+          .replaceAll('{amount}', fmtAmount(amount)),
       type: NotificationType.dailyCollectionRecorded,
       priority: NotificationPriority.normal,
       senderUserId: senderUserId,
@@ -116,8 +119,8 @@ class NotificationFactory {
       id: notificationId,
       title: NotificationMessages.followUpAddedTitle,
       body: NotificationMessages.followUpAddedBody
-          .replaceAll('{sponsor}', sponsorName)
-          .replaceAll('{date}', dateLabel),
+          .replaceAll('{userName}', senderUserName)
+          .replaceAll('{sponsor}', sponsorName),
       type: NotificationType.sponsorFollowUpDue,
       priority: NotificationPriority.normal,
       senderUserId: senderUserId,
@@ -140,6 +143,7 @@ class NotificationFactory {
       id: notificationId,
       title: NotificationMessages.followUpCompletedTitle,
       body: NotificationMessages.followUpCompletedBody
+          .replaceAll('{userName}', senderUserName)
           .replaceAll('{sponsor}', sponsorName),
       type: NotificationType.sponsorFollowUpDue,
       priority: NotificationPriority.normal,
@@ -164,9 +168,10 @@ class NotificationFactory {
       id: notificationId,
       title: NotificationMessages.sponsorAddedTitle,
       body: NotificationMessages.sponsorAddedBody
+          .replaceAll('{userName}', senderUserName)
           .replaceAll('{sponsor}', sponsorName)
           .replaceAll('{amount}', fmtAmount(amount)),
-      type: NotificationType.collectionCompleted,
+      type: NotificationType.sponsorAdded,
       priority: NotificationPriority.normal,
       senderUserId: senderUserId,
       senderUserName: senderUserName,
@@ -185,7 +190,8 @@ class NotificationFactory {
     return AppNotification(
       id: notificationId,
       title: NotificationMessages.settingsUpdatedTitle,
-      body: NotificationMessages.settingsUpdatedBody,
+      body: NotificationMessages.settingsUpdatedBody
+          .replaceAll('{userName}', senderUserName),
       type: NotificationType.settingsUpdated,
       priority: NotificationPriority.low,
       senderUserId: senderUserId,

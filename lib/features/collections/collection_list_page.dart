@@ -476,28 +476,44 @@ class _RecordCollectionDialogState extends State<_RecordCollectionDialog>
 
   Future<void> _submit() async {
     final a = _amount;
-    if (a == null || a <= 0 || a > _rem) return;
+    debugPrint('[SUBMIT_STEP-1] amount=$a, _rem=$_rem, _isFull=$_isFull');
+    if (a == null || a <= 0 || a > _rem) {
+      debugPrint('[SUBMIT_STEP-1a] Validation failed, returning');
+      return;
+    }
     setState(() => _loading = true);
+    debugPrint('[SUBMIT_STEP-2] _loading=true set');
     try {
       final note = _isFull ? 'Full collection' : '';
+      debugPrint('[SUBMIT_STEP-3] About recordContribution targetId=${_t.id} amount=$a note=$note');
       await widget.ref.read(firestoreProvider).recordContribution(
             targetId: _t.id,
             amount: a,
             note: note,
           );
+      debugPrint('[SUBMIT_STEP-4] recordContribution complete');
+      debugPrint('[SUBMIT_STEP-5] About recordContributionRecorded');
       await widget.ref.read(activityServiceProvider).recordContributionRecorded(
             _t,
             a,
             userId: widget.ref.read(userIdProvider),
             userName: widget.ref.read(userNameProvider),
           );
+      debugPrint('[SUBMIT_STEP-6] recordContributionRecorded complete');
       _collectedAmount = a;
       setState(() => _success = true);
+      debugPrint('[SUBMIT_STEP-7] _success=true set, starting animation');
       _successCtrl.forward();
+      debugPrint('[SUBMIT_STEP-8] About Future.delayed(1200ms)');
       await Future.delayed(const Duration(milliseconds: 1200));
+      debugPrint('[SUBMIT_STEP-9] Future.delayed complete');
+      debugPrint('[SUBMIT_STEP-10] About Navigator.pop()');
       if (mounted) Navigator.of(context).pop();
-    } on Exception {
+      debugPrint('[SUBMIT_STEP-11] Navigator.pop() returned');
+    } catch (e) {
+      debugPrint('[SUBMIT_CATCH] Error caught: $e');
       setState(() => _loading = false);
+      debugPrint('[SUBMIT_CATCH] _loading set to false');
     }
   }
 

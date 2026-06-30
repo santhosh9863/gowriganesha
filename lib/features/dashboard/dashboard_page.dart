@@ -18,7 +18,10 @@ import 'package:ganesha_2026/core/providers/expense_provider.dart';
 import 'package:ganesha_2026/core/providers/followup_provider.dart';
 import 'package:ganesha_2026/core/providers/target_provider.dart';
 import 'package:ganesha_2026/core/providers/festival_provider.dart';
+import 'package:ganesha_2026/core/providers/auth_provider.dart';
+import 'package:ganesha_2026/core/models/user_role.dart';
 import 'package:ganesha_2026/shared/services/festival_countdown_service.dart';
+import 'package:ganesha_2026/shared/widgets/confirm_dialog.dart';
 import 'package:ganesha_2026/shared/utils/amount_format.dart';
 import 'package:ganesha_2026/shared/widgets/app_page_header.dart';
 import 'package:ganesha_2026/shared/widgets/app_qr_sheet.dart';
@@ -1183,10 +1186,12 @@ class _ActivityTimeline extends ConsumerStatefulWidget {
 
 class _ActivityTimelineState extends ConsumerState<_ActivityTimeline> {
   _ActivityFilter _filter = _ActivityFilter.all;
+  bool _clearing = false;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final role = ref.watch(roleProvider);
     final allItems = ref.watch(activitiesStreamProvider).valueOrNull ?? [];
     final items = _filtered(allItems);
     return Container(
@@ -1203,6 +1208,19 @@ class _ActivityTimelineState extends ConsumerState<_ActivityTimeline> {
             children: [
               const Text('Activity Feed', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.warmGray500)),
               const Spacer(),
+              if (role == UserRole.admin)
+                _clearing
+                    ? const SizedBox(
+                        width: 16, height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.warmGray400),
+                        tooltip: 'Clear activity feed',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                        onPressed: () => _handleClear(context),
+                      ),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -1228,6 +1246,29 @@ class _ActivityTimelineState extends ConsumerState<_ActivityTimeline> {
         ],
       ),
     );
+  }
+
+  Future<void> _handleClear(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Clear Activity Feed',
+      message: 'Delete all activity records? This cannot be undone.',
+      confirmLabel: 'Clear All',
+    );
+    if (!confirmed || !mounted) return;
+    setState(() => _clearing = true);
+    try {
+      await ref.read(firestoreProvider).clearActivityFeed();
+    } catch (_) {
+      if (mounted) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Failed to clear activity feed')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
   }
 
   List<Activity> _filtered(List<Activity> items) {
@@ -1293,7 +1334,9 @@ class _ActivityTimelineState extends ConsumerState<_ActivityTimeline> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: _HighlightedText(
-                    text: a.description.isNotEmpty ? a.description : a.title,
+                    text: a.userName != null && a.userName!.isNotEmpty
+                        ? '${a.userName} — ${a.description.isNotEmpty ? a.description : a.title}'
+                        : (a.description.isNotEmpty ? a.description : a.title),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: AppColors.charcoal,
                     ),

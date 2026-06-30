@@ -34,8 +34,11 @@ class NotificationRepository {
   Future<bool> createNotification(AppNotification notification) async {
     try {
       final dedupKey = _computeDedupKey(notification);
+      debugPrint('[NOTIF_REPO_STEP-1] dedupKey=$dedupKey');
       if (dedupKey != null) {
+        debugPrint('[NOTIF_REPO_STEP-2] calling _tryDedup');
         final deduped = await _tryDedup(notification, dedupKey);
+        debugPrint('[NOTIF_REPO_STEP-3] _tryDedup returned deduped=$deduped');
         if (deduped) return true;
       }
 
@@ -43,7 +46,9 @@ class NotificationRepository {
           ? notification.copyWith(dedupKey: dedupKey)
           : notification;
 
+      debugPrint('[NOTIF_REPO_STEP-4] About to Firestore .set() id=${notification.id}');
       await _notifications.doc(notification.id).set(notificationWithDedupKey.toMap());
+      debugPrint('[NOTIF_REPO_STEP-5] Firestore .set() complete');
       debugPrint('[NOTIFICATION_REPO] Created: ${notification.id}');
       return false;
     } on FirebaseException catch (e) {
@@ -58,6 +63,7 @@ class NotificationRepository {
     );
 
     try {
+      debugPrint('[TRY_DEDUP_STEP-1] Starting query festivalId=${AppConstants.festivalId} dedupKey=$dedupKey');
       final snapshot = await _notifications
           .where('festivalId', isEqualTo: AppConstants.festivalId)
           .where('dedupKey', isEqualTo: dedupKey)
@@ -65,14 +71,18 @@ class NotificationRepository {
           .orderBy('createdAt', descending: true)
           .limit(1)
           .get();
+      debugPrint('[TRY_DEDUP_STEP-2] Query returned ${snapshot.docs.isEmpty ? "no docs" : "found doc"}');
 
       if (snapshot.docs.isEmpty) return false;
 
       final existing = snapshot.docs.first;
       final existingId = existing.id;
+      debugPrint('[TRY_DEDUP_STEP-3] Found existing doc $existingId, about to runTransaction');
 
       await _firestore.runTransaction((transaction) async {
+        debugPrint('[TRY_DEDUP_STEP-4] Transaction started');
         final docSnapshot = await transaction.get(existing.reference);
+        debugPrint('[TRY_DEDUP_STEP-5] Transaction get complete, exists=${docSnapshot.exists}');
         if (!docSnapshot.exists) return;
         final existingData = docSnapshot.data()!;
         final existingMetadata =
@@ -89,8 +99,10 @@ class NotificationRepository {
           'metadata': mergedMetadata,
           if (notification.isPinned) 'isPinned': true,
         });
+        debugPrint('[TRY_DEDUP_STEP-6] Transaction update called');
       });
 
+      debugPrint('[TRY_DEDUP_STEP-7] runTransaction complete');
       debugPrint('[NOTIFICATION_REPO] Dedup merged into: $existingId');
       return true;
     } on FirebaseException catch (e) {

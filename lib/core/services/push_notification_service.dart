@@ -109,17 +109,8 @@ class PushNotificationService {
   }
 
   Future<void> _onForegroundMessage(RemoteMessage message) async {
-    final title = message.notification?.title ?? 'Sankalpa';
-    final body = message.notification?.body ?? '';
-    final entityType = message.data['entityType'] as String?;
-
-    await _localService.show(
-      id: message.messageId ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      title: title,
-      body: body,
-      payload: message.messageId,
-      channelId: LocalNotificationService.channelFor(entityType),
-    );
+    final category = message.data['category'] as String?;
+    _analytics?.trackOpened(category: category);
   }
 
   void _onNotificationTap(RemoteMessage message) {
@@ -151,10 +142,7 @@ class PushNotificationService {
       title,
       body,
       NotificationDetails(
-        android: AndroidNotificationDetails(
-          channel, channel,
-          importance: Importance.defaultImportance,
-        ),
+        android: LocalNotificationService.detailsFor(channel),
         iOS: const DarwinNotificationDetails(),
       ),
       payload: message.messageId,

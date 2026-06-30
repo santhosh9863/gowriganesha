@@ -36,9 +36,9 @@ class Festival {
       'year': year,
       'location': location,
       if (festivalDate != null) 'festivalDate': Timestamp.fromDate(festivalDate!),
-      if (upiId != null) 'upiId': upiId,
-      if (accountName != null) 'accountName': accountName,
-      if (qrImageUrl != null) 'qrImageUrl': qrImageUrl,
+      'upiId': upiId,
+      'accountName': accountName,
+      'qrImageUrl': qrImageUrl,
     };
   }
 

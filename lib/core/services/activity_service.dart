@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ganesha_2026/core/constants.dart';
@@ -41,6 +42,8 @@ class ActivityService {
       createdAt: Timestamp.now(),
       recordId: expense.id,
       entityType: 'expense',
+      userId: userId,
+      userName: userName,
     ));
 
     final threshold = 50000;
@@ -74,6 +77,7 @@ class ActivityService {
     required String userName,
   }) async {
     final activityId = _firestore.generateId();
+    debugPrint('[REC_CONT_REC_STEP-1] About addActivity id=$activityId');
     await _firestore.addActivity(Activity(
       id: activityId,
       festivalId: AppConstants.festivalId,
@@ -84,7 +88,10 @@ class ActivityService {
       createdAt: Timestamp.now(),
       recordId: target.id,
       entityType: 'target',
+      userId: userId,
+      userName: userName,
     ));
+    debugPrint('[REC_CONT_REC_STEP-2] addActivity complete');
 
     final notification = NotificationFactory.collectionRecorded(
       notificationId: _notificationRepository.createNotificationId(),
@@ -94,7 +101,9 @@ class ActivityService {
       senderUserId: userId,
       senderUserName: userName,
     );
+    debugPrint('[REC_CONT_REC_STEP-3] About createNotification id=${notification.id}');
     await _notificationService.createNotification(notification);
+    debugPrint('[REC_CONT_REC_STEP-4] createNotification complete');
   }
 
   Future<void> recordDailyCollectionRecorded(
@@ -112,6 +121,8 @@ class ActivityService {
           '${AppConstants.currencySymbol}${fmtAmount(dc.amount)} on ${_formatDate(dc.date.toDate())}',
       createdAt: Timestamp.now(),
       entityType: 'daily_collection',
+      userId: userId,
+      userName: userName,
     ));
 
     final notification = NotificationFactory.dailyCollectionRecorded(
@@ -130,6 +141,7 @@ class ActivityService {
     required String userName,
   }) async {
     final activityId = _firestore.generateId();
+    debugPrint('[REC_SPONSOR_STEP-1] About addActivity id=$activityId');
     await _firestore.addActivity(Activity(
       id: activityId,
       festivalId: AppConstants.festivalId,
@@ -140,7 +152,10 @@ class ActivityService {
       createdAt: Timestamp.now(),
       recordId: target.id,
       entityType: 'target',
+      userId: userId,
+      userName: userName,
     ));
+    debugPrint('[REC_SPONSOR_STEP-2] addActivity complete');
 
     final notification = NotificationFactory.sponsorAdded(
       notificationId: _notificationRepository.createNotificationId(),
@@ -150,7 +165,9 @@ class ActivityService {
       senderUserId: userId,
       senderUserName: userName,
     );
+    debugPrint('[REC_SPONSOR_STEP-3] About createNotification id=${notification.id}');
     await _notificationService.createNotification(notification);
+    debugPrint('[REC_SPONSOR_STEP-4] createNotification complete');
   }
 
   Future<void> recordFollowUpAdded(
@@ -169,6 +186,8 @@ class ActivityService {
       createdAt: Timestamp.now(),
       recordId: followup.id,
       entityType: 'sponsor_followup',
+      userId: userId,
+      userName: userName,
     ));
 
     final notification = NotificationFactory.followUpAdded(
@@ -197,6 +216,8 @@ class ActivityService {
       createdAt: Timestamp.now(),
       recordId: followup.id,
       entityType: 'sponsor_followup',
+      userId: userId,
+      userName: userName,
     ));
 
     final notification = NotificationFactory.followUpCompleted(
@@ -221,6 +242,8 @@ class ActivityService {
       description: 'Festival settings were changed',
       createdAt: Timestamp.now(),
       entityType: 'settings',
+      userId: userId,
+      userName: userName,
     ));
 
     final notification = NotificationFactory.settingsUpdated(

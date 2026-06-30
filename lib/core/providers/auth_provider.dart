@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -58,6 +59,21 @@ class RoleNotifier extends StateNotifier<UserRole> {
     await _prefs.setString('userName', name);
   }
 
+  Future<void> setUserId(String id) async {
+    _ref.read(userIdProvider.notifier).state = id;
+    await _prefs.setString('userId', id);
+  }
+
+  String _ensureUserId() {
+    final existing = _prefs.getString('userId');
+    if (existing != null && existing.isNotEmpty) return existing;
+    final newId = DateTime.now().millisecondsSinceEpoch.toString() +
+        Random().nextInt(999999).toString();
+    _ref.read(userIdProvider.notifier).state = newId;
+    _prefs.setString('userId', newId);
+    return newId;
+  }
+
   Future<void> setCredentials(UserRole role, String name) async {
     _ref.read(userNameProvider.notifier).state = name;
     await _prefs.setString('userName', name);
@@ -68,6 +84,7 @@ class RoleNotifier extends StateNotifier<UserRole> {
   Future<bool> loginAsAdmin(String password, {String? userName}) async {
     final service = _ref.read(firestoreProvider);
     final storedHash = await service.getAdminPasswordHash();
+    _ensureUserId();
     if (storedHash == null) {
       await service.setAdminPasswordHash(_hashPassword(password));
       if (userName != null) await setUserName(userName);
@@ -88,12 +105,18 @@ class RoleNotifier extends StateNotifier<UserRole> {
     final storedPassword = await service.getVolunteerPassword();
     debugPrint('[VOLUNTEER_AUTH] Firestore fetch complete: ${storedPassword != null ? "found" : "null"}');
     if (storedPassword == null) {
-      debugPrint('[VOLUNTEER_AUTH] No volunteerPassword document in Firestore — denying');
-      return false;
+      debugPrint('[VOLUNTEER_AUTH] No volunteerPassword set — first login, saving password');
+      await service.setVolunteerPassword(password);
+      if (userName != null) await setUserName(userName);
+      _ensureUserId();
+      await setRole(UserRole.volunteer);
+      debugPrint('[VOLUNTEER_AUTH] Role set to volunteer');
+      return true;
     }
     if (password == storedPassword) {
       debugPrint('[VOLUNTEER_AUTH] Password match — granting access');
       if (userName != null) await setUserName(userName);
+      _ensureUserId();
       await setRole(UserRole.volunteer);
       debugPrint('[VOLUNTEER_AUTH] Role set to volunteer');
       return true;
@@ -103,8 +126,8 @@ class RoleNotifier extends StateNotifier<UserRole> {
   }
 
   Future<void> logout() async {
-    state = UserRole.volunteer;
-    await _prefs.setString('role', 'volunteer');
+    state = UserRole.none;
+    await _prefs.setString('role', 'none');
   }
 
   Future<void> clearSession() async {

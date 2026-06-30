@@ -44,6 +44,7 @@ enum NotificationCategory {
 }
 
 enum NotificationType {
+  sponsorAdded(NotificationCategory.sponsor),
   sponsorFollowUpDue(NotificationCategory.sponsor),
   sponsorOverdue(NotificationCategory.sponsor),
   collectionCompleted(NotificationCategory.sponsor),

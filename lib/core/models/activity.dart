@@ -9,6 +9,8 @@ class Activity {
   final Timestamp createdAt;
   final String? recordId;
   final String? entityType;
+  final String? userId;
+  final String? userName;
 
   const Activity({
     required this.id,
@@ -19,6 +21,8 @@ class Activity {
     required this.createdAt,
     this.recordId,
     this.entityType,
+    this.userId,
+    this.userName,
   });
 
   Map<String, dynamic> toMap() {
@@ -30,6 +34,8 @@ class Activity {
       'createdAt': createdAt,
       if (recordId != null) 'recordId': recordId,
       if (entityType != null) 'entityType': entityType,
+      if (userId != null) 'userId': userId,
+      if (userName != null) 'userName': userName,
     };
   }
 
@@ -43,6 +49,8 @@ class Activity {
       createdAt: (map['createdAt'] as Timestamp?) ?? Timestamp.now(),
       recordId: map['recordId'] as String?,
       entityType: map['entityType'] as String?,
+      userId: map['userId'] as String?,
+      userName: map['userName'] as String?,
     );
   }
 }

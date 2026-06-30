@@ -34,5 +34,53 @@ service cloud.firestore {
       allow create, update: if request.resource.data.userId == request.auth.uid;
       allow delete: if resource.data.userId == request.auth.uid;
     }
+
+    // Festival metadata
+    match /festivals/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Sponsor targets
+    match /targets/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+
+      // Target contributions subcollection
+      match /contributions/{subDocument} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
+      }
+    }
+
+    // Festival expenses
+    match /expenses/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Daily street/area collections
+    match /daily_collections/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Sponsor follow-ups
+    match /sponsor_followups/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // App settings (budget, etc.)
+    match /settings/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Config (security passwords, etc.)
+    match /config/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
   }
 }

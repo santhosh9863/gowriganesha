@@ -3,6 +3,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
 
+const String _notificationIcon = '@mipmap/ic_launcher';
+
 abstract class LocalNotificationService {
   Future<void> initialize();
   Future<void> show({
@@ -33,7 +35,84 @@ abstract class LocalNotificationService {
       _ => 'announcements',
     };
   }
+
+  static AndroidNotificationDetails detailsFor(String channelId) {
+    return _channelDetails[channelId] ?? _channelDetails['announcements']!;
+  }
 }
+
+final Map<String, AndroidNotificationDetails> _channelDetails = {
+  'critical_alerts': const AndroidNotificationDetails(
+    'critical_alerts', 'Critical Alerts',
+    channelDescription: 'Large expenses, overdue sponsors',
+    importance: Importance.high,
+    priority: Priority.high,
+    playSound: true,
+    enableVibration: true,
+    channelShowBadge: true,
+    icon: _notificationIcon,
+  ),
+  'visit_reminders': const AndroidNotificationDetails(
+    'visit_reminders', 'Visit Reminders',
+    channelDescription: 'Follow-up due and overdue reminders',
+    importance: Importance.high,
+    priority: Priority.high,
+    playSound: true,
+    enableVibration: true,
+    channelShowBadge: true,
+    icon: _notificationIcon,
+  ),
+  'festival_updates': const AndroidNotificationDetails(
+    'festival_updates', 'Festival Updates',
+    channelDescription: 'Countdown milestones and festival alerts',
+    importance: Importance.defaultImportance,
+    priority: Priority.defaultPriority,
+    playSound: true,
+    enableVibration: true,
+    channelShowBadge: true,
+    icon: _notificationIcon,
+  ),
+  'collections': const AndroidNotificationDetails(
+    'collections', 'Collections',
+    channelDescription: 'Sponsor and daily collection notifications',
+    importance: Importance.defaultImportance,
+    priority: Priority.defaultPriority,
+    playSound: true,
+    enableVibration: true,
+    channelShowBadge: true,
+    icon: _notificationIcon,
+  ),
+  'expenses': const AndroidNotificationDetails(
+    'expenses', 'Expenses',
+    channelDescription: 'Expense recorded alerts',
+    importance: Importance.defaultImportance,
+    priority: Priority.defaultPriority,
+    playSound: true,
+    enableVibration: true,
+    channelShowBadge: true,
+    icon: _notificationIcon,
+  ),
+  'announcements': const AndroidNotificationDetails(
+    'announcements', 'Announcements',
+    channelDescription: 'Admin broadcasts and system alerts',
+    importance: Importance.high,
+    priority: Priority.high,
+    playSound: true,
+    enableVibration: true,
+    channelShowBadge: true,
+    icon: _notificationIcon,
+  ),
+  'background_sync': const AndroidNotificationDetails(
+    'background_sync', 'Background Sync',
+    channelDescription: 'Silent sync operations',
+    importance: Importance.low,
+    priority: Priority.low,
+    playSound: false,
+    enableVibration: false,
+    channelShowBadge: false,
+    icon: _notificationIcon,
+  ),
+};
 
 class SankalpaLocalNotificationService implements LocalNotificationService {
   late final FlutterLocalNotificationsPlugin _plugin;
@@ -46,7 +125,7 @@ class SankalpaLocalNotificationService implements LocalNotificationService {
 
     tz_data.initializeTimeZones();
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(_notificationIcon);
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -58,6 +137,7 @@ class SankalpaLocalNotificationService implements LocalNotificationService {
         android: androidSettings,
         iOS: iosSettings,
       ),
+      onDidReceiveNotificationResponse: _onNotificationTap,
     );
 
     await _createChannels();
@@ -65,82 +145,30 @@ class SankalpaLocalNotificationService implements LocalNotificationService {
     debugPrint('[LOCAL_NOTIF] Initialized');
   }
 
+  void _onNotificationTap(NotificationResponse response) {
+    debugPrint('[LOCAL_NOTIF] Tapped: ${response.payload}');
+  }
+
   Future<void> _createChannels() async {
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
     if (android == null) return;
 
-    for (final channel in _channels) {
-      await android.createNotificationChannel(channel);
+    for (final entry in _channelDetails.entries) {
+      final d = entry.value;
+      await android.createNotificationChannel(
+        AndroidNotificationChannel(
+          d.channelId, d.channelName,
+          description: d.channelDescription,
+          importance: d.importance ?? Importance.defaultImportance,
+          playSound: d.playSound ?? true,
+          enableVibration: d.enableVibration ?? true,
+          showBadge: d.channelShowBadge ?? true,
+        ),
+      );
     }
-    debugPrint('[LOCAL_NOTIF] Created ${_channels.length} channels');
+    debugPrint('[LOCAL_NOTIF] Created ${_channelDetails.length} channels');
   }
-
-  static const List<AndroidNotificationChannel> _channels = [
-    AndroidNotificationChannel(
-      'critical_alerts', 'Critical Alerts',
-      description: 'Large expenses, overdue sponsors',
-      importance: Importance.high,
-      playSound: true,
-      enableVibration: true,
-      enableLights: true,
-      showBadge: true,
-      groupId: 'sankalpa_critical',
-    ),
-    AndroidNotificationChannel(
-      'visit_reminders', 'Visit Reminders',
-      description: 'Follow-up due and overdue reminders',
-      importance: Importance.high,
-      playSound: true,
-      enableVibration: true,
-      showBadge: true,
-      groupId: 'sankalpa_reminder',
-    ),
-    AndroidNotificationChannel(
-      'festival_updates', 'Festival Updates',
-      description: 'Countdown milestones and festival alerts',
-      importance: Importance.defaultImportance,
-      playSound: true,
-      enableVibration: true,
-      showBadge: true,
-      groupId: 'sankalpa_festival',
-    ),
-    AndroidNotificationChannel(
-      'collections', 'Collections',
-      description: 'Sponsor and daily collection notifications',
-      importance: Importance.defaultImportance,
-      playSound: true,
-      enableVibration: true,
-      showBadge: true,
-      groupId: 'sankalpa_collection',
-    ),
-    AndroidNotificationChannel(
-      'expenses', 'Expenses',
-      description: 'Expense recorded alerts',
-      importance: Importance.defaultImportance,
-      playSound: true,
-      enableVibration: true,
-      showBadge: true,
-      groupId: 'sankalpa_expense',
-    ),
-    AndroidNotificationChannel(
-      'announcements', 'Announcements',
-      description: 'Admin broadcasts and system alerts',
-      importance: Importance.high,
-      playSound: true,
-      enableVibration: true,
-      showBadge: true,
-      groupId: 'sankalpa_announce',
-    ),
-    AndroidNotificationChannel(
-      'background_sync', 'Background Sync',
-      description: 'Silent sync operations',
-      importance: Importance.low,
-      playSound: false,
-      enableVibration: false,
-      showBadge: false,
-    ),
-  ];
 
   @override
   Future<void> show({
@@ -151,12 +179,9 @@ class SankalpaLocalNotificationService implements LocalNotificationService {
     String? channelId,
   }) async {
     if (!_initialized) await initialize();
+    final actualChannel = channelId ?? 'announcements';
     final details = NotificationDetails(
-      android: AndroidNotificationDetails(
-        channelId ?? 'announcements',
-        'Announcements',
-        importance: Importance.defaultImportance,
-      ),
+      android: LocalNotificationService.detailsFor(actualChannel),
       iOS: const DarwinNotificationDetails(),
     );
     await _plugin.show(id.hashCode, title, body, details, payload: payload);
@@ -172,12 +197,9 @@ class SankalpaLocalNotificationService implements LocalNotificationService {
     String? channelId,
   }) async {
     if (!_initialized) await initialize();
+    final actualChannel = channelId ?? 'announcements';
     final details = NotificationDetails(
-      android: AndroidNotificationDetails(
-        channelId ?? 'announcements',
-        'Announcements',
-        importance: Importance.defaultImportance,
-      ),
+      android: LocalNotificationService.detailsFor(actualChannel),
       iOS: const DarwinNotificationDetails(),
     );
     final tzScheduledAt = tz.TZDateTime.from(scheduledAt, tz.local);

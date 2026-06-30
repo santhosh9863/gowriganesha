@@ -251,14 +251,25 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
   }
 
   Future<void> _handleSave() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_isSaving) return;
-    if (!mounted) return;
+    debugPrint('[HANDLE_SAVE_STEP-1] Starting');
+    if (!_formKey.currentState!.validate()) {
+      debugPrint('[HANDLE_SAVE_STEP-1a] Validation failed, returning');
+      return;
+    }
+    if (_isSaving) {
+      debugPrint('[HANDLE_SAVE_STEP-1b] Already saving, returning');
+      return;
+    }
+    if (!mounted) {
+      debugPrint('[HANDLE_SAVE_STEP-1c] Not mounted, returning');
+      return;
+    }
     if (widget.targetId != null && ref.read(roleProvider) != UserRole.admin) {
       context.showWarning('Access Denied');
       return;
     }
     setState(() => _isSaving = true);
+    debugPrint('[HANDLE_SAVE_STEP-2] isSaving=true set');
 
     final service = ref.read(firestoreProvider);
     final now = Timestamp.now();
@@ -266,6 +277,7 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
 
     try {
       if (widget.targetId != null) {
+        debugPrint('[HANDLE_SAVE_STEP-3] Update path');
         final givenAmount = _loadedTarget?.givenAmount ?? 0;
         final target = Target(
           id: widget.targetId!,
@@ -279,7 +291,10 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
           createdAt: now,
           updatedAt: now,
         );
+        debugPrint('[HANDLE_SAVE_STEP-4] About service.updateTarget');
         await service.updateTarget(target);
+        debugPrint('[HANDLE_SAVE_STEP-5] updateTarget complete');
+        debugPrint('[HANDLE_SAVE_STEP-6] About addActivity for update');
         await service.addActivity(Activity(
           id: service.generateId(),
           festivalId: AppConstants.festivalId,
@@ -290,7 +305,9 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
           recordId: target.id,
           entityType: 'target',
         ));
+        debugPrint('[HANDLE_SAVE_STEP-7] addActivity for update complete');
       } else {
+        debugPrint('[HANDLE_SAVE_STEP-3] Create path');
         createdTarget = Target(
           id: service.generateId(),
           festivalId: AppConstants.festivalId,
@@ -303,34 +320,45 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
           createdAt: now,
           updatedAt: now,
         );
+        debugPrint('[HANDLE_SAVE_STEP-4] About service.addTarget id=${createdTarget.id}');
         await service.addTarget(createdTarget);
+        debugPrint('[HANDLE_SAVE_STEP-5] addTarget complete');
       }
     } on Exception catch (e) {
+      debugPrint('[HANDLE_SAVE_CATCH] Exception: $e');
       if (mounted) {
         context.showError(e.toString());
       }
       return;
     } finally {
+      debugPrint('[HANDLE_SAVE_FINALLY] Entered, mounted=$mounted');
       if (mounted) {
         setState(() => _isSaving = false);
       }
+      debugPrint('[HANDLE_SAVE_FINALLY] Done');
     }
+
+    debugPrint('[HANDLE_SAVE_STEP-8] After try/catch, createdTarget=$createdTarget, mounted=$mounted');
 
     if (createdTarget != null && mounted) {
       try {
         final activityService = ref.read(activityServiceProvider);
         final userId = ref.read(userIdProvider);
         final userName = ref.read(userNameProvider);
+        debugPrint('[HANDLE_SAVE_STEP-9] About recordSponsorAdded userId=$userId userName=$userName');
         await activityService.recordSponsorAdded(
           createdTarget,
           userId: userId,
           userName: userName,
         );
-      } on Exception catch (e) {
-        debugPrint('[SPONSOR] Activity/Notification failed (non-fatal): $e');
+        debugPrint('[HANDLE_SAVE_STEP-10] recordSponsorAdded complete');
+      } catch (e) {
+        debugPrint('[HANDLE_SAVE_STEP-ERR] recordSponsorAdded threw: $e');
       }
     }
 
+    debugPrint('[HANDLE_SAVE_STEP-11] About context.pop()');
     if (mounted) context.pop();
+    debugPrint('[HANDLE_SAVE_STEP-12] context.pop() returned');
   }
 }

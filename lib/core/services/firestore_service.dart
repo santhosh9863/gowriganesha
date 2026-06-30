@@ -51,9 +51,14 @@ class FirestoreService {
   String generateId() => _firestore.collection('_').doc().id;
 
   Future<String?> getAdminPasswordHash() async {
-    final doc = await _config.doc('security').get();
-    if (!doc.exists || doc.data() == null) return null;
-    return doc.data()!['adminPasswordHash'] as String?;
+    try {
+      final doc = await _config.doc('security').get();
+      if (!doc.exists || doc.data() == null) return null;
+      return doc.data()!['adminPasswordHash'] as String?;
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error fetching admin password hash: $e');
+      throw FirestoreException('Failed to load admin credentials', originalError: e);
+    }
   }
 
   Future<void> setAdminPasswordHash(String hash) async {
@@ -64,12 +69,29 @@ class FirestoreService {
   }
 
   Future<String?> getVolunteerPassword() async {
-    final doc = await _config.doc('security').get();
-    debugPrint('[FIRESTORE] Document config/security exists: ${doc.exists}');
-    debugPrint('[FIRESTORE] Document data: ${doc.data()}');
-    if (!doc.exists || doc.data() == null) return null;
-    debugPrint('[FIRESTORE] volunteerPassword field value: "${doc.data()!['volunteerPassword']}"');
-    return doc.data()!['volunteerPassword'] as String?;
+    try {
+      final doc = await _config.doc('security').get();
+      debugPrint('[FIRESTORE] Document config/security exists: ${doc.exists}');
+      debugPrint('[FIRESTORE] Document data: ${doc.data()}');
+      if (!doc.exists || doc.data() == null) return null;
+      debugPrint('[FIRESTORE] volunteerPassword field value: "${doc.data()!['volunteerPassword']}"');
+      return doc.data()!['volunteerPassword'] as String?;
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error fetching volunteer password: $e');
+      throw FirestoreException('Failed to load volunteer credentials', originalError: e);
+    }
+  }
+
+  Future<void> setVolunteerPassword(String password) async {
+    try {
+      await _config.doc('security').set({
+        'volunteerPassword': password,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error setting volunteer password: $e');
+      throw FirestoreException('Failed to set volunteer password', originalError: e);
+    }
   }
 
   Future<int> getBudget(String settingsId) async {
@@ -266,7 +288,9 @@ class FirestoreService {
 
   Future<void> addTarget(Target target) async {
     try {
+      debugPrint('[ADD_TARGET_STEP-1] About to Firestore .set() id=${target.id}');
       await _targets.doc(target.id).set(target.toMap());
+      debugPrint('[ADD_TARGET_STEP-2] Firestore .set() complete');
       debugPrint('[FIRESTORE] Target added: ${target.id}');
     } on FirebaseException catch (e) {
       debugPrint('[FIRESTORE] Error adding target: $e');
@@ -342,7 +366,7 @@ class FirestoreService {
     String note = '',
     String recordedBy = 'system',
   }) async {
-    debugPrint('[ADJUST] FIRESTORE.recordContribution BEGIN: targetId=$targetId amount=$amount');
+    debugPrint('[REC_CONT_STEP-1] BEGIN: targetId=$targetId amount=$amount');
     try {
       final batch = _firestore.batch();
       final targetRef = _targets.doc(targetId);
@@ -362,14 +386,14 @@ class FirestoreService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      debugPrint('[ADJUST] FIRESTORE.recordContribution: About to batch.commit()');
+      debugPrint('[REC_CONT_STEP-2] About to batch.commit()');
       await batch.commit();
-      debugPrint('[ADJUST] FIRESTORE.recordContribution: batch.commit() completed');
+      debugPrint('[REC_CONT_STEP-3] batch.commit() completed');
     } on FirebaseException catch (e) {
-      debugPrint('[ADJUST] FIRESTORE.recordContribution ERROR: $e');
+      debugPrint('[REC_CONT_STEP-ERR] batch.commit() threw: $e');
       throw FirestoreException('Failed to record contribution', originalError: e);
     }
-    debugPrint('[ADJUST] FIRESTORE.recordContribution END');
+    debugPrint('[REC_CONT_STEP-4] END');
   }
 
   Future<void> recordCorrection({
@@ -605,15 +629,15 @@ class FirestoreService {
   }
 
   Future<void> addActivity(Activity activity) async {
-    debugPrint('[ADJUST] FIRESTORE.addActivity BEGIN: id=${activity.id} type=${activity.type}');
+    debugPrint('[ADD_ACT_STEP-1] BEGIN: id=${activity.id} type=${activity.type}');
     try {
-      debugPrint('[ADJUST] FIRESTORE.addActivity: About to Firestore set()');
+      debugPrint('[ADD_ACT_STEP-2] About to Firestore .set()');
       await _activities.doc(activity.id).set(activity.toMap());
-      debugPrint('[ADJUST] FIRESTORE.addActivity: Firestore set() completed');
+      debugPrint('[ADD_ACT_STEP-3] Firestore .set() completed');
     } on FirebaseException catch (e) {
-      debugPrint('[ADJUST] FIRESTORE.addActivity ERROR: $e');
+      debugPrint('[ADD_ACT_STEP-ERR] Firestore .set() threw: $e');
     }
-    debugPrint('[ADJUST] FIRESTORE.addActivity END');
+    debugPrint('[ADD_ACT_STEP-4] END');
   }
 
   Future<void> clearActivityFeed() async {
