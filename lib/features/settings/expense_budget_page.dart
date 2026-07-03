@@ -25,6 +25,16 @@ class ExpenseBudgetPage extends ConsumerStatefulWidget {
 
 class _ExpenseBudgetPageState extends ConsumerState<ExpenseBudgetPage> {
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(expenseBudgetServiceProvider).seedIfEmpty();
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final role = ref.watch(roleProvider);

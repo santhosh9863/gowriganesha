@@ -13,6 +13,16 @@ class ExpenseBudgetRepository {
 
   String generateId() => _firestore.collection('_').doc().id;
 
+  Future<bool> isEmpty() async {
+    try {
+      final snapshot = await _collection.limit(1).get();
+      return snapshot.docs.isEmpty;
+    } on FirebaseException catch (e) {
+      debugPrint('[EXP_BUDGET_REPO] Error checking isEmpty: $e');
+      throw FirestoreException('Failed to check expense budget', originalError: e);
+    }
+  }
+
   Stream<List<ExpenseBudget>> watchAll() {
     return _collection
         .orderBy('displayOrder')
