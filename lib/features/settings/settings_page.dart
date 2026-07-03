@@ -23,6 +23,8 @@ import 'package:ganesha_2026/shared/widgets/app_section_header.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ganesha_2026/shared/widgets/app_snackbar.dart';
 import 'package:ganesha_2026/features/settings/sponsor_diagnostics.dart';
+import 'package:ganesha_2026/features/settings/expense_budget_page.dart';
+import 'package:ganesha_2026/core/providers/expense_budget_provider.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -99,6 +101,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
           ),
 
+          const SizedBox(height: AppSpacing.sm),
+          _ExpenseBudgetCard(),
           const SizedBox(height: AppSpacing.xl),
 
           // ── Application ──
@@ -1485,5 +1489,98 @@ class _AdminPermissionsCard extends StatelessWidget {
       }
     }
     return widgets;
+  }
+}
+
+// ──────────────────────────────────────────────
+// Expense Budget Card
+// ──────────────────────────────────────────────
+class _ExpenseBudgetCard extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final itemsAsync = ref.watch(expenseBudgetStreamProvider);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const ExpenseBudgetPage(),
+          ),
+        ),
+        borderRadius: AppRadius.largeBorder,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: AppRadius.largeBorder,
+            border: Border.all(color: AppColors.infoBg),
+            boxShadow: AppShadows.subtle,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.infoBg,
+                  borderRadius: AppRadius.mediumBorder,
+                ),
+                child: const Icon(
+                  Icons.account_tree_rounded,
+                  color: AppColors.info,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Expense Budget',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: AppColors.charcoal,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    itemsAsync.when(
+                      data: (items) {
+                        final total = items.fold<int>(0, (s, e) => s + e.plannedAmount);
+                        return Text(
+                          '${items.length} categories · ${AppConstants.currencySymbol}${fmtAmount(total)} planned',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: AppColors.warmGray500,
+                          ),
+                        );
+                      },
+                      loading: () => Text(
+                        'Loading...',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: AppColors.warmGray400,
+                        ),
+                      ),
+                      error: (_, __) => Text(
+                        'Error loading',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: AppColors.error,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.warmGray400,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
