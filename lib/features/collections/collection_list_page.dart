@@ -476,6 +476,7 @@ class _RecordCollectionDialogState extends State<_RecordCollectionDialog>
 
   Future<void> _submit() async {
     final a = _amount;
+    final navigator = Navigator.of(context, rootNavigator: true);
     debugPrint('[SUBMIT_STEP-1] amount=$a, _rem=$_rem, _isFull=$_isFull');
     if (a == null || a <= 0 || a > _rem) {
       debugPrint('[SUBMIT_STEP-1a] Validation failed, returning');
@@ -508,7 +509,7 @@ class _RecordCollectionDialogState extends State<_RecordCollectionDialog>
       await Future.delayed(const Duration(milliseconds: 1200));
       debugPrint('[SUBMIT_STEP-9] Future.delayed complete');
       debugPrint('[SUBMIT_STEP-10] About Navigator.pop()');
-      if (mounted) Navigator.of(context).pop();
+      if (mounted) navigator.pop();
       debugPrint('[SUBMIT_STEP-11] Navigator.pop() returned');
     } catch (e) {
       debugPrint('[SUBMIT_CATCH] Error caught: $e');

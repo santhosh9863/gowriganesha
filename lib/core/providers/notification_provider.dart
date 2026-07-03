@@ -66,10 +66,13 @@ final unreadNotificationsCountProvider = Provider<int>((ref) {
   final notifications = ref.watch(notificationsStreamProvider);
   final userId = ref.watch(userIdProvider);
   final role = ref.watch(roleProvider);
+  final locallyClearedIds = ref.watch(locallyClearedIdsProvider);
   final targetRole =
       role == UserRole.none || role == UserRole.admin ? null : role.name;
   return notifications.valueOrNull
           ?.where((n) => n.isUnreadBy(userId))
+          .where((n) => !n.isClearedBy(userId))
+          .where((n) => !locallyClearedIds.contains(n.id))
           .where((n) =>
               targetRole == null ||
               n.targetRole == null ||
@@ -80,6 +83,9 @@ final unreadNotificationsCountProvider = Provider<int>((ref) {
 
 final pendingNotificationTapProvider =
     StateProvider<({String entityType, String? entityId})?>((ref) => null);
+
+final locallyClearedIdsProvider = StateProvider<Set<String>>((ref) => const {});
+final locallyReadIdsProvider = StateProvider<Set<String>>((ref) => const {});
 
 final pushNotificationServiceProvider = Provider<PushNotificationService>((ref) {
   final repo = ref.watch(notificationRepositoryProvider);

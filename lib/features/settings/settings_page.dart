@@ -22,6 +22,7 @@ import 'package:ganesha_2026/shared/widgets/app_page_scaffold.dart';
 import 'package:ganesha_2026/shared/widgets/app_section_header.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ganesha_2026/shared/widgets/app_snackbar.dart';
+import 'package:ganesha_2026/features/settings/sponsor_diagnostics.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -163,6 +164,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
             ),
             _AdminPermissionsCard(),
+            const SizedBox(height: AppSpacing.md),
+            _DiagnosticsCard(),
           ],
         ],
       ),
@@ -1287,6 +1290,87 @@ class _AccountCard extends ConsumerWidget {
       ScaffoldMessenger.of(context).clearSnackBars();
       context.showError('Incorrect admin password');
     }
+  }
+}
+
+// ──────────────────────────────────────────────
+// Diagnostics Card
+// ──────────────────────────────────────────────
+class _DiagnosticsCard extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: AppRadius.largeBorder,
+          border: Border.all(color: AppColors.infoBg),
+          boxShadow: AppShadows.subtle,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.infoBg,
+                    borderRadius: AppRadius.mediumBorder,
+                  ),
+                  child: const Icon(
+                    Icons.bug_report_rounded,
+                    color: AppColors.info,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Sponsor Diagnostics',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: AppColors.charcoal,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Audit sponsor data & dashboard calculations',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: AppColors.warmGray500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final result = await runSponsorDiagnostics(ref);
+                  if (context.mounted) {
+                    await showDiagnosticsDialog(context, result);
+                  }
+                },
+                icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                label: const Text('Run Sponsor Diagnostics'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

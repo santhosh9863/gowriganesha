@@ -180,6 +180,25 @@ class NotificationRepository {
     }
   }
 
+  Future<int> clearAll(String userId, {String? targetRole}) async {
+    try {
+      final docs = await _findNonClearedNotifications(userId, targetRole: targetRole);
+      if (docs.isEmpty) return 0;
+      final batch = _firestore.batch();
+      for (final doc in docs) {
+        batch.update(doc.reference, {
+          'clearedBy.$userId': FieldValue.serverTimestamp(),
+        });
+      }
+      await batch.commit();
+      debugPrint('[NOTIFICATION_REPO] Cleared ${docs.length} notifications for $userId');
+      return docs.length;
+    } on FirebaseException catch (e) {
+      debugPrint('[NOTIFICATION_REPO] Error clearing notifications: $e');
+      throw FirestoreException('Failed to clear notifications', originalError: e);
+    }
+  }
+
   Future<int> markAllAsRead(String userId, {String? targetRole}) async {
     try {
       final unreadDocs = await _findUnreadNotifications(userId, targetRole: targetRole);
@@ -213,6 +232,28 @@ class NotificationRepository {
       }
     }
     return unread;
+  }
+
+  Future<List<DocumentSnapshot<Map<String, dynamic>>>> _findNonClearedNotifications(
+    String userId, {
+    String? targetRole,
+  }) async {
+    final snapshot = await _notifications
+        .where('archivedAt', isNull: true)
+        .orderBy('createdAt', descending: true)
+        .limit(100)
+        .get();
+
+    final nonCleared = <DocumentSnapshot<Map<String, dynamic>>>[];
+    for (final doc in snapshot.docs) {
+      if (!_isTargetedForUser(doc.data(), targetRole)) continue;
+      final data = doc.data();
+      final clearedBy = data['clearedBy'] as Map<String, dynamic>? ?? {};
+      if (!clearedBy.containsKey(userId)) {
+        nonCleared.add(doc);
+      }
+    }
+    return nonCleared;
   }
 
   Future<void> _batchMarkAsRead(

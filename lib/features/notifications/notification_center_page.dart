@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -25,6 +26,7 @@ class _NotificationCenterPageState
   bool _loadingAction = false;
   NotificationCategory? _categoryFilter;
   bool _showArchived = false;
+  final Set<String> _currentFilteredIds = {};
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +35,8 @@ class _NotificationCenterPageState
     final unreadCount = ref.watch(unreadNotificationsCountProvider);
     final userId = ref.watch(userIdProvider);
     final role = ref.watch(roleProvider);
+    final locallyReadIds = ref.watch(locallyReadIdsProvider);
+    final locallyClearedIds = ref.watch(locallyClearedIdsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -74,6 +78,23 @@ class _NotificationCenterPageState
                 ),
               ),
             ),
+          if (notificationsAsync.hasValue &&
+              notificationsAsync.valueOrNull!
+                  .any((n) => !locallyClearedIds.contains(n.id)) &&
+              !_loadingAction)
+            Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.sm),
+              child: TextButton(
+                onPressed: _clearAll,
+                child: Text(
+                  'Clear All',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: AppColors.error,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
           if (_loadingAction)
             const Padding(
               padding: EdgeInsets.only(right: AppSpacing.lg),
@@ -104,7 +125,18 @@ class _NotificationCenterPageState
           loading: () => _buildShimmerList(),
           error: (e, _) => _buildErrorState(e),
           data: (notifications) {
-            final filtered = _applyFilters(notifications, role);
+            final patched = notifications.map((n) {
+              if (locallyReadIds.contains(n.id)) {
+                return n.copyWith(
+                  readBy: {...n.readBy, userId: Timestamp.now()},
+                );
+              }
+              return n;
+            }).toList();
+            final filtered = _applyFilters(patched, role, userId, locallyClearedIds);
+            _currentFilteredIds
+              ..clear()
+              ..addAll(filtered.map((n) => n.id));
             if (filtered.isEmpty) {
               final hasActiveFilter = _categoryFilter != null || _showArchived;
               if (hasActiveFilter) {
@@ -413,6 +445,8 @@ class _NotificationCenterPageState
   List<AppNotification> _applyFilters(
     List<AppNotification> notifications,
     UserRole role,
+    String userId,
+    Set<String> locallyClearedIds,
   ) {
     var filtered = notifications;
 
@@ -432,6 +466,9 @@ class _NotificationCenterPageState
     if (!_showArchived) {
       filtered = filtered.where((n) => n.archivedAt == null).toList();
     }
+
+    filtered = filtered.where((n) => !n.isClearedBy(userId)).toList();
+    filtered = filtered.where((n) => !locallyClearedIds.contains(n.id)).toList();
 
     return filtered;
   }
@@ -534,6 +571,7 @@ class _NotificationCenterPageState
   }
 
   Future<void> _markAllAsRead() async {
+    final currentIds = Set<String>.from(_currentFilteredIds);
     setState(() => _loadingAction = true);
     try {
       final service = ref.read(notificationServiceProvider);
@@ -544,6 +582,31 @@ class _NotificationCenterPageState
       await service.markAllAsRead(userId, targetRole: targetRole);
     } finally {
       if (mounted) setState(() => _loadingAction = false);
+    }
+    if (mounted) {
+      ref.invalidate(notificationsStreamProvider);
+      final existing = ref.read(locallyReadIdsProvider);
+      ref.read(locallyReadIdsProvider.notifier).state = <String>{...existing, ...currentIds};
+    }
+  }
+
+  Future<void> _clearAll() async {
+    final currentIds = Set<String>.from(_currentFilteredIds);
+    setState(() => _loadingAction = true);
+    try {
+      final service = ref.read(notificationServiceProvider);
+      final userId = ref.read(userIdProvider);
+      final role = ref.read(roleProvider);
+      final targetRole =
+          role == UserRole.none || role == UserRole.admin ? null : role.name;
+      await service.clearAll(userId, targetRole: targetRole);
+    } finally {
+      if (mounted) setState(() => _loadingAction = false);
+    }
+    if (mounted) {
+      ref.invalidate(notificationsStreamProvider);
+      final existing = ref.read(locallyClearedIdsProvider);
+      ref.read(locallyClearedIdsProvider.notifier).state = <String>{...existing, ...currentIds};
     }
   }
 }

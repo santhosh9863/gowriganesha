@@ -32,6 +32,7 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
   String _sponsorId = '';
   bool _initialized = false;
   bool _isSaving = false;
+  bool _submittedOnce = false;
 
   @override
   void initState() {
@@ -127,7 +128,9 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
               padding: const EdgeInsets.all(AppSpacing.lg),
               child: Form(
                 key: _formKey,
-                autovalidateMode: AutovalidateMode.always,
+                autovalidateMode: _submittedOnce
+                    ? AutovalidateMode.onUserInteraction
+                    : AutovalidateMode.disabled,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -234,7 +237,11 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
   }
 
   Future<void> _handleSave() async {
-    if (!_formKey.currentState!.validate()) return;
+    _submittedOnce = true;
+    if (!_formKey.currentState!.validate()) {
+      setState(() {});
+      return;
+    }
     if (_followUpDate == null) {
       context.showWarning('Please select a visit date');
       return;

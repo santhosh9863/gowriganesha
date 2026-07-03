@@ -56,6 +56,10 @@ class NotificationService {
     return _repository.markAllAsRead(userId, targetRole: targetRole);
   }
 
+  Future<int> clearAll(String userId, {String? targetRole}) async {
+    return _repository.clearAll(userId, targetRole: targetRole);
+  }
+
   Future<int> getUnreadCount(String userId, {String? targetRole}) async {
     return _repository.getUnreadCount(userId, targetRole: targetRole);
   }

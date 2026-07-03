@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ganesha_2026/core/models/notification_type.dart';
 
@@ -16,6 +17,7 @@ class AppNotification {
   final Timestamp? scheduledAt;
   final Timestamp? archivedAt;
   final Map<String, Timestamp> readBy;
+  final Map<String, Timestamp>? clearedBy;
   final bool isPinned;
   final String? actionRoute;
   final String? entityType;
@@ -42,6 +44,7 @@ class AppNotification {
     this.scheduledAt,
     this.archivedAt,
     this.readBy = const {},
+    this.clearedBy,
     this.isPinned = false,
     this.actionRoute,
     this.entityType,
@@ -59,6 +62,8 @@ class AppNotification {
   }
 
   bool isUnreadBy(String userId) => statusFor(userId) == NotificationStatus.unread;
+
+  bool isClearedBy(String userId) => clearedBy?.containsKey(userId) ?? false;
 
   bool get isValid => title.isNotEmpty && body.isNotEmpty && senderUserId.isNotEmpty;
 
@@ -78,6 +83,7 @@ class AppNotification {
       if (scheduledAt != null) 'scheduledAt': scheduledAt,
       if (archivedAt != null) 'archivedAt': archivedAt,
       'readBy': readBy.map((k, v) => MapEntry(k, v)),
+      if (clearedBy != null) 'clearedBy': clearedBy!.map((k, v) => MapEntry(k, v)),
       'isPinned': isPinned,
       if (actionRoute != null) 'actionRoute': actionRoute,
       if (entityType != null) 'entityType': entityType,
@@ -91,6 +97,7 @@ class AppNotification {
 
   factory AppNotification.fromMap(String id, Map<String, dynamic> map) {
     final readBy = _readReadByMap(map['readBy']);
+    final clearedBy = _readReadByMap(map['clearedBy']);
     final legacyReadAt = map['readAt'] as Timestamp?;
 
     if (legacyReadAt != null && readBy.isEmpty) {
@@ -112,6 +119,7 @@ class AppNotification {
       scheduledAt: map['scheduledAt'] as Timestamp?,
       archivedAt: map['archivedAt'] as Timestamp?,
       readBy: readBy,
+      clearedBy: clearedBy,
       isPinned: map['isPinned'] as bool? ?? false,
       actionRoute: map['actionRoute'] as String?,
       entityType: map['entityType'] as String?,
@@ -146,6 +154,7 @@ class AppNotification {
     Timestamp? scheduledAt,
     Timestamp? archivedAt,
     Map<String, Timestamp>? readBy,
+    Map<String, Timestamp>? clearedBy,
     bool? isPinned,
     String? actionRoute,
     String? entityType,
@@ -159,6 +168,7 @@ class AppNotification {
     bool clearScheduledAt = false,
     bool clearArchivedAt = false,
     bool clearReadBy = false,
+    bool clearClearedBy = false,
     bool clearActionRoute = false,
     bool clearEntityType = false,
     bool clearEntityId = false,
@@ -181,6 +191,7 @@ class AppNotification {
       scheduledAt: clearScheduledAt ? null : (scheduledAt ?? this.scheduledAt),
       archivedAt: clearArchivedAt ? null : (archivedAt ?? this.archivedAt),
       readBy: clearReadBy ? {} : (readBy ?? this.readBy),
+      clearedBy: clearClearedBy ? {} : (clearedBy ?? this.clearedBy),
       isPinned: isPinned ?? this.isPinned,
       actionRoute: clearActionRoute ? null : (actionRoute ?? this.actionRoute),
       entityType: clearEntityType ? null : (entityType ?? this.entityType),
@@ -205,7 +216,8 @@ class AppNotification {
         other.senderUserId == senderUserId &&
         other.createdAt == createdAt &&
         other.isPinned == isPinned &&
-        other.archivedAt == archivedAt;
+        other.archivedAt == archivedAt &&
+        mapEquals(other.clearedBy, clearedBy);
   }
 
   @override

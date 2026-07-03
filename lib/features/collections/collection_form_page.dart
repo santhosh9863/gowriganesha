@@ -33,6 +33,7 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
   Target? _loadedTarget;
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _submittedOnce = false;
 
   @override
   void initState() {
@@ -101,7 +102,9 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
               padding: const EdgeInsets.all(AppSpacing.lg),
               child: Form(
                 key: _formKey,
-                autovalidateMode: AutovalidateMode.always,
+                autovalidateMode: _submittedOnce
+                    ? AutovalidateMode.onUserInteraction
+                    : AutovalidateMode.disabled,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -252,8 +255,10 @@ class _CollectionFormPageState extends ConsumerState<CollectionFormPage> {
 
   Future<void> _handleSave() async {
     debugPrint('[HANDLE_SAVE_STEP-1] Starting');
+    _submittedOnce = true;
     if (!_formKey.currentState!.validate()) {
       debugPrint('[HANDLE_SAVE_STEP-1a] Validation failed, returning');
+      setState(() {});
       return;
     }
     if (_isSaving) {
