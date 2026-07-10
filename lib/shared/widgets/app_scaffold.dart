@@ -6,7 +6,7 @@ import 'package:ganesha_2026/core/models/user_role.dart';
 import 'package:ganesha_2026/core/models/notification_type.dart';
 import 'package:ganesha_2026/core/providers/auth_provider.dart';
 import 'package:ganesha_2026/core/providers/notification_provider.dart';
-import 'package:ganesha_2026/core/providers/target_provider.dart';
+
 import 'package:ganesha_2026/shared/widgets/animated_bottom_nav.dart';
 import 'package:ganesha_2026/shared/widgets/app_notification_banner.dart';
 
@@ -20,7 +20,7 @@ class AppScaffold extends ConsumerStatefulWidget {
 }
 
 class _AppScaffoldState extends ConsumerState<AppScaffold>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    with SingleTickerProviderStateMixin {
   late final AnimationController _tabFadeCtrl;
   late final Animation<double> _tabFadeAnim;
   int _currentTab = 0;
@@ -28,7 +28,6 @@ class _AppScaffoldState extends ConsumerState<AppScaffold>
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     _currentTab = widget.navigationShell.currentIndex;
     _tabFadeCtrl = AnimationController(
       vsync: this,
@@ -39,13 +38,6 @@ class _AppScaffoldState extends ConsumerState<AppScaffold>
       curve: Curves.easeOutCubic,
     );
     _tabFadeCtrl.forward();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      ref.invalidate(targetsStreamProvider);
-    }
   }
 
   @override
@@ -62,7 +54,6 @@ class _AppScaffoldState extends ConsumerState<AppScaffold>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _tabFadeCtrl.dispose();
     super.dispose();
   }

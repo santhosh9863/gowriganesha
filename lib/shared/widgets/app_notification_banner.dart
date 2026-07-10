@@ -165,7 +165,6 @@ class _BannerContent extends StatelessWidget {
           }
         },
         child: SankalpaGlass(
-          sigma: 12,
           opacity: 0.88,
           borderRadius: AppRadius.largeBorder,
           borderColor: AppColors.outline,

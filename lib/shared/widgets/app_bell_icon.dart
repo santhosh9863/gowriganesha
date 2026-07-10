@@ -58,7 +58,6 @@ class _AppBellIconState extends ConsumerState<AppBellIcon>
     });
 
     return SankalpaGlass(
-      sigma: 8,
       opacity: 0.92,
       borderRadius: AppRadius.mediumBorder,
       borderColor: AppColors.outline,
@@ -99,7 +98,6 @@ class _AppBellIconState extends ConsumerState<AppBellIcon>
                   top: 4,
                   right: 4,
                   child: SankalpaGlass(
-                    sigma: 6,
                     opacity: 0.95,
                     borderRadius: BorderRadius.circular(10),
                     padding: const EdgeInsets.symmetric(

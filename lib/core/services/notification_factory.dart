@@ -228,6 +228,7 @@ class NotificationFactory {
     required String volunteerName,
     required String senderUserId,
     required String senderUserName,
+    String? registeredAtLabel,
   }) {
     return AppNotification(
       id: notificationId,
@@ -239,6 +240,11 @@ class NotificationFactory {
       senderUserId: senderUserId,
       senderUserName: senderUserName,
       createdAt: Timestamp.now(),
+      entityType: 'user',
+      actionRoute: '/settings/volunteer-management',
+      metadata: registeredAtLabel != null
+          ? {'registeredAt': registeredAtLabel}
+          : null,
     );
   }
 

@@ -7,6 +7,7 @@ import 'package:ganesha_2026/core/models/daily_collection.dart';
 import 'package:ganesha_2026/core/models/expense.dart';
 import 'package:ganesha_2026/core/models/sponsor_followup.dart';
 import 'package:ganesha_2026/core/models/target.dart';
+import 'package:ganesha_2026/core/models/user.dart';
 import 'package:ganesha_2026/core/services/firestore_service.dart';
 import 'package:ganesha_2026/core/services/notification_factory.dart';
 import 'package:ganesha_2026/core/services/notification_repository.dart';
@@ -226,6 +227,36 @@ class ActivityService {
       followUpId: followup.id,
       senderUserId: userId,
       senderUserName: userName,
+    );
+    await _notificationService.createNotification(notification);
+  }
+
+  Future<void> recordVolunteerJoined(
+    AppUser user, {
+    required String userId,
+    required String userName,
+    String? registeredAtLabel,
+  }) async {
+    await _firestore.addActivity(Activity(
+      id: _firestore.generateId(),
+      festivalId: AppConstants.festivalId,
+      type: 'volunteer_joined',
+      title: 'New Volunteer Joined',
+      description:
+          '${user.name} joined the festival team.\nRegistered\n${registeredAtLabel ?? _formatDate(user.registeredAt.toDate())}',
+      createdAt: Timestamp.now(),
+      entityType: 'user',
+      recordId: user.id,
+      userId: userId,
+      userName: userName,
+    ));
+
+    final notification = NotificationFactory.newVolunteerLogin(
+      notificationId: _notificationRepository.createNotificationId(),
+      volunteerName: user.name,
+      senderUserId: userId,
+      senderUserName: userName,
+      registeredAtLabel: registeredAtLabel,
     );
     await _notificationService.createNotification(notification);
   }

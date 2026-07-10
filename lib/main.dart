@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -15,11 +16,15 @@ void main() async {
     debugPrint('[GLOBAL_ERR] FlutterError: ${details.exception}');
     debugPrint('[GLOBAL_ERR] Stack: ${details.stack}');
     FlutterError.dumpErrorToConsole(details);
+    if (kDebugMode) {
+      FlutterError.presentError(details);
+    }
   };
 
   PlatformDispatcher.instance.onError = (error, stack) {
     debugPrint('[GLOBAL_ERR] PlatformDispatcher error: $error');
     debugPrint('[GLOBAL_ERR] Stack: $stack');
+    if (kDebugMode) return false;
     return true;
   };
 

@@ -1,10 +1,14 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:ganesha_2026/core/theme.dart';
 import 'package:ganesha_2026/core/models/user_role.dart';
 import 'package:ganesha_2026/core/providers/auth_provider.dart';
 import 'package:ganesha_2026/core/providers/notification_provider.dart';
+import 'package:ganesha_2026/core/providers/user_provider.dart';
 import 'package:ganesha_2026/core/services/notification_navigator.dart';
 import 'package:ganesha_2026/shared/widgets/app_scaffold.dart';
 import 'package:ganesha_2026/shared/widgets/page_transitions.dart';
@@ -22,6 +26,7 @@ import 'package:ganesha_2026/features/followups/followup_list_page.dart';
 import 'package:ganesha_2026/features/followups/followup_form_page.dart';
 import 'package:ganesha_2026/features/notifications/notification_center_page.dart';
 import 'package:ganesha_2026/features/settings/settings_page.dart';
+import 'package:ganesha_2026/features/volunteer_management/volunteer_management_page.dart';
 
 class _RouterRefreshNotifier extends ChangeNotifier {
   void signal() => notifyListeners();
@@ -57,6 +62,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           RegExp(r'^/daily-collections/[^/]+/edit$'),
           RegExp(r'^/followups/add$'),
           RegExp(r'^/followups/[^/]+/edit$'),
+          RegExp(r'^/settings/volunteer-management$'),
         ];
         if (blocked.any((r) => r.hasMatch(location))) return '/';
       }
@@ -175,6 +181,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       _buildRoute('/settings', const SettingsPage()),
+      _buildRoute('/settings/volunteer-management', const VolunteerManagementPage()),
       _buildRoute('/notifications', const NotificationCenterPage()),
     ],
   );
@@ -194,11 +201,82 @@ class GaneshaApp extends ConsumerStatefulWidget {
   ConsumerState<GaneshaApp> createState() => _GaneshaAppState();
 }
 
-class _GaneshaAppState extends ConsumerState<GaneshaApp> {
+String _detectPlatform() {
+  if (kIsWeb) return 'web';
+  try {
+    if (Platform.isAndroid) return 'android';
+    if (Platform.isIOS) return 'ios';
+    if (Platform.isWindows) return 'windows';
+    if (Platform.isMacOS) return 'macos';
+    if (Platform.isLinux) return 'linux';
+  } catch (_) {}
+  return 'unknown';
+}
+
+class _GaneshaAppState extends ConsumerState<GaneshaApp>
+    with WidgetsBindingObserver {
   bool _landingDone = false;
+  bool _disposed = false;
 
   void _onLandingComplete() {
     setState(() => _landingDone = true);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _backfillUser());
+  }
+
+  Future<void> _backfillUser() async {
+    final role = ref.read(roleProvider);
+    if (role == UserRole.none) return;
+
+    final userId = ref.read(userIdProvider);
+    final userName = ref.read(userNameProvider);
+    if (userId.isEmpty || userName.isEmpty) return;
+
+    final firebaseUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (firebaseUid.isEmpty) return;
+
+    final userService = ref.read(userServiceProvider);
+    await userService.ensureUserExists(
+      userId: userId,
+      name: userName,
+      role: role,
+      firebaseUid: firebaseUid,
+      device: _detectPlatform(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    final role = ref.read(roleProvider);
+    if (role == UserRole.none) return;
+
+    final userId = ref.read(userIdProvider);
+    if (userId.isEmpty) return;
+
+    final userService = ref.read(userServiceProvider);
+
+    if (state == AppLifecycleState.resumed) {
+      Future.delayed(const Duration(seconds: 2), () {
+        if (_disposed) return;
+        userService.updateActivity(userId);
+      });
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      userService.setOffline(userId);
+    }
   }
 
   @override

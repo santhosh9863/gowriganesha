@@ -10,6 +10,7 @@ import 'package:ganesha_2026/core/models/daily_collection.dart';
 import 'package:ganesha_2026/core/models/activity.dart';
 import 'package:ganesha_2026/core/models/contribution.dart';
 import 'package:ganesha_2026/core/models/sponsor_followup.dart';
+import 'package:ganesha_2026/core/models/user.dart';
 
 class FirestoreException implements Exception {
   final String message;
@@ -47,6 +48,9 @@ class FirestoreService {
 
   CollectionReference<Map<String, dynamic>> get _config =>
       _firestore.collection('config');
+
+  CollectionReference<Map<String, dynamic>> get _users =>
+      _firestore.collection('users');
 
   String generateId() => _firestore.collection('_').doc().id;
 
@@ -676,6 +680,62 @@ class FirestoreService {
     } catch (e) {
       debugPrint('[CLEAR] Unexpected error: $e');
       rethrow;
+    }
+  }
+
+  Future<AppUser?> getUser(String userId) async {
+    try {
+      final doc = await _users.doc(userId).get();
+      if (!doc.exists || doc.data() == null) return null;
+      return AppUser.fromMap(doc.id, doc.data()!);
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error fetching user: $e');
+      throw FirestoreException('Failed to load user', originalError: e);
+    }
+  }
+
+  Future<void> addUser(AppUser user) async {
+    try {
+      await _users.doc(user.id).set(user.toMap());
+      debugPrint('[FIRESTORE] User added: ${user.id}');
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error adding user: $e');
+      throw FirestoreException('Failed to add user', originalError: e);
+    }
+  }
+
+  Future<void> updateUser(String userId, Map<String, dynamic> data) async {
+    try {
+      await _users.doc(userId).update(data);
+      debugPrint('[FIRESTORE] User updated: $userId');
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error updating user: $e');
+      throw FirestoreException('Failed to update user', originalError: e);
+    }
+  }
+
+  Stream<List<AppUser>> watchUsers() {
+    return _users
+        .orderBy('registeredAt', descending: true)
+        .snapshots()
+        .handleError((e) {
+      debugPrint('[FIRESTORE] Error watching users: $e');
+    }).map((snapshot) {
+      return snapshot.docs
+          .map((doc) => AppUser.fromMap(doc.id, doc.data()))
+          .toList();
+    });
+  }
+
+  Future<List<AppUser>> getAllUsers() async {
+    try {
+      final snapshot = await _users.get();
+      return snapshot.docs
+          .map((doc) => AppUser.fromMap(doc.id, doc.data()))
+          .toList();
+    } on FirebaseException catch (e) {
+      debugPrint('[FIRESTORE] Error fetching all users: $e');
+      throw FirestoreException('Failed to load users', originalError: e);
     }
   }
 

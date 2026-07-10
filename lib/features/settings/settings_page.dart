@@ -25,6 +25,7 @@ import 'package:ganesha_2026/shared/widgets/app_snackbar.dart';
 import 'package:ganesha_2026/features/settings/sponsor_diagnostics.dart';
 import 'package:ganesha_2026/features/settings/expense_budget_page.dart';
 import 'package:ganesha_2026/core/providers/expense_budget_provider.dart';
+import 'package:ganesha_2026/core/providers/user_provider.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -170,6 +171,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             _AdminPermissionsCard(),
             const SizedBox(height: AppSpacing.md),
             _DiagnosticsCard(),
+            const SizedBox(height: AppSpacing.md),
+            _VolunteerManagementCard(),
           ],
         ],
       ),
@@ -1489,6 +1492,78 @@ class _AdminPermissionsCard extends StatelessWidget {
       }
     }
     return widgets;
+  }
+}
+
+// ──────────────────────────────────────────────
+// Volunteer Management Card
+// ──────────────────────────────────────────────
+class _VolunteerManagementCard extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final stats = ref.watch(usersStatsProvider);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      child: InkWell(
+        onTap: () => context.push('/settings/volunteer-management'),
+        borderRadius: AppRadius.largeBorder,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: AppRadius.largeBorder,
+            border: Border.all(color: AppColors.primaryBg),
+            boxShadow: AppShadows.subtle,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryBg,
+                  borderRadius: AppRadius.mediumBorder,
+                ),
+                child: const Icon(
+                  Icons.group_rounded,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Volunteer Management',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: AppColors.charcoal,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${stats.total} volunteers · ${stats.online} online',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: AppColors.warmGray500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.warmGray400,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

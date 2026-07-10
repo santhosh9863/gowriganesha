@@ -38,8 +38,8 @@ class NotificationMessages {
   static const String settingsUpdatedBody = '{userName} updated festival settings';
 
   // System
-  static const String newVolunteerTitle = 'New Volunteer Login';
-  static const String newVolunteerBody = '{name} logged in as volunteer';
+  static const String newVolunteerTitle = 'New Volunteer Joined';
+  static const String newVolunteerBody = '{name} joined the festival team.';
   static const String appUpdateTitle = 'App Update Available';
   static const String appUpdateBody = 'A new version of Sankalpa is available';
   static const String maintenanceTitle = 'Scheduled Maintenance';

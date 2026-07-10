@@ -11,3 +11,4 @@ bool canAccessSettings(UserRole role) => role == UserRole.admin;
 bool canLockFestival(UserRole role) => role == UserRole.admin;
 bool canEditRecords(UserRole role) => role == UserRole.admin;
 bool canManageExpenses(UserRole role) => role == UserRole.admin;
+bool canManageVolunteers(UserRole role) => role == UserRole.admin;
