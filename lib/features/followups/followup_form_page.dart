@@ -109,7 +109,7 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
         : null;
     final role = ref.watch(roleProvider);
 
-    if (role != UserRole.admin) {
+    if (isEditing && role != UserRole.admin) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) context.go('/followups');
       });
@@ -248,7 +248,7 @@ class _FollowUpFormPageState extends ConsumerState<FollowUpFormPage> {
     }
     if (_isSaving) return;
     if (!mounted) return;
-    if (ref.read(roleProvider) != UserRole.admin) {
+    if (widget.followUpId != null && ref.read(roleProvider) != UserRole.admin) {
       context.showWarning('Access Denied');
       return;
     }
